@@ -221,4 +221,43 @@ describe.skipIf(process.platform !== "win32")("fetch-sidecars.ps1 함수 실행 
     expect((await assertDll(Buffer.concat([Buffer.from("PK"), Buffer.alloc(1_100_000), Buffer.from(LGPL)]))).error).toMatch(/not a valid PE file/)
     expect((await assertDll(Buffer.from(`MZ${LGPL}`))).error).toMatch(/not a valid PE file/)
   })
+
+  // FFmpeg 대역: .cmd 가 텍스트를 출력하고 지정한 종료 코드로 끝난다. DLL 폴더는 비어 있는 임시 폴더.
+  const assertFfmpeg = async (lines: string[], exitCode: number) => {
+    const dir = tmp()
+    const exe = join(dir, "ffmpeg.cmd")
+    writeFileSync(exe, ["@echo off", ...lines.map((l) => `echo ${l}`), `exit /b ${exitCode}`].join("\r\n"))
+    return ps([fnSource("Assert-LgplFfmpeg")], `Assert-LgplFfmpeg ${psq(exe)} ${psq(join(dir, "dlls"))}; Write-Output 'PASSED'`)
+  }
+  const OK_LINES = ["ffmpeg version n8.1.3 Copyright (c) 2000-2026 the FFmpeg developers", "configuration: --disable-gpl --enable-shared"]
+
+  it("T-sidecar-24 [External] 실행되지 않거나 0 이 아닌 코드로 끝나는 ffmpeg 는 검증 불가로 거부한다(fail closed)", async () => {
+    // Arrange / Act
+    const missing = await ps([fnSource("Assert-LgplFfmpeg")], `Assert-LgplFfmpeg ${psq(join(tmp(), "nope.exe"))} ${psq(tmp())}; Write-Output 'PASSED'`)
+    const crashed = await assertFfmpeg(OK_LINES, -1073741515) // STATUS_DLL_NOT_FOUND, 출력이 LGPL 처럼 보여도 거부
+    // Assert
+    expect(missing.error).toMatch(/could not be run/)
+    expect(missing.out).not.toContain("PASSED")
+    expect(crashed.error).toMatch(/exited with code -1073741515/)
+    expect(crashed.out).not.toContain("PASSED")
+  })
+
+  it("T-sidecar-25 [Validation] 버전·configuration 줄이 없는 출력은 거부하고, --enable-gpl / --enable-nonfree 는 거부한다", async () => {
+    const empty = await assertFfmpeg(["hello"], 0)
+    const gpl = await assertFfmpeg(["ffmpeg version n8.1.3", "configuration: --enable-gpl --enable-libx264"], 0)
+    const nonfree = await assertFfmpeg(["ffmpeg version n8.1.3", "configuration: --enable-nonfree"], 0)
+    expect(empty.error).toMatch(/no version\/configuration/)
+    expect(gpl.error).toMatch(/--enable-gpl or --enable-nonfree/)
+    expect(nonfree.error).toMatch(/--enable-gpl or --enable-nonfree/)
+    for (const r of [empty, gpl, nonfree]) expect(r.out).not.toContain("PASSED")
+  })
+
+  it("T-sidecar-26 [Happy] LGPL 로 보이는 출력 + 종료 코드 0 이면 통과하고 PATH 를 복원한다", async () => {
+    const dir = tmp()
+    const exe = join(dir, "ffmpeg.cmd")
+    writeFileSync(exe, ["@echo off", ...OK_LINES.map((l) => `echo ${l}`), "exit /b 0"].join("\r\n"))
+    const r = await ps([fnSource("Assert-LgplFfmpeg")], `$p = $env:PATH; Assert-LgplFfmpeg ${psq(exe)} ${psq(join(dir, "dlls"))}; if ($env:PATH -ne $p) { throw 'PATH not restored' }; Write-Output 'PASSED'`)
+    expect(r.error).toBeNull()
+    expect(r.out).toContain("PASSED")
+  })
 })

@@ -113,6 +113,30 @@ function Assert-LgplLibMpv($DllPath) {
   }
 }
 
+# Refuse a GPL/nonfree FFmpeg: the distributed build must be LGPL. Fails closed: if the exe cannot run (its shared DLLs live in
+# $DllDir, not next to the exe, so $DllDir is prepended to PATH for the call only) or prints no version/configuration, the build is
+# rejected rather than silently passing an unchecked binary.
+function Assert-LgplFfmpeg($Exe, $DllDir) {
+  $oldPath = $env:PATH
+  $oldEap = $ErrorActionPreference
+  try {
+    $env:PATH = "$DllDir;$oldPath"
+    $ErrorActionPreference = 'Continue' # Windows PowerShell 5.1 turns native stderr into terminating errors under 'Stop'
+    $ver = & $Exe -version 2>&1 | Out-String
+    $code = $LASTEXITCODE
+  } catch {
+    throw "FFmpeg could not be run for the license check: $($_.Exception.Message)"
+  } finally {
+    $env:PATH = $oldPath
+    $ErrorActionPreference = $oldEap
+  }
+  if ($code -ne 0) { throw "FFmpeg -version exited with code $code (missing DLLs?); cannot verify the LGPL build: $ver" }
+  if ($ver -notmatch 'ffmpeg version' -or $ver -notmatch 'configuration:') { throw "FFmpeg -version printed no version/configuration; cannot verify the LGPL build: $ver" }
+  if ($ver -match '--enable-gpl' -or $ver -match '--enable-nonfree') {
+    throw 'FFmpeg build reports --enable-gpl or --enable-nonfree; refusing to bundle'
+  }
+}
+
 $ff = Get-Verified $FfmpegUrl $FfmpegSha 'ffmpeg-lgpl-shared.zip'
 $wh = Get-Verified $WhisperUrl $WhisperSha 'whisper-bin-x64.zip'
 $mpv = Get-Verified $MpvUrl $MpvSha 'libmpv-v0.42.0-x86_64-w64-mingw32-lgpl.zip'
@@ -140,11 +164,8 @@ if (-not $whCli) { throw 'whisper-cli.exe not found in archive' }
 Copy-Item $whCli.FullName (Join-Path $Bin "whisper-cli-$Triple.exe") -Force
 Copy-Item (Join-Path $whCli.Directory.FullName '*.dll') $dll -Force
 
-# Refuse a GPL/nonfree FFmpeg: the distributed build must be LGPL.
-$ver = & (Join-Path $Bin "ffmpeg-$Triple.exe") -version 2>&1 | Out-String
-if ($ver -match '--enable-gpl' -or $ver -match '--enable-nonfree') {
-  throw 'FFmpeg build reports --enable-gpl or --enable-nonfree; refusing to bundle'
-}
+Assert-LgplFfmpeg (Join-Path $Bin "ffmpeg-$Triple.exe") $dll
+Write-Host 'FFmpeg LGPL check passed'
 
 # libmpv: only the DLL and its license, laid out as libmpv/{libmpv-2.dll,LICENSE.LGPL} (-> <install dir>/libmpv/).
 $mpvDir = Join-Path $Bin 'libmpv'
