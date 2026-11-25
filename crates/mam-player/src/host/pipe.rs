@@ -354,10 +354,47 @@ mod tests {
         };
         // Assert: ACE 는 하나, 현재 사용자 SID 만. Everyone/Users/Authenticated Users 등 없음
         assert_eq!(sddl.matches("(A;").count(), 1, "{sddl}");
-        assert!(sddl.contains(&sid), "{sddl}");
+        // SDDL 은 잘 알려진 SID 를 별칭으로 줄인다(로컬 Administrator → LA) — 전체 SID 로 정규화해 비교
+        let ace = &sddl[sddl.find("(A;").unwrap()..];
+        let ace = &ace[..ace.find(')').unwrap()];
+        let token = ace.rsplit(';').next().unwrap();
+        assert_eq!(normalize_sid_token(token), sid, "{sddl}");
         for broad in [";;;WD)", ";;;BU)", ";;;AU)", ";;;AN)", ";;;S-1-1-0)"] {
             assert!(!sddl.contains(broad), "{sddl}");
         }
         assert_eq!(owner_only_sddl("S-1-5-21-1"), "D:P(A;;GA;;;S-1-5-21-1)");
+    }
+
+    /// SDDL SID 토큰(별칭 또는 `S-1-...`)을 전체 SID 문자열로 변환한다
+    fn normalize_sid_token(token: &str) -> String {
+        use windows::Win32::Security::Authorization::ConvertStringSidToSidW;
+        let wide = HSTRING::from(token);
+        // SAFETY: 널 종료 입력, 출력 SID·문자열 버퍼는 모두 LocalFree 로 해제한다
+        unsafe {
+            let mut psid = windows::Win32::Security::PSID::default();
+            ConvertStringSidToSidW(&wide, &mut psid).unwrap();
+            let mut s = PWSTR::null();
+            ConvertSidToStringSidW(psid, &mut s).unwrap();
+            let out = s.to_string().unwrap();
+            let _ = LocalFree(Some(HLOCAL(s.0 as *mut c_void)));
+            let _ = LocalFree(Some(HLOCAL(psid.0)));
+            out
+        }
+    }
+
+    #[test]
+    fn t_player_pipe_07_sid_token_normalizes_aliases_and_passes_full_sids() {
+        // 분류: Happy / Boundary(별칭 vs 전체 SID)
+        // Arrange / Act / Assert: 계정과 무관한 고정 SID 의 별칭
+        assert_eq!(normalize_sid_token("WD"), "S-1-1-0");
+        assert_eq!(normalize_sid_token("BA"), "S-1-5-32-544");
+        // 전체 SID 는 그대로
+        assert_eq!(
+            normalize_sid_token("S-1-5-21-1-2-3-500"),
+            "S-1-5-21-1-2-3-500"
+        );
+        // 현재 사용자 SID 도 그대로
+        let sid = current_user_sid().unwrap();
+        assert_eq!(normalize_sid_token(&sid), sid);
     }
 }
