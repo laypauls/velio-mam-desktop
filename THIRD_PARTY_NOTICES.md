@@ -39,7 +39,7 @@ licenses and are not covered here.
   <https://github.com/FFmpeg/FFmpeg/commit/29e619e767>, and the build scripts / patches / dependency versions are in
   <https://github.com/BtbN/FFmpeg-Builds> (tag `autobuild-2026-09-30-13-08`). You can also request the complete
   corresponding source code of FFmpeg and of the LGPL / GPL licensed libraries listed in 1.1.1 from the velio.
-  distributor at `opensource@velio.example.invalid` (written offer valid for at least three years after the release).
+  distributor by opening an issue at <https://github.com/laypauls/velio-mam-desktop/issues> (written offer valid for at least three years after the release).
 - **Replacing the libraries**: the libraries are shared DLLs. You may replace them (or `ffmpeg.exe` / `ffprobe.exe`)
   with your own build of a compatible FFmpeg version; the application also accepts an explicit FFmpeg path in its
   settings.
@@ -213,7 +213,8 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
   (build scripts `scripts.d/*.sh`, which pin each dependency to a git commit or tag); the FFmpeg inside is
   `git-2026-11-04-baa68e6` (<https://github.com/FFmpeg/FFmpeg/commit/baa68e6>, libavcodec 63.26.100). The unmodified
   binary comes from that official release. You can also request the complete corresponding source code of libmpv,
-  FFmpeg and the libraries listed in 1.3.1 and 1.1.1 from the velio. distributor at `opensource@velio.example.invalid`
+  FFmpeg and the libraries listed in 1.3.1 and 1.1.1 from the velio. distributor by opening an issue at
+  <https://github.com/laypauls/velio-mam-desktop/issues>
   (written offer valid for at least three years after the release).
 - **Replacing the library (LGPL relinking)**: `libmpv-2.dll` is a separate, dynamically loaded file. You may replace it
   with your own build of a compatible libmpv (a `libmpv-2.dll` exporting the mpv client API, version 2.x) by copying it
