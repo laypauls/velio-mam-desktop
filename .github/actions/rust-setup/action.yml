@@ -1,0 +1,47 @@
+name: rust-setup
+description: Rust toolchain + build-time download caches (ort onnxruntime, lindera dictionary) + cargo cache
+inputs:
+  components:
+    description: Extra rustup components (comma separated)
+    default: ""
+  cache-key:
+    description: Suffix for the rust-cache shared key (separates job profiles)
+    default: ""
+runs:
+  using: composite
+  steps:
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: "1.94.0"
+        components: ${{ inputs.components }}
+
+    # lindera-ko-dic build.rs downloads mecab-ko-dic (~48MB). Point its cache at a fixed dir and cache that dir.
+    - name: Prepare download cache dirs
+      id: dirs
+      shell: pwsh
+      run: |
+        $lindera = Join-Path $env:RUNNER_TEMP 'lindera-dict-cache'
+        New-Item -ItemType Directory -Force -Path $lindera | Out-Null
+        "LINDERA_BUILD_DICTIONARY_CACHE_DIR=$lindera" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        "lindera_path=$lindera" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+    - name: Cache lindera dictionary
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.dirs.outputs.lindera_path }}
+        key: lindera-ko-dic-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+        restore-keys: lindera-ko-dic-${{ runner.os }}-
+
+    # ort-sys (crates/mam-ai, feature download-binaries) extracts onnxruntime (~360MB) into
+    # <cache_dir>/ort.pyke.io/dfbin/<target>/<hash>. On Windows cache_dir = %LOCALAPPDATA% (verified locally:
+    # %LOCALAPPDATA%\ort.pyke.io\dfbin\x86_64-pc-windows-msvc). ort-sys 2.0.0-rc.15 has no env override for it.
+    - name: Cache onnxruntime (ort-sys download)
+      uses: actions/cache@v4
+      with:
+        path: ${{ env.LOCALAPPDATA }}\ort.pyke.io
+        key: ort-pyke-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+        restore-keys: ort-pyke-${{ runner.os }}-
+
+    - uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: ${{ inputs.cache-key }}

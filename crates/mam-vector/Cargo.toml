@@ -1,0 +1,25 @@
+[package]
+name = "mam-vector"
+version = "0.1.0"
+description = "MAM Desktop - vector index PoC (flat scan), raw embedding store, measurement tools"
+authors = []
+edition = "2024"
+
+[features]
+default = []
+
+[dependencies]
+thiserror = "2"
+half = "2"
+memmap2 = "0.9"
+bytemuck = "1"
+# 원시 임베딩 저장 (a) SQLite BLOB — 마이그레이션이 아니라 측정 DB 에만 만든다 (D3). mam-db 와 같은 버전으로 통일.
+rusqlite = { version = "0.40", features = ["bundled", "backup"] }
+
+[dev-dependencies]
+tempfile = "3"
+# 측정 도구(examples/) 전용
+mam-db = { path = "../mam-db" }
+
+[target.'cfg(windows)'.dev-dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_ProcessStatus", "Win32_System_Threading"] }

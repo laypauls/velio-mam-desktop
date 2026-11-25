@@ -1,0 +1,21 @@
+[package]
+name = "mam-plugin-host"
+version = "0.1.0"
+description = "MAM Desktop - plugin worker supervisor (spawn, line-delimited JSON protocol, timeouts, crash breaker)"
+authors = []
+edition = "2024"
+
+[dependencies]
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+mam-plugin-manifest = { path = "../mam-plugin-manifest" }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[target.'cfg(windows)'.dev-dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Threading"] }

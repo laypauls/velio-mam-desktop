@@ -1,0 +1,29 @@
+[package]
+name = "mam-plugin-gateway"
+version = "0.1.0"
+description = "MAM Desktop - plugin host API gateway (permission checks, asset/kv/tag host functions, log sanitizer)"
+authors = []
+edition = "2024"
+
+[dependencies]
+mam-plugin-host = { path = "../mam-plugin-host" }
+mam-plugin-manifest = { path = "../mam-plugin-manifest" }
+mam-core = { path = "../mam-core" }
+mam-db = { path = "../mam-db" }
+rusqlite = "0.40"
+mam-media = { path = "../mam-media" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+tracing = "0.1"
+thiserror = "2"
+
+[features]
+# 시험 전용 접근자(`Gateway::kv_meter_used`) — 통합 시험이 자기 자신을 dev-dependency 로 켠다
+test-util = []
+
+[dev-dependencies]
+mam-plugin-gateway = { path = ".", features = ["test-util"] }
+tempfile = "3"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+rusqlite = { version = "0.40", features = ["bundled"] }

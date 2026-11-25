@@ -1,0 +1,61 @@
+[package]
+name = "mam-desktop"
+version = "0.1.0"
+description = "velio. - local media asset manager"
+authors = []
+edition = "2024"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "mam_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[features]
+# P1-7 rollback scenario tests only — never enable in a release build.
+# inject-fail-verify: `--verify-update` exits non-zero (NSIS post-install check fails).
+# inject-fail-startup: normal startup fails before the app is marked healthy.
+inject-fail-verify = []
+inject-fail-startup = []
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+mam-db = { path = "../crates/mam-db" }
+mam-core = { path = "../crates/mam-core" }
+mam-media = { path = "../crates/mam-media" }
+mam-search = { path = "../crates/mam-search" }
+mam-ai = { path = "../crates/mam-ai" }
+mam-vector = { path = "../crates/mam-vector" }
+mam-player = { path = "../crates/mam-player" }
+mam-plugin-runtime = { path = "../crates/mam-plugin-runtime" }
+semver = "1"
+rusqlite = "0.40"
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "std"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Shell", "Win32_System_Time", "Win32_System_SystemInformation"] }
+# 영상 클릭 뒤 키보드 포커스를 WebView 로 돌린다 (ICoreWebView2Controller::MoveFocus). 버전은 tauri/wry 가 쓰는 것과 같아야 타입이 맞는다 (Cargo.lock 0.39.x)
+webview2-com = "0.39"
+# 시스템 음량(Core Audio IAudioEndpointVolume). 버전은 Cargo.lock 에 이미 있는 0.62.x 와 같게 둔다
+windows = { version = "0.62", features = ["Win32_Media_Audio", "Win32_Media_Audio_Endpoints", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_UI_Shell_PropertiesSystem", "Win32_System_Threading"] }
+
+[dev-dependencies]
+tempfile = "3"
+# 가짜 워커·파일 매핑 표면 (host::testing) - 시험에서만 켠다
+mam-player = { path = "../crates/mam-player", features = ["test-support"] }

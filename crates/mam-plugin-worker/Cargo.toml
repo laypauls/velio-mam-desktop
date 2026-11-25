@@ -1,0 +1,17 @@
+[package]
+name = "mam-plugin-worker"
+version = "0.1.0"
+description = "MAM Desktop - QuickJS plugin worker process (one runtime = one plugin, no fs/net/process capability)"
+authors = []
+edition = "2024"
+
+[[bin]]
+name = "mam-plugin-worker"
+path = "src/main.rs"
+
+[dependencies]
+# PoC(F5)와 같은 버전 고정. 기본 feature(std = Rust std) 만 — loader·dyn-load·bindgen 없음
+rquickjs = "=0.14.0"
+serde_json = "1"
+# 프로토콜 타입만 쓴다 (워커가 호스트의 감독 코드를 호출하지 않는다)
+mam-plugin-host = { path = "../mam-plugin-host" }

@@ -1,0 +1,6 @@
+{
+  "plugin.name": "EXIF 요약",
+  "plugin.description": "이미지 크기와 방향을 요약하고 방향별 태그를 붙입니다.",
+  "command.summarize": "선택한 이미지 요약",
+  "provider.exif": "이미지 크기·방향"
+}

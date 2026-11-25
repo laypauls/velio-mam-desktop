@@ -1,0 +1,19 @@
+{
+  "build": {
+    "beforeBuildCommand": "pnpm build && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-player-worker.ps1 && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-plugin-worker.ps1"
+  },
+  "bundle": {
+    "externalBin": [
+      "binaries/ffmpeg",
+      "binaries/ffprobe",
+      "binaries/whisper-cli",
+      "binaries/mam-player-worker",
+      "binaries/mam-plugin-worker"
+    ],
+    "resources": {
+      "binaries/dlls/*": "./",
+      "binaries/licenses/*": "licenses/",
+      "binaries/libmpv": "libmpv"
+    }
+  }
+}

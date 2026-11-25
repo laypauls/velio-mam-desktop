@@ -1,0 +1,22 @@
+{
+  "apiVersion": 1,
+  "id": "com.example.exif-summary",
+  "version": "1.0.0",
+  "engines": { "mam": ">=0.1.0" },
+  "main": "main.js",
+  "displayName": "plugin.name",
+  "description": "plugin.description",
+  "permissions": ["asset.read.metadata", "kv.write", "tag.write"],
+  "activationEvents": ["onCommand:summarize", "onProvider:exif"],
+  "contributes": {
+    "commands": [{ "id": "summarize", "title": "command.summarize" }],
+    "menus": {
+      "assetContext": [
+        { "command": "summarize", "when": "selection.count >= 1 && asset.kind == 'image'" }
+      ]
+    },
+    "providers": {
+      "metadata": [{ "id": "exif", "title": "provider.exif", "assetKinds": ["image"] }]
+    }
+  }
+}

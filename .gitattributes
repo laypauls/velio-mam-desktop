@@ -1,0 +1,36 @@
+# Line endings: LF everywhere (matches .editorconfig), independent of each clone's core.autocrlf
+* text=auto eol=lf
+
+# Windows scripts need CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary
+*.png binary
+*.jpg binary
+*.ico binary
+*.icns binary
+*.woff2 binary
+*.webp binary
+*.gif binary
+*.bmp binary
+*.tif binary
+*.tiff binary
+*.heic binary
+*.heif binary
+*.avif binary
+*.dng binary
+*.mp4 binary
+*.mov binary
+*.webm binary
+*.mkv binary
+*.mxf binary
+*.mp3 binary
+*.wav binary
+*.flac binary
+*.m4a binary
+*.ogg binary
+*.onnx binary
+*.bin binary
+*.sqlite binary

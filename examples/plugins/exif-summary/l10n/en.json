@@ -1,0 +1,6 @@
+{
+  "plugin.name": "EXIF Summary",
+  "plugin.description": "Summarizes image size and orientation, and tags images by orientation.",
+  "command.summarize": "Summarize selected images",
+  "provider.exif": "Image size and orientation"
+}

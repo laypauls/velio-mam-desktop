@@ -1,0 +1,33 @@
+[package]
+name = "mam-player"
+version = "0.1.0"
+description = "MAM Desktop - player host (libmpv worker process + WebView2 SharedBuffer transport)"
+authors = []
+edition = "2024"
+
+[dependencies]
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+# 워커 프로토콜(JSON 줄)·WebView 메시지 검증
+serde_json = "1"
+
+# 호스트(host/): 워커 프로세스·Named Pipe(DACL)·핸들 복제. Cargo.lock 의 0.62.x 와 같은 버전
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_Security_Authorization",
+  "Win32_Security_Cryptography",
+  "Win32_Storage_FileSystem",
+  "Win32_System_IO",
+  "Win32_System_Memory",
+  "Win32_System_Pipes",
+  "Win32_System_Threading",
+] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[features]
+# 테스트 보조(host::testing — 가짜 워커·파일 매핑 표면). src-tauri·워커 crate 의 시험이 켠다. 릴리스에 켜지 않는다
+test-support = []

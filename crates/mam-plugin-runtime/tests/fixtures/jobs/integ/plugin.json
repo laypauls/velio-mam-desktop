@@ -1,0 +1,14 @@
+{
+  "apiVersion": 1,
+  "id": "com.example.integ",
+  "version": "1.0.0",
+  "engines": { "mam": ">=0.1.0" },
+  "main": "main.js",
+  "displayName": "integ.name",
+  "permissions": ["asset.read.metadata", "kv.write", "tag.write"],
+  "contributes": {
+    "providers": {
+      "metadata": [{ "id": "meta.extract", "title": "integ.prov", "assetKinds": ["image"] }]
+    }
+  }
+}

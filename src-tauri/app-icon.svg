@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="48 85 1160 1160" role="img" aria-label="velio.">
+  <!-- 원본: temp/mockups/보라·청록 리본 V 로고.png (1254×1254) 외곽 실측으로 재작성 — 같은 좌표계 -->
+  <defs>
+    <linearGradient id="vl-blue" x1="1120" y1="300" x2="600" y2="1030" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#00ECFF"/>
+      <stop offset="0.3" stop-color="#02C6FC"/>
+      <stop offset="0.62" stop-color="#0A7CFA"/>
+      <stop offset="1" stop-color="#2230F5"/>
+    </linearGradient>
+    <linearGradient id="vl-purple" x1="180" y1="320" x2="520" y2="940" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A729FF"/>
+      <stop offset="0.55" stop-color="#7A0CF5"/>
+      <stop offset="1" stop-color="#3F03C4"/>
+    </linearGradient>
+    <linearGradient id="vl-fold" x1="560" y1="860" x2="470" y2="800" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2A0290" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#2A0290" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <!-- 오른쪽 리본 + 아래 굴곡 (전체 외곽) -->
+  <path fill="url(#vl-blue)" d="M97 303 L300 304 C372 305 418 332 447 384 L625 722 L792 404
+    C818 352 868 304 950 303 L1158 303 C1140 325 1110 370 1086 415 L822 915 C790 985 720 1028 630 1028
+    C540 1028 470 1000 432 940 L166 415 C140 372 116 328 97 303 Z"/>
+  <!-- 왼쪽 리본 (접힘 선까지) -->
+  <path fill="url(#vl-purple)" d="M97 303 L300 304 C372 305 418 332 447 384 L625 722
+    L597 780 C575 826 545 880 502 914 C482 931 462 944 436 946 L166 415 C140 372 116 328 97 303 Z"/>
+  <!-- 접힘 그림자 -->
+  <path fill="url(#vl-fold)" d="M625 722 L597 780 C575 826 545 880 502 914 C482 931 462 944 436 946
+    L400 875 C470 870 540 820 600 720 Z"/>
+</svg>
