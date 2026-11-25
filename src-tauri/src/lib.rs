@@ -8,35 +8,39 @@ mod dev_seed;
 mod error;
 mod exit_run;
 mod folder_detection_commands;
-mod remote_source_commands;
 mod ingest_commands;
-mod pick_save;
-mod locale;
 #[cfg(test)]
 mod load_soak;
+mod locale;
 mod logging;
+mod metadata_commands;
+mod metadata_types;
 mod native;
+mod pick_save;
 mod play_range_commands;
-mod resume_commands;
 mod player_commands;
 mod player_subtitle;
+mod player_surface;
 mod plugin_commands;
 mod plugin_errors;
 mod plugin_job_commands;
-mod player_surface;
 mod progress;
 mod protect_commands;
 mod protection;
 mod protocols;
 mod purge_backup;
+mod remote_source_commands;
 mod reset;
 mod restore;
+mod resume_commands;
 mod reuse_commands;
 mod scene_commands;
 mod search_collection_order;
 mod search_commands;
 mod search_hybrid;
 mod search_service;
+mod search_user_fields;
+mod session_end;
 mod shutdown;
 mod startup;
 mod storage_commands;
@@ -46,10 +50,6 @@ mod system_volume;
 mod tray;
 mod update;
 mod update_guard;
-mod metadata_commands;
-mod metadata_types;
-mod search_user_fields;
-mod session_end;
 mod user_commands;
 mod volume_commands;
 
@@ -68,7 +68,9 @@ use mam_core::userdata::UserData;
 use mam_core::{Blake3Hasher, WindowsFileIdentity, WindowsVolumes};
 use mam_db::{DEFAULT_READERS, DbPool, SystemClock};
 use mam_media::{CancellableProcessRunner, MediaTools, SidecarGate, ToolConfig};
-use mam_plugin_runtime::{GatewayConfig, HostSystemClock, PluginJobs, PluginJobsDeps, PluginRuntime, RuntimeDeps};
+use mam_plugin_runtime::{
+    GatewayConfig, HostSystemClock, PluginJobs, PluginJobsDeps, PluginRuntime, RuntimeDeps,
+};
 use tauri::{Manager, RunEvent};
 
 use ai::{AiRunner, AiService, EventSink, LateSink, LocalEmbedders, ModelService, TauriSink};
@@ -325,7 +327,8 @@ pub fn run() {
         data_root: paths.root().to_path_buf(),
         plugins_dir: paths.plugins(),
         worker_exe: mam_plugin_runtime::locate_worker_default(),
-        app_version: semver::Version::parse(&version).unwrap_or_else(|_| semver::Version::new(0, 0, 0)),
+        app_version: semver::Version::parse(&version)
+            .unwrap_or_else(|_| semver::Version::new(0, 0, 0)),
         gateway: GatewayConfig::new(paths.cache()),
         on_change: Arc::new(move |change| match serde_json::to_value(&change) {
             Ok(v) => plugin_sink.emit(mam_plugin_runtime::PLUGIN_CHANGED_EVENT, v),
@@ -341,7 +344,10 @@ pub fn run() {
         protected: vec![paths.root().to_path_buf(), backups_dir.clone()],
     });
     // 백업 폴더는 실행 중 설정으로 바뀔 수 있다 — 내보내기마다 현재 설정으로 다시 계산한다(고정 목록은 부팅 시점 값)
-    plugin_jobs.set_protected_source(plugin_job_commands::plugin_protected_source(Arc::clone(&storage), paths.root().to_path_buf()));
+    plugin_jobs.set_protected_source(plugin_job_commands::plugin_protected_source(
+        Arc::clone(&storage),
+        paths.root().to_path_buf(),
+    ));
     plugin_runtime.set_job_hooks(Arc::clone(&plugin_jobs) as _);
     ingest.register_executor(JobKind::Plugin, plugin_jobs.executor());
     // 7e. 새 디스크 감지: 대기 목록 이벤트 + 장치 변경 알림(숨긴 최상위 창)으로 점검을 즉시 깨운다 (1초 디바운스)
@@ -753,7 +759,7 @@ fn install_session_end_hook(app: &tauri::App, services: &Arc<exit_run::ExitServi
     };
     let (handle, services) = (app.handle().clone(), Arc::clone(services));
     let installed = session_end::install(
-        hwnd.0 as *mut std::ffi::c_void,
+        hwnd.0,
         Arc::new(move || {
             services.run(&handle, exit_run::Mode::SessionEnd);
         }),

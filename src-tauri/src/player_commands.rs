@@ -59,7 +59,17 @@ pub struct OpenReply {
 
 impl From<OpenInfo> for OpenReply {
     fn from(i: OpenInfo) -> Self {
-        Self { session_id: i.session_id, length_ms: i.length_ms, fps: i.fps, state: if i.paused { ReplyState::Paused } else { ReplyState::Playing }, time_ms: i.time_ms }
+        Self {
+            session_id: i.session_id,
+            length_ms: i.length_ms,
+            fps: i.fps,
+            state: if i.paused {
+                ReplyState::Paused
+            } else {
+                ReplyState::Playing
+            },
+            time_ms: i.time_ms,
+        }
     }
 }
 
@@ -78,23 +88,55 @@ pub struct PlayerService {
 /// 오류 변환 - 사용자 경로·내부 문구는 싣지 않는다. 원인은 로그에만 남긴다
 pub(crate) fn open_error(e: PlayerError) -> CommandError {
     if e.is_engine_unavailable() {
-        return CommandError::logged(ErrorCode::PlayerUnavailable, "player engine is not available", &e);
+        return CommandError::logged(
+            ErrorCode::PlayerUnavailable,
+            "player engine is not available",
+            &e,
+        );
     }
     match e {
-        PlayerError::Timeout => CommandError::logged(ErrorCode::PlayerTimeout, "the player did not respond in time", &e),
-        PlayerError::RestartFailed => CommandError::logged(ErrorCode::PlayerRestartFailed, "the player stopped repeatedly", &e),
-        e => CommandError::logged(ErrorCode::OpenFailed, "cannot open the media for playback", &e),
+        PlayerError::Timeout => CommandError::logged(
+            ErrorCode::PlayerTimeout,
+            "the player did not respond in time",
+            &e,
+        ),
+        PlayerError::RestartFailed => CommandError::logged(
+            ErrorCode::PlayerRestartFailed,
+            "the player stopped repeatedly",
+            &e,
+        ),
+        e => CommandError::logged(
+            ErrorCode::OpenFailed,
+            "cannot open the media for playback",
+            &e,
+        ),
     }
 }
 
 pub(crate) fn command_error(e: PlayerError) -> CommandError {
     match e {
         PlayerError::NoMedia => CommandError::new(ErrorCode::NotFound, "no media is open"),
-        PlayerError::Timeout => CommandError::logged(ErrorCode::PlayerTimeout, "the player did not respond in time", &e),
-        PlayerError::Restarting => CommandError::new(ErrorCode::PlayerRestarting, "the player is restarting"),
-        PlayerError::RestartFailed => CommandError::logged(ErrorCode::PlayerRestartFailed, "the player stopped repeatedly", &e),
-        PlayerError::InvalidArgument(_) => CommandError::logged(ErrorCode::InvalidInput, "invalid argument", &e),
-        e if e.is_engine_unavailable() => CommandError::logged(ErrorCode::PlayerUnavailable, "player engine is not available", &e),
+        PlayerError::Timeout => CommandError::logged(
+            ErrorCode::PlayerTimeout,
+            "the player did not respond in time",
+            &e,
+        ),
+        PlayerError::Restarting => {
+            CommandError::new(ErrorCode::PlayerRestarting, "the player is restarting")
+        }
+        PlayerError::RestartFailed => CommandError::logged(
+            ErrorCode::PlayerRestartFailed,
+            "the player stopped repeatedly",
+            &e,
+        ),
+        PlayerError::InvalidArgument(_) => {
+            CommandError::logged(ErrorCode::InvalidInput, "invalid argument", &e)
+        }
+        e if e.is_engine_unavailable() => CommandError::logged(
+            ErrorCode::PlayerUnavailable,
+            "player engine is not available",
+            &e,
+        ),
         e => CommandError::logged(ErrorCode::Internal, "player command failed", &e),
     }
 }
@@ -108,7 +150,10 @@ fn to_pairs(ranges: Option<Vec<PlayRange>>) -> Result<Option<Vec<(i64, i64)>>, C
     match ranges {
         None => Ok(None),
         Some(v) if !valid_ranges(&v) => Err(invalid("ranges")),
-        Some(v) => Ok(Some(normalize_ranges(v.into_iter().map(|r| (r.start_ms, r.end_ms)).collect())).filter(|r| !r.is_empty())),
+        Some(v) => Ok(Some(normalize_ranges(
+            v.into_iter().map(|r| (r.start_ms, r.end_ms)).collect(),
+        ))
+        .filter(|r| !r.is_empty())),
     }
 }
 
@@ -120,7 +165,10 @@ fn check_side(v: u32) -> bool {
 #[cfg(debug_assertions)]
 fn dev_dirs() -> Vec<PathBuf> {
     let m = env!("CARGO_MANIFEST_DIR");
-    vec![PathBuf::from(m).join("binaries/libmpv"), PathBuf::from(m).join("../temp/poc-mpv/lib")]
+    vec![
+        PathBuf::from(m).join("binaries/libmpv"),
+        PathBuf::from(m).join("../temp/poc-mpv/lib"),
+    ]
 }
 
 #[cfg(not(debug_assertions))]
@@ -130,7 +178,11 @@ fn dev_dirs() -> Vec<PathBuf> {
 
 /// 자산 행의 소스 길이(ms) — 구간 재생(EDL)의 길이 힌트. 없으면 워커가 먼저 열어 얻는다
 fn duration_hint(storage: &Storage, asset_id: i64) -> Option<i64> {
-    let info = storage.pool.read(|c| Ok(mam_core::processing::media_info(c, asset_id))).ok()?.ok()??;
+    let info = storage
+        .pool
+        .read(|c| Ok(mam_core::processing::media_info(c, asset_id)))
+        .ok()?
+        .ok()??;
     info.duration_ms.filter(|d| *d > 0)
 }
 
@@ -160,7 +212,12 @@ impl PlayerService {
                 tracing::warn!(%err, "cannot emit player state");
             }
         });
-        let cfg = HostConfig { worker_exe: worker, libmpv_dir: libmpv, inherit_stderr: std::env::var_os("MAM_PLAYER_LOG").is_some(), ..HostConfig::default() };
+        let cfg = HostConfig {
+            worker_exe: worker,
+            libmpv_dir: libmpv,
+            inherit_stderr: std::env::var_os("MAM_PLAYER_LOG").is_some(),
+            ..HostConfig::default()
+        };
         let host = Arc::new(PlayerHost::new(cfg, surface, sink));
         Self::with_host(host, cache_dir)
     }
@@ -185,20 +242,43 @@ impl PlayerService {
 
     /// 자산을 해석(오프라인·파일 없음이면 `asset_offline`)한 뒤 읽기 전용으로 연다. `autoplay` 가 아니면 첫 프레임에서 정지한 채(`paused`) 둔다.
     /// `ranges`(선택)는 `set_ranges` 와 같은 검증을 거쳐 열기와 함께 적용된다. 인자 검증은 자산 조회·엔진 접근보다 먼저다
-    pub fn open(&self, reuse: &Reuse, asset_id: i64, canvas: CanvasSize, autoplay: bool, ranges: Option<Vec<PlayRange>>, hint: Option<i64>, start_ms: Option<u64>) -> Result<OpenReply, CommandError> {
+    #[allow(clippy::too_many_arguments)] // mirrors the player_open IPC argument list; a param struct would only be a pass-through
+    pub fn open(
+        &self,
+        reuse: &Reuse,
+        asset_id: i64,
+        canvas: CanvasSize,
+        autoplay: bool,
+        ranges: Option<Vec<PlayRange>>,
+        hint: Option<i64>,
+        start_ms: Option<u64>,
+    ) -> Result<OpenReply, CommandError> {
         let ranges = to_pairs(ranges)?;
-        let start_ms = start_ms.map(|ms| i64::try_from(ms).map_err(|_| invalid("startMs"))).transpose()?;
+        let start_ms = start_ms
+            .map(|ms| i64::try_from(ms).map_err(|_| invalid("startMs")))
+            .transpose()?;
         if !check_side(canvas.width) || !check_side(canvas.height) {
             return Err(invalid("canvas"));
         }
         let path = match reuse.original_path(asset_id) {
             Ok(p) => p,
             Err(IngestError::Offline | IngestError::NotFound) => {
-                return Err(CommandError::new(ErrorCode::AssetOffline, "the original file is offline or missing"));
+                return Err(CommandError::new(
+                    ErrorCode::AssetOffline,
+                    "the original file is offline or missing",
+                ));
             }
             Err(e) => return Err(e.into()),
         };
-        let opened = self.host.open(OpenRequest { asset_id, path, autoplay, canvas: (canvas.width, canvas.height), ranges, duration_hint_ms: hint, start_ms });
+        let opened = self.host.open(OpenRequest {
+            asset_id,
+            path,
+            autoplay,
+            canvas: (canvas.width, canvas.height),
+            ranges,
+            duration_hint_ms: hint,
+            start_ms,
+        });
         self.subs.clear(); // 이전 플레이어가 자막 파일 핸들을 놓은 뒤 (성공·실패 모두)
         *self.current() = opened.is_ok().then_some(asset_id);
         opened.map(OpenReply::from).map_err(open_error)
@@ -226,7 +306,9 @@ impl PlayerService {
         if !volume.is_finite() {
             return Err(invalid("volume"));
         }
-        self.host.set_volume(volume.round().clamp(0.0, 100.0) as i32, muted).map_err(command_error)
+        self.host
+            .set_volume(volume.round().clamp(0.0, 100.0) as i32, muted)
+            .map_err(command_error)
     }
 
     /// 캔버스 장치 픽셀 크기 (120ms 디바운스된 값) — 렌더 크기를 바꾼다. 열린 미디어가 없으면 기억만 한다
@@ -234,7 +316,9 @@ impl PlayerService {
         if !check_side(width) || !check_side(height) {
             return Err(invalid("size"));
         }
-        self.host.set_render_size(width, height).map_err(command_error)
+        self.host
+            .set_render_size(width, height)
+            .map_err(command_error)
     }
 
     /// 프론트의 보임 여부 (`document.hidden`·보기 숨김). 창 최소화와 합쳐 워커에 알린다. UI 스레드에서 불러도 막히지 않는다
@@ -262,7 +346,8 @@ impl PlayerService {
     }
 
     fn sync_render_active(&self) {
-        let eff = self.js_active.load(Ordering::Acquire) && self.window_active.load(Ordering::Acquire);
+        let eff =
+            self.js_active.load(Ordering::Acquire) && self.window_active.load(Ordering::Acquire);
         if self.last_active.swap(eff, Ordering::AcqRel) != eff || eff {
             // `true` 는 값이 같아도 다시 보낸다 — 워커가 현재 프레임을 다시 게시한다 (WebGL 컨텍스트 복구·접힌 스테이지 복귀)
             self.host.set_render_active(eff);
@@ -270,19 +355,30 @@ impl PlayerService {
     }
 
     /// 재생 구간 (`null`/빈 목록 = 구간 모드 끔). 열린 미디어가 없거나 `asset_id` 가 현재 자산과 다르면 무시한다
-    pub fn set_ranges(&self, asset_id: i64, ranges: Option<Vec<PlayRange>>) -> Result<(), CommandError> {
+    pub fn set_ranges(
+        &self,
+        asset_id: i64,
+        ranges: Option<Vec<PlayRange>>,
+    ) -> Result<(), CommandError> {
         let pairs = to_pairs(ranges)?;
         self.host.set_ranges(asset_id, pairs).map_err(command_error)
     }
 
     /// 외부 자막 선택 (`None` = 끔). SRT 를 MAM 캐시에 쓴 뒤 워커에 넘긴다. 임시 파일은 워커가 놓았다는 응답 뒤에만 지운다
-    pub fn set_subtitle(&self, asset_id: i64, sub: Option<(String, Vec<mam_core::subtitle::Cue>)>) -> Result<(), CommandError> {
+    pub fn set_subtitle(
+        &self,
+        asset_id: i64,
+        sub: Option<(String, Vec<mam_core::subtitle::Cue>)>,
+    ) -> Result<(), CommandError> {
         let path = match sub {
             Some((id, cues)) => Some(self.subs.prepare(asset_id, &id, &cues)?),
             None => None,
         };
         let clearing = path.is_none();
-        let r = self.host.set_subtitle(asset_id, path).map_err(command_error);
+        let r = self
+            .host
+            .set_subtitle(asset_id, path)
+            .map_err(command_error);
         if clearing && r.is_ok() {
             self.subs.clear();
         }
@@ -305,7 +401,9 @@ impl PlayerService {
     /// 디스크 꺼내기 준비: 열려 있는 자산이 그 디스크에 있으면 재생을 닫는다 (워커가 원본 파일 핸들을 놓을 때까지 기다린다).
     /// 열린 자산이 없거나 다른 디스크면 아무것도 하지 않는다. 닫기 실패는 로그만 (준비는 계속된다)
     pub fn close_if_on_volume(&self, scope: &mam_core::ingest::EjectScope) {
-        let on_volume = self.current().is_some_and(|asset_id| scope.contains_asset(asset_id));
+        let on_volume = self
+            .current()
+            .is_some_and(|asset_id| scope.contains_asset(asset_id));
         if on_volume && let Err(e) = self.close() {
             tracing::warn!(code = ?e.code(), "eject: cannot close the player");
         }
@@ -342,10 +440,12 @@ where
     F: FnOnce(&PlayerService) -> Result<T, CommandError> + Send + 'static,
 {
     let svc = Arc::clone(svc);
-    tauri::async_runtime::spawn_blocking(move || f(&svc)).await.map_err(|e| {
-        tracing::error!(%e, "blocking task failed");
-        CommandError::internal()
-    })?
+    tauri::async_runtime::spawn_blocking(move || f(&svc))
+        .await
+        .map_err(|e| {
+            tracing::error!(%e, "blocking task failed");
+            CommandError::internal()
+        })?
 }
 
 #[tauri::command]
@@ -354,6 +454,7 @@ pub async fn player_available(svc: Svc<'_>) -> Result<bool, CommandError> {
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)] // Tauri command: each parameter is an injected State or an IPC argument
 pub async fn player_open(
     svc: Svc<'_>,
     reuse: State<'_, Arc<Reuse>>,
@@ -373,7 +474,11 @@ pub async fn player_open(
 }
 
 #[tauri::command]
-pub async fn player_set_ranges(svc: Svc<'_>, asset_id: i64, ranges: Option<Vec<PlayRange>>) -> Result<(), CommandError> {
+pub async fn player_set_ranges(
+    svc: Svc<'_>,
+    asset_id: i64,
+    ranges: Option<Vec<PlayRange>>,
+) -> Result<(), CommandError> {
     blocking(&svc, move |s| s.set_ranges(asset_id, ranges)).await
 }
 
@@ -398,7 +503,11 @@ pub async fn player_set_volume(svc: Svc<'_>, volume: f64, muted: bool) -> Result
 }
 
 #[tauri::command]
-pub async fn player_set_render_size(svc: Svc<'_>, width: u32, height: u32) -> Result<(), CommandError> {
+pub async fn player_set_render_size(
+    svc: Svc<'_>,
+    width: u32,
+    height: u32,
+) -> Result<(), CommandError> {
     blocking(&svc, move |s| s.set_render_size(width, height)).await
 }
 
@@ -413,7 +522,10 @@ pub async fn player_set_render_active(svc: Svc<'_>, active: bool) -> Result<(), 
 
 /// 슬롯 반환 — 프레임마다 불리는 경로라 `blocking` 을 거치지 않는다 (호스트 호출은 비차단: epoch 검사 + `try_send`)
 #[tauri::command]
-pub async fn player_release_slots(svc: Svc<'_>, release: serde_json::Value) -> Result<(), CommandError> {
+pub async fn player_release_slots(
+    svc: Svc<'_>,
+    release: serde_json::Value,
+) -> Result<(), CommandError> {
     svc.release_slots(release)
 }
 
@@ -455,4 +567,3 @@ pub fn on_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
 #[cfg(test)]
 #[path = "player_commands_tests.rs"]
 pub(crate) mod tests;
-

@@ -171,7 +171,7 @@ describe.skipIf(process.platform !== "win32")("fetch-sidecars.ps1 함수 실행 
     writeFileSync(join(cache, "libmpv.zip"), "stale-wrong")
     const want = sha256("the-pinned-content")
     // Act
-    const r = await ps([fnSource("Get-Verified")], `$CacheDir = ${psq(cache)}; Get-Verified ${psq(url)} '${want}' 'libmpv.zip'`)
+    const r = await ps([fnSource("Get-Sha256"), fnSource("Get-Verified")], `$CacheDir = ${psq(cache)}; Get-Verified ${psq(url)} '${want}' 'libmpv.zip'`)
     // Assert
     expect(r.error).toMatch(/^SHA-256 mismatch for libmpv\.zip \(got [0-9a-f]{64}, want [0-9a-f]{64}\)$/)
     expect(r.error).toContain(sha256(served))
@@ -181,7 +181,7 @@ describe.skipIf(process.platform !== "win32")("fetch-sidecars.ps1 함수 실행 
   it("T-sidecar-19 [Happy] 캐시 파일 해시가 맞으면 다시 받지 않는다(서버 없는 주소여도 통과)", async () => {
     const cache = tmp()
     writeFileSync(join(cache, "libmpv.zip"), "pinned")
-    const r = await ps([fnSource("Get-Verified")], `$CacheDir = ${psq(cache)}; Get-Verified 'http://127.0.0.1:1/never' '${sha256("pinned")}' 'libmpv.zip'`)
+    const r = await ps([fnSource("Get-Sha256"), fnSource("Get-Verified")], `$CacheDir = ${psq(cache)}; Get-Verified 'http://127.0.0.1:1/never' '${sha256("pinned")}' 'libmpv.zip'`)
     expect(r.error).toBeNull()
   })
 

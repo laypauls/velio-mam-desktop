@@ -27,6 +27,15 @@ $Root = Split-Path -Parent $PSScriptRoot
 $Bin = Join-Path $Root 'src-tauri/binaries'
 if (-not $CacheDir) { $CacheDir = Join-Path $Bin '.cache' }
 
+# Lowercase hex SHA-256 of a file via .NET. Deliberately not Get-FileHash: that cmdlet lives in Microsoft.PowerShell.Utility, which
+# Windows PowerShell 5.1 failed to autoload on the CI runner (PSModulePath inherited from PowerShell 7), while .NET needs no module.
+function Get-Sha256($Path) {
+  $sha = [Security.Cryptography.SHA256]::Create()
+  $fs = [IO.File]::OpenRead((Convert-Path $Path))
+  try { return ([BitConverter]::ToString($sha.ComputeHash($fs)) -replace '-', '').ToLower() }
+  finally { $fs.Dispose(); $sha.Dispose() }
+}
+
 $FfmpegUrl = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n8.1.3-9-g29e619e767-win64-lgpl-shared-8.1.zip'
 $FfmpegSha = '3e47bda1607740550141e37c0e49d1e5182b34699f15adfd137ee266d346811a'
 $WhisperUrl = 'https://github.com/ggml-org/whisper.cpp/releases/download/b5454/whisper-bin-x64.zip'
@@ -42,10 +51,10 @@ $MpvLicenseName = 'LICENSE.LGPL'
 # ffmpeg-LICENSE.txt. It is copied from the pinned file in the repo (licenses/README.md lists source + SHA-256), not downloaded.
 $GplText = Join-Path $Root 'licenses/GPL-3.0.txt'
 if (-not (Test-Path $GplText)) { throw "missing pinned license text: $GplText" }
-$GplSha = (Get-FileHash $GplText -Algorithm SHA256).Hash.ToLower()
+$GplSha = (Get-Sha256 $GplText)
 $Gpl2Text = Join-Path $Root 'licenses/GPL-2.0.txt'
 if (-not (Test-Path $Gpl2Text)) { throw "missing pinned license text: $Gpl2Text" }
-$GplSha += (Get-FileHash $Gpl2Text -Algorithm SHA256).Hash.ToLower()
+$GplSha += (Get-Sha256 $Gpl2Text)
 
 $Stamp = Join-Path $Bin '.fetched'
 $Want = "$FfmpegSha;$WhisperSha;$MpvSha;$GplSha"
@@ -58,11 +67,11 @@ if (-not $Force -and (Test-Path $Stamp) -and ((Get-Content $Stamp -Raw).Trim() -
 function Get-Verified($Url, $Sha, $Name) {
   New-Item -ItemType Directory -Force -Path $CacheDir | Out-Null
   $dest = Join-Path $CacheDir $Name
-  if (-not (Test-Path $dest) -or (Get-FileHash $dest -Algorithm SHA256).Hash.ToLower() -ne $Sha) {
+  if (-not (Test-Path $dest) -or (Get-Sha256 $dest) -ne $Sha) {
     Write-Host "downloading $Url"
     Invoke-WebRequest -Uri $Url -OutFile $dest -UseBasicParsing
   }
-  $got = (Get-FileHash $dest -Algorithm SHA256).Hash.ToLower()
+  $got = (Get-Sha256 $dest)
   if ($got -ne $Sha) { Remove-Item $dest -Force; throw "SHA-256 mismatch for $Name (got $got, want $Sha)" }
   return $dest
 }

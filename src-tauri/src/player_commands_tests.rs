@@ -21,7 +21,9 @@ type Events = Arc<Mutex<Vec<PlayerEvent>>>;
 
 fn wav_bytes() -> Vec<u8> {
     let rate: u32 = 8000;
-    let samples: Vec<i16> = (0..rate * 3).map(|i| ((i as f32 * 440.0 * std::f32::consts::TAU / rate as f32).sin() * 8000.0) as i16).collect();
+    let samples: Vec<i16> = (0..rate * 3)
+        .map(|i| ((i as f32 * 440.0 * std::f32::consts::TAU / rate as f32).sin() * 8000.0) as i16)
+        .collect();
     let data_len = (samples.len() * 2) as u32;
     let mut b = Vec::new();
     b.extend_from_slice(b"RIFF");
@@ -43,7 +45,10 @@ fn wav_bytes() -> Vec<u8> {
 }
 
 pub(crate) fn canvas() -> CanvasSize {
-    CanvasSize { width: 640, height: 360 }
+    CanvasSize {
+        width: 640,
+        height: 360,
+    }
 }
 
 pub(crate) struct Fx {
@@ -78,16 +83,45 @@ pub(crate) fn fixture() -> Fx {
             identity: Arc::new(WindowsFileIdentity),
             hasher: Arc::new(Blake3Hasher),
         },
-        IngestConfig { auto_excludes: vec![data.clone()], ..IngestConfig::default() },
+        IngestConfig {
+            auto_excludes: vec![data.clone()],
+            ..IngestConfig::default()
+        },
     );
     let view = ingest.add_folder(media.to_str().unwrap()).unwrap();
-    scan_folder(ingest.env(), view.folder_id, &|| false, &AtomicBool::new(false)).unwrap();
+    scan_folder(
+        ingest.env(),
+        view.folder_id,
+        &|| false,
+        &AtomicBool::new(false),
+    )
+    .unwrap();
     let wav_id = pool
-        .read(|c| Ok(c.query_row("SELECT asset_id FROM file_locations WHERE rel_path LIKE '%clip.wav'", [], |r| r.get::<_, i64>(0))))
+        .read(|c| {
+            Ok(c.query_row(
+                "SELECT asset_id FROM file_locations WHERE rel_path LIKE '%clip.wav'",
+                [],
+                |r| r.get::<_, i64>(0),
+            ))
+        })
         .unwrap()
         .unwrap();
-    let reuse = Arc::new(Reuse::new(Arc::clone(&pool), Arc::new(SystemClock), Arc::new(StdFs), Arc::new(ShellLauncher), vec![data.clone()]));
-    Fx { _dir: dir, data, media, pool, reuse, wav_id, _ingest: ingest }
+    let reuse = Arc::new(Reuse::new(
+        Arc::clone(&pool),
+        Arc::new(SystemClock),
+        Arc::new(StdFs),
+        Arc::new(ShellLauncher),
+        vec![data.clone()],
+    ));
+    Fx {
+        _dir: dir,
+        data,
+        media,
+        pool,
+        reuse,
+        wav_id,
+        _ingest: ingest,
+    }
 }
 
 pub(crate) fn set_volume_offline(fx: &Fx) {
@@ -104,7 +138,11 @@ fn fast() -> Timeouts {
         open: Duration::from_millis(1500),
         command: Duration::from_millis(250),
         silence: Duration::from_secs(3),
-        backoff: [Duration::ZERO, Duration::from_millis(10), Duration::from_millis(20)],
+        backoff: [
+            Duration::ZERO,
+            Duration::from_millis(10),
+            Duration::from_millis(20),
+        ],
         frame_grace: Duration::from_millis(100),
         ..Timeouts::default()
     }
@@ -122,20 +160,35 @@ pub(crate) fn engine(fx: &Fx) -> Eng {
     let events: Events = Arc::default();
     let ev = Arc::clone(&events);
     let host = PlayerHost::with_spawner(
-        HostConfig { timeouts: fast(), ..HostConfig::default() },
+        HostConfig {
+            timeouts: fast(),
+            ..HostConfig::default()
+        },
         MemSurface::new(),
         Arc::new(move |e| ev.lock().unwrap().push(e)),
         Some(FakeSpawner::new(Arc::clone(&script))),
     );
-    Eng { svc: PlayerService::with_host(Arc::new(host), fx.data.join("cache")), events, script }
+    Eng {
+        svc: PlayerService::with_host(Arc::new(host), fx.data.join("cache")),
+        events,
+        script,
+    }
 }
 
 /// 워커·libmpv 가 없는 설치 (`player_unavailable`)
 pub(crate) fn no_engine(fx: &Fx) -> (PlayerService, Events) {
     let events: Events = Arc::default();
     let ev = Arc::clone(&events);
-    let host = PlayerHost::with_spawner(HostConfig::default(), MemSurface::new(), Arc::new(move |e| ev.lock().unwrap().push(e)), None);
-    (PlayerService::with_host(Arc::new(host), fx.data.join("cache")), events)
+    let host = PlayerHost::with_spawner(
+        HostConfig::default(),
+        MemSurface::new(),
+        Arc::new(move |e| ev.lock().unwrap().push(e)),
+        None,
+    );
+    (
+        PlayerService::with_host(Arc::new(host), fx.data.join("cache")),
+        events,
+    )
 }
 
 pub(crate) fn code_of(e: &CommandError) -> serde_json::Value {
@@ -143,7 +196,10 @@ pub(crate) fn code_of(e: &CommandError) -> serde_json::Value {
 }
 
 pub(crate) fn fingerprint(p: &Path) -> (Vec<u8>, std::time::SystemTime) {
-    (std::fs::read(p).unwrap(), std::fs::metadata(p).unwrap().modified().unwrap())
+    (
+        std::fs::read(p).unwrap(),
+        std::fs::metadata(p).unwrap().modified().unwrap(),
+    )
 }
 
 fn wait_for(events: &Events, ms: u64, pred: impl Fn(&PlayerEvent) -> bool) -> Option<PlayerEvent> {
@@ -171,19 +227,43 @@ fn fixture_json() -> serde_json::Value {
 #[test]
 fn t_ipc_player_mpv_01_argument_and_reply_shapes_match_the_golden_contract() {
     // Arrange / Act: 프론트가 보내는 camelCase JSON
-    let c: CanvasSize = serde_json::from_value(serde_json::json!({"width": 1280, "height": 720})).unwrap();
+    let c: CanvasSize =
+        serde_json::from_value(serde_json::json!({"width": 1280, "height": 720})).unwrap();
     let a: ControlAction = serde_json::from_value(serde_json::json!("stepBack")).unwrap();
     let fx = fixture_json();
-    let reply = serde_json::to_value(OpenReply { session_id: 5, length_ms: Some(120_000), fps: Some(29.97002997002997), state: ReplyState::Paused, time_ms: 0 }).unwrap();
+    let reply = serde_json::to_value(OpenReply {
+        session_id: 5,
+        length_ms: Some(120_000),
+        fps: Some(29.97002997002997),
+        state: ReplyState::Paused,
+        time_ms: 0,
+    })
+    .unwrap();
     // Assert
     assert_eq!((c.width, c.height), (1280, 720));
     assert_eq!(a, ControlAction::StepBack);
-    assert_eq!(reply, fx["openReply"], "프론트(vitest)와 공유하는 golden fixture");
-    assert_eq!(serde_json::to_value(OpenReply { session_id: 1, length_ms: None, fps: None, state: ReplyState::Playing, time_ms: 7 }).unwrap(), serde_json::json!({"sessionId": 1, "lengthMs": null, "fps": null, "state": "playing", "timeMs": 7}));
+    assert_eq!(
+        reply, fx["openReply"],
+        "프론트(vitest)와 공유하는 golden fixture"
+    );
+    assert_eq!(
+        serde_json::to_value(OpenReply {
+            session_id: 1,
+            length_ms: None,
+            fps: None,
+            state: ReplyState::Playing,
+            time_ms: 7
+        })
+        .unwrap(),
+        serde_json::json!({"sessionId": 1, "lengthMs": null, "fps": null, "state": "playing", "timeMs": 7})
+    );
     assert_eq!(PLAYER_STATE_EVENT, "player://state");
     // 누락·잘못된 필드는 거부 (구 계약의 rect·fps 는 더 이상 받지 않는다)
     assert!(serde_json::from_value::<CanvasSize>(serde_json::json!({"width": 1})).is_err());
-    assert!(serde_json::from_value::<CanvasSize>(serde_json::json!({"width": -1, "height": 2})).is_err());
+    assert!(
+        serde_json::from_value::<CanvasSize>(serde_json::json!({"width": -1, "height": 2}))
+            .is_err()
+    );
     assert!(serde_json::from_value::<ControlAction>(serde_json::json!("fastForward")).is_err());
 }
 
@@ -216,18 +296,42 @@ fn t_ipc_player_mpv_02_engine_errors_map_to_contract_codes_without_paths() {
     }
     // 일반 command
     assert_eq!(code_of(&command_error(PlayerError::NoMedia)), "not_found");
-    assert_eq!(code_of(&command_error(PlayerError::Timeout)), "player_timeout");
-    assert_eq!(code_of(&command_error(PlayerError::Restarting)), "player_restarting");
-    assert_eq!(code_of(&command_error(PlayerError::RestartFailed)), "player_restart_failed");
-    assert_eq!(code_of(&command_error(PlayerError::InvalidArgument(secret))), "invalid_input");
-    assert_eq!(code_of(&command_error(PlayerError::SpawnFailed("x".into()))), "player_unavailable");
+    assert_eq!(
+        code_of(&command_error(PlayerError::Timeout)),
+        "player_timeout"
+    );
+    assert_eq!(
+        code_of(&command_error(PlayerError::Restarting)),
+        "player_restarting"
+    );
+    assert_eq!(
+        code_of(&command_error(PlayerError::RestartFailed)),
+        "player_restart_failed"
+    );
+    assert_eq!(
+        code_of(&command_error(PlayerError::InvalidArgument(secret))),
+        "invalid_input"
+    );
+    assert_eq!(
+        code_of(&command_error(PlayerError::SpawnFailed("x".into()))),
+        "player_unavailable"
+    );
     assert_eq!(code_of(&command_error(PlayerError::HostGone)), "internal");
 }
 
 #[test]
 fn t_ipc_player_mpv_03_event_error_codes_use_the_same_strings_as_the_command_error_codes() {
-    for (a, b) in [(PlayerErrorCode::OpenFailed, ErrorCode::OpenFailed), (PlayerErrorCode::PlayerWorkerCrashed, ErrorCode::PlayerWorkerCrashed)] {
-        assert_eq!(serde_json::to_value(a).unwrap(), serde_json::to_value(b).unwrap());
+    for (a, b) in [
+        (PlayerErrorCode::OpenFailed, ErrorCode::OpenFailed),
+        (
+            PlayerErrorCode::PlayerWorkerCrashed,
+            ErrorCode::PlayerWorkerCrashed,
+        ),
+    ] {
+        assert_eq!(
+            serde_json::to_value(a).unwrap(),
+            serde_json::to_value(b).unwrap()
+        );
     }
 }
 
@@ -239,8 +343,22 @@ fn t_ipc_player_mpv_04_unavailable_engine_and_offline_assets() {
     // Act / Assert: 가용성 false, 열기는 player_unavailable (프론트는 외부 열기로 폴백)
     assert!(!svc.available());
     for autoplay in [true, false] {
-        assert_eq!(code_of(&svc.open(&fx.reuse, fx.wav_id, canvas(), autoplay, None, None, None).unwrap_err()), "player_unavailable", "{autoplay}");
-        assert_eq!(code_of(&svc.open(&fx.reuse, 9_999_999, canvas(), autoplay, None, None, None).unwrap_err()), "asset_offline", "{autoplay}: 자산 해석이 먼저");
+        assert_eq!(
+            code_of(
+                &svc.open(&fx.reuse, fx.wav_id, canvas(), autoplay, None, None, None)
+                    .unwrap_err()
+            ),
+            "player_unavailable",
+            "{autoplay}"
+        );
+        assert_eq!(
+            code_of(
+                &svc.open(&fx.reuse, 9_999_999, canvas(), autoplay, None, None, None)
+                    .unwrap_err()
+            ),
+            "asset_offline",
+            "{autoplay}: 자산 해석이 먼저"
+        );
     }
     // 열기 전 제어 명령은 오류 없이 무시된다
     svc.control(ControlAction::Toggle).unwrap();
@@ -251,11 +369,19 @@ fn t_ipc_player_mpv_04_unavailable_engine_and_offline_assets() {
     // 파일이 사라진 자산 (볼륨은 연결됨) -> asset_offline
     let (original, backup) = (fx.media.join("clip.wav"), fx.media.join("clip.bak"));
     std::fs::rename(&original, &backup).unwrap();
-    assert_eq!(code_of(&svc.open(&fx.reuse, fx.wav_id, canvas(), true, None, None, None).unwrap_err()), "asset_offline");
+    assert_eq!(
+        code_of(
+            &svc.open(&fx.reuse, fx.wav_id, canvas(), true, None, None, None)
+                .unwrap_err()
+        ),
+        "asset_offline"
+    );
     std::fs::rename(&backup, &original).unwrap();
     // 볼륨 오프라인 -> asset_offline, 경로를 싣지 않는다
     set_volume_offline(&fx);
-    let err = svc.open(&fx.reuse, fx.wav_id, canvas(), true, None, None, None).unwrap_err();
+    let err = svc
+        .open(&fx.reuse, fx.wav_id, canvas(), true, None, None, None)
+        .unwrap_err();
     assert_eq!(code_of(&err), "asset_offline");
     assert!(!serde_json::to_string(&err).unwrap().contains("clip.wav"));
 }
@@ -267,23 +393,73 @@ fn t_ipc_player_mpv_05_invalid_arguments_are_rejected_before_the_asset_lookup_an
     let svc = &e.svc;
     for bad in [f64::NAN, f64::INFINITY] {
         assert_eq!(code_of(&svc.seek(bad).unwrap_err()), "invalid_input");
-        assert_eq!(code_of(&svc.set_volume(bad, false).unwrap_err()), "invalid_input");
+        assert_eq!(
+            code_of(&svc.set_volume(bad, false).unwrap_err()),
+            "invalid_input"
+        );
     }
     for bad in [0.0, -1.0, 0.05, 17.0, f64::NAN] {
-        assert_eq!(code_of(&svc.set_rate(bad).unwrap_err()), "invalid_input", "{bad}");
+        assert_eq!(
+            code_of(&svc.set_rate(bad).unwrap_err()),
+            "invalid_input",
+            "{bad}"
+        );
     }
     // 캔버스·렌더 크기: 0 과 16385 는 거부 (존재하지 않는 자산이어도 invalid_input 이 먼저), 경계 1·16384 는 통과
     for (w, h) in [(0, 10), (10, 0), (16385, 10), (10, 16385), (0, 0)] {
-        assert_eq!(code_of(&svc.open(&fx.reuse, 9_999_999, CanvasSize { width: w, height: h }, true, None, None, None).unwrap_err()), "invalid_input", "{w}x{h}");
-        assert_eq!(code_of(&svc.set_render_size(w, h).unwrap_err()), "invalid_input", "{w}x{h}");
+        assert_eq!(
+            code_of(
+                &svc.open(
+                    &fx.reuse,
+                    9_999_999,
+                    CanvasSize {
+                        width: w,
+                        height: h
+                    },
+                    true,
+                    None,
+                    None,
+                    None
+                )
+                .unwrap_err()
+            ),
+            "invalid_input",
+            "{w}x{h}"
+        );
+        assert_eq!(
+            code_of(&svc.set_render_size(w, h).unwrap_err()),
+            "invalid_input",
+            "{w}x{h}"
+        );
     }
-    assert_eq!(code_of(&svc.open(&fx.reuse, 9_999_999, CanvasSize { width: 1, height: 16384 }, true, None, None, None).unwrap_err()), "asset_offline");
+    assert_eq!(
+        code_of(
+            &svc.open(
+                &fx.reuse,
+                9_999_999,
+                CanvasSize {
+                    width: 1,
+                    height: 16384
+                },
+                true,
+                None,
+                None,
+                None
+            )
+            .unwrap_err()
+        ),
+        "asset_offline"
+    );
     svc.set_render_size(1, 16384).unwrap();
     // 정상 범위 (열린 미디어가 없으므로 무시) - 음수 seek·범위 밖 음량은 보정
     svc.seek(-5.0).unwrap();
     svc.set_rate(1.5).unwrap();
     svc.set_volume(250.0, true).unwrap();
-    assert_eq!(e.script.spawns.load(Ordering::SeqCst), 0, "세션 없는 호출은 워커를 띄우지 않는다");
+    assert_eq!(
+        e.script.spawns.load(Ordering::SeqCst),
+        0,
+        "세션 없는 호출은 워커를 띄우지 않는다"
+    );
 }
 
 #[test]
@@ -295,21 +471,44 @@ fn t_ipc_player_mpv_06_open_play_close_emit_state_and_leave_original_untouched()
     let e = engine(&fx);
     assert!(e.svc.available());
     // Act
-    let reply = e.svc.open(&fx.reuse, fx.wav_id, canvas(), true, None, Some(3000), None).expect("open");
+    let reply = e
+        .svc
+        .open(&fx.reuse, fx.wav_id, canvas(), true, None, Some(3000), None)
+        .expect("open");
     e.svc.control(ControlAction::Pause).unwrap();
     e.svc.seek(1000.0).unwrap();
     e.svc.set_volume(40.0, false).unwrap();
-    let paused = wait_for(&e.events, 2000, |ev| ev.state == EventState::Paused && ev.time_ms == 1000);
+    let paused = wait_for(&e.events, 2000, |ev| {
+        ev.state == EventState::Paused && ev.time_ms == 1000
+    });
     e.svc.close().unwrap();
     e.svc.shutdown();
     // Assert: 응답이 첫 상태를 준다 (열기 뒤 첫 프레임 이벤트는 없다) · 이벤트 모양에 경로가 없다
-    assert_eq!((reply.session_id, reply.state, reply.time_ms, reply.length_ms), (1, ReplyState::Playing, 0, Some(30_000)));
+    assert_eq!(
+        (
+            reply.session_id,
+            reply.state,
+            reply.time_ms,
+            reply.length_ms
+        ),
+        (1, ReplyState::Playing, 0, Some(30_000))
+    );
     let json = serde_json::to_value(paused.expect("paused event")).unwrap();
-    assert_eq!((json["assetId"].as_i64(), json["sessionId"].as_u64()), (Some(fx.wav_id), Some(1)));
+    assert_eq!(
+        (json["assetId"].as_i64(), json["sessionId"].as_u64()),
+        (Some(fx.wav_id), Some(1))
+    );
     assert!(!json.to_string().contains("clip.wav"));
     assert_eq!(e.events.lock().unwrap()[0].state, EventState::Opening);
     // 힌트(자산 행의 소스 길이)가 워커의 Open 으로 간다
-    assert!(e.script.commands().iter().any(|c| matches!(c, Command::Open { duration_ms: Some(3000), paused: false, .. })));
+    assert!(e.script.commands().iter().any(|c| matches!(
+        c,
+        Command::Open {
+            duration_ms: Some(3000),
+            paused: false,
+            ..
+        }
+    )));
     // 원본 보호: 내용·수정 시각 불변, 폴더에 부산물 없음
     assert_eq!(fingerprint(&original), before);
     assert_eq!(std::fs::read_dir(&fx.media).unwrap().count(), 1);
@@ -319,11 +518,24 @@ fn t_ipc_player_mpv_06_open_play_close_emit_state_and_leave_original_untouched()
 fn t_player_open_04_service_opens_paused_when_autoplay_is_false() {
     let fx = fixture();
     let e = engine(&fx);
-    let reply = e.svc.open(&fx.reuse, fx.wav_id, canvas(), false, None, None, None).expect("open");
+    let reply = e
+        .svc
+        .open(&fx.reuse, fx.wav_id, canvas(), false, None, None, None)
+        .expect("open");
     assert_eq!((reply.state, reply.time_ms), (ReplyState::Paused, 0));
     std::thread::sleep(Duration::from_millis(300));
-    let ev: Vec<_> = e.events.lock().unwrap().iter().map(|e| (e.state, e.time_ms)).collect();
-    assert!(ev.iter().all(|(s, _)| !matches!(s, EventState::Playing | EventState::Ended)), "{ev:?}");
+    let ev: Vec<_> = e
+        .events
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|e| (e.state, e.time_ms))
+        .collect();
+    assert!(
+        ev.iter()
+            .all(|(s, _)| !matches!(s, EventState::Playing | EventState::Ended)),
+        "{ev:?}"
+    );
     e.svc.control(ControlAction::Play).unwrap();
     assert!(wait_for(&e.events, 2000, |e| e.state == EventState::Playing).is_some());
 }
@@ -334,17 +546,82 @@ fn t_ipc_player_ranges_03_open_validates_ranges_before_asset_and_engine() {
     let fx = fixture();
     let (svc, events) = no_engine(&fx);
     for autoplay in [true, false] {
-        for bad in [vec![range(5, 5)], vec![range(-1, 10)], vec![range(10, 5)], vec![range(0, 10), range(20, 20)]] {
-            assert_eq!(code_of(&svc.open(&fx.reuse, 9_999_999, canvas(), autoplay, Some(bad), None, None).unwrap_err()), "invalid_input", "{autoplay}");
+        for bad in [
+            vec![range(5, 5)],
+            vec![range(-1, 10)],
+            vec![range(10, 5)],
+            vec![range(0, 10), range(20, 20)],
+        ] {
+            assert_eq!(
+                code_of(
+                    &svc.open(
+                        &fx.reuse,
+                        9_999_999,
+                        canvas(),
+                        autoplay,
+                        Some(bad),
+                        None,
+                        None
+                    )
+                    .unwrap_err()
+                ),
+                "invalid_input",
+                "{autoplay}"
+            );
         }
     }
-    let many = |n: i64| (0..n).map(|i| range(i * 10, i * 10 + 5)).collect::<Vec<_>>();
-    assert_eq!(code_of(&svc.open(&fx.reuse, fx.wav_id, canvas(), true, Some(many(1001)), None, None).unwrap_err()), "invalid_input");
-    assert_eq!(code_of(&svc.open(&fx.reuse, fx.wav_id, canvas(), true, Some(many(1000)), None, None).unwrap_err()), "player_unavailable");
+    let many = |n: i64| {
+        (0..n)
+            .map(|i| range(i * 10, i * 10 + 5))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        code_of(
+            &svc.open(
+                &fx.reuse,
+                fx.wav_id,
+                canvas(),
+                true,
+                Some(many(1001)),
+                None,
+                None
+            )
+            .unwrap_err()
+        ),
+        "invalid_input"
+    );
+    assert_eq!(
+        code_of(
+            &svc.open(
+                &fx.reuse,
+                fx.wav_id,
+                canvas(),
+                true,
+                Some(many(1000)),
+                None,
+                None
+            )
+            .unwrap_err()
+        ),
+        "player_unavailable"
+    );
     // 유효한 구간 / null / 빈 목록은 검증을 통과해 다음 단계 오류를 낸다 (게이트 반대편)
     for ok in [None, Some(vec![]), Some(vec![range(0, 100)])] {
-        assert_eq!(code_of(&svc.open(&fx.reuse, fx.wav_id, canvas(), true, ok.clone(), None, None).unwrap_err()), "player_unavailable", "{ok:?}");
-        assert_eq!(code_of(&svc.open(&fx.reuse, 9_999_999, canvas(), false, ok, None, None).unwrap_err()), "asset_offline");
+        assert_eq!(
+            code_of(
+                &svc.open(&fx.reuse, fx.wav_id, canvas(), true, ok.clone(), None, None)
+                    .unwrap_err()
+            ),
+            "player_unavailable",
+            "{ok:?}"
+        );
+        assert_eq!(
+            code_of(
+                &svc.open(&fx.reuse, 9_999_999, canvas(), false, ok, None, None)
+                    .unwrap_err()
+            ),
+            "asset_offline"
+        );
     }
     assert!(events.lock().unwrap().is_empty());
 }
@@ -353,12 +630,27 @@ fn t_ipc_player_ranges_03_open_validates_ranges_before_asset_and_engine() {
 fn t_player_ranges_05_set_ranges_validates_arguments_before_the_engine() {
     let fx = fixture();
     let (svc, events) = no_engine(&fx);
-    for bad in [vec![range(5, 5)], vec![range(-1, 10)], vec![range(10, 5)], vec![range(0, 10), range(20, 20)]] {
-        assert_eq!(code_of(&svc.set_ranges(1, Some(bad)).unwrap_err()), "invalid_input");
+    for bad in [
+        vec![range(5, 5)],
+        vec![range(-1, 10)],
+        vec![range(10, 5)],
+        vec![range(0, 10), range(20, 20)],
+    ] {
+        assert_eq!(
+            code_of(&svc.set_ranges(1, Some(bad)).unwrap_err()),
+            "invalid_input"
+        );
     }
-    let many = |n: i64| (0..n).map(|i| range(i * 10, i * 10 + 5)).collect::<Vec<_>>();
+    let many = |n: i64| {
+        (0..n)
+            .map(|i| range(i * 10, i * 10 + 5))
+            .collect::<Vec<_>>()
+    };
     svc.set_ranges(1, Some(many(1000))).unwrap();
-    assert_eq!(code_of(&svc.set_ranges(1, Some(many(1001))).unwrap_err()), "invalid_input");
+    assert_eq!(
+        code_of(&svc.set_ranges(1, Some(many(1001))).unwrap_err()),
+        "invalid_input"
+    );
     svc.set_ranges(1, None).unwrap();
     svc.set_ranges(1, Some(vec![])).unwrap();
     svc.set_ranges(1, Some(vec![range(0, 100)])).unwrap();
@@ -370,14 +662,35 @@ fn t_player_open_14_service_sends_normalized_ranges_with_the_open_and_updates_th
     let fx = fixture();
     let e = engine(&fx);
     // 겹치는 구간은 병합·정렬되어 워커로 간다 (워커는 EDL 로 만든다)
-    e.svc.open(&fx.reuse, fx.wav_id, canvas(), false, Some(vec![range(5000, 6000), range(1000, 2000), range(1500, 2500)]), None, None).expect("open");
+    e.svc
+        .open(
+            &fx.reuse,
+            fx.wav_id,
+            canvas(),
+            false,
+            Some(vec![
+                range(5000, 6000),
+                range(1000, 2000),
+                range(1500, 2500),
+            ]),
+            None,
+            None,
+        )
+        .expect("open");
     assert!(e.script.commands().iter().any(|c| matches!(c, Command::Open { ranges: Some(r), .. } if r == &vec![(1000, 2500), (5000, 6000)])), "{:?}", e.script.commands());
     // 구간 해제 → 워커에 None
     e.svc.set_ranges(fx.wav_id, Some(vec![])).unwrap();
-    assert!(e.script.commands().iter().any(|c| matches!(c, Command::SetRanges { ranges: None, .. })));
+    assert!(
+        e.script
+            .commands()
+            .iter()
+            .any(|c| matches!(c, Command::SetRanges { ranges: None, .. }))
+    );
     // 다른 자산의 요청은 워커에 가지 않는다
     let n = e.script.commands().len();
-    e.svc.set_ranges(fx.wav_id + 1, Some(vec![range(0, 10)])).unwrap();
+    e.svc
+        .set_ranges(fx.wav_id + 1, Some(vec![range(0, 10)]))
+        .unwrap();
     assert_eq!(e.script.commands().len(), n);
 }
 
@@ -389,11 +702,25 @@ fn t_ipc_player_mpv_07_command_signatures_match_the_contract() {
     let src = include_str!("player_commands.rs").replace("\r\n", "\n");
     let lib = include_str!("lib.rs").replace("\r\n", "\n");
     // Act / Assert: player_open — assetId, autoplay(필수), canvas, ranges(선택), startMs(선택, 이어보기)
-    let open = src.split("pub async fn player_open(").nth(1).and_then(|s| s.split(") -> Result<OpenReply").next()).expect("player_open");
-    for arg in ["asset_id: i64", "autoplay: bool", "canvas: CanvasSize", "ranges: Option<Vec<PlayRange>>", "start_ms: Option<u64>"] {
+    let open = src
+        .split("pub async fn player_open(")
+        .nth(1)
+        .and_then(|s| s.split(") -> Result<OpenReply").next())
+        .expect("player_open");
+    for arg in [
+        "asset_id: i64",
+        "autoplay: bool",
+        "canvas: CanvasSize",
+        "ranges: Option<Vec<PlayRange>>",
+        "start_ms: Option<u64>",
+    ] {
         assert!(open.contains(arg), "player_open must take `{arg}`: {open}");
     }
-    assert!(!open.contains("rect") && !open.contains("Option<bool>"), "구 계약의 rect 가 남아 있다");
+    assert!(
+        !open.contains("rect") && !open.contains("Option<bool>"),
+        "구 계약의 rect 가 남아 있다"
+    );
+    let squash = |s: &str| s.split_whitespace().collect::<String>().replace(",)", ")");
     for sig in [
         "pub async fn player_set_ranges(svc: Svc<'_>, asset_id: i64, ranges: Option<Vec<PlayRange>>) -> Result<(), CommandError>",
         "pub async fn player_control(svc: Svc<'_>, action: ControlAction) -> Result<(), CommandError>",
@@ -407,24 +734,57 @@ fn t_ipc_player_mpv_07_command_signatures_match_the_contract() {
         "pub async fn player_close(svc: Svc<'_>) -> Result<(), CommandError>",
         "pub async fn player_available(svc: Svc<'_>) -> Result<bool, CommandError>",
     ] {
-        assert!(src.contains(sig), "signature changed: {sig}");
+        // rustfmt 이 긴 시그니처를 여러 줄로 접으므로 공백·후행 쉼표를 제거한 형태로 비교한다
+        assert!(
+            squash(&src).contains(&squash(sig)),
+            "signature changed: {sig}"
+        );
     }
     // 제거된 command·이벤트가 다시 생기지 않았다 / 등록이 계약과 같다
-    for gone in ["player_set_rect", "player_set_visible", "player_snapshot", "player://input"] {
-        assert!(!src.contains(gone) && !lib.contains(&format!("player_commands::{gone}")), "removed contract item is back: {gone}");
+    for gone in [
+        "player_set_rect",
+        "player_set_visible",
+        "player_snapshot",
+        "player://input",
+    ] {
+        assert!(
+            !src.contains(gone) && !lib.contains(&format!("player_commands::{gone}")),
+            "removed contract item is back: {gone}"
+        );
     }
-    for reg in ["player_available", "player_open", "player_control", "player_seek", "player_set_rate", "player_set_volume", "player_set_render_size", "player_set_render_active", "player_release_slots", "player_restart", "player_close", "player_set_ranges"] {
-        assert!(lib.contains(&format!("player_commands::{reg},")), "not registered: {reg}");
+    for reg in [
+        "player_available",
+        "player_open",
+        "player_control",
+        "player_seek",
+        "player_set_rate",
+        "player_set_volume",
+        "player_set_render_size",
+        "player_set_render_active",
+        "player_release_slots",
+        "player_restart",
+        "player_close",
+        "player_set_ranges",
+    ] {
+        assert!(
+            lib.contains(&format!("player_commands::{reg},")),
+            "not registered: {reg}"
+        );
     }
     assert!(lib.contains("player_commands::on_page_load_started(webview.app_handle())"));
     assert!(!lib.contains("player_input"), "player_input 은 삭제됐다");
-    assert!(!std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/player_input.rs").exists());
+    assert!(
+        !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src/player_input.rs")
+            .exists()
+    );
 }
 
 #[test]
 fn t_ipc_player_mpv_08_range_payload_shapes() {
     // 구간: camelCase 정수. 소수·누락·문자열은 command 진입 전에 역직렬화 실패 (프론트가 Math.round 해야 하는 이유)
-    let r: PlayRange = serde_json::from_value(serde_json::json!({"startMs": 1000, "endMs": 2500})).unwrap();
+    let r: PlayRange =
+        serde_json::from_value(serde_json::json!({"startMs": 1000, "endMs": 2500})).unwrap();
     assert_eq!((r.start_ms, r.end_ms), (1000, 2500));
     for bad in [
         serde_json::json!({"startMs": 1000.5, "endMs": 2000}),
@@ -432,7 +792,10 @@ fn t_ipc_player_mpv_08_range_payload_shapes() {
         serde_json::json!({"start_ms": 1000, "end_ms": 2000}),
         serde_json::json!({"startMs": "1000", "endMs": 2000}),
     ] {
-        assert!(serde_json::from_value::<PlayRange>(bad.clone()).is_err(), "{bad}");
+        assert!(
+            serde_json::from_value::<PlayRange>(bad.clone()).is_err(),
+            "{bad}"
+        );
     }
 }
 
@@ -441,8 +804,16 @@ fn t_ipc_player_mpv_08_range_payload_shapes() {
 fn t_ipc_player_mpv_09_render_active_combines_the_page_and_the_window_and_resends_true() {
     let fx = fixture();
     let e = engine(&fx);
-    e.svc.open(&fx.reuse, fx.wav_id, canvas(), false, None, None, None).expect("open");
-    let sent = |v: bool| e.script.commands().iter().filter(|c| matches!(c, Command::SetRenderActive { active } if *active == v)).count();
+    e.svc
+        .open(&fx.reuse, fx.wav_id, canvas(), false, None, None, None)
+        .expect("open");
+    let sent = |v: bool| {
+        e.script
+            .commands()
+            .iter()
+            .filter(|c| matches!(c, Command::SetRenderActive { active } if *active == v))
+            .count()
+    };
     let settle = |n: usize, v: bool| {
         let end = Instant::now() + Duration::from_secs(2);
         while sent(v) < n && Instant::now() < end {
@@ -473,13 +844,25 @@ fn t_ipc_player_mpv_09_render_active_combines_the_page_and_the_window_and_resend
 fn t_ipc_player_mpv_10_restart_failed_and_manual_restart_through_the_service() {
     let fx = fixture();
     let e = engine(&fx);
-    e.svc.open(&fx.reuse, fx.wav_id, canvas(), true, None, None, None).expect("open");
+    e.svc
+        .open(&fx.reuse, fx.wav_id, canvas(), true, None, None, None)
+        .expect("open");
     e.script.fail_spawns.store(100, Ordering::SeqCst);
     e.svc.host.kill_worker_for_test();
-    let crashed = wait_for(&e.events, 4000, |ev| ev.state == EventState::RestartFailed).expect("restartFailed");
-    assert_eq!(serde_json::to_value(&crashed).unwrap()["errorCode"], "player_worker_crashed");
-    assert_eq!(code_of(&e.svc.seek(10.0).unwrap_err()), "player_restart_failed");
-    assert_eq!(code_of(&e.svc.control(ControlAction::StepForward).unwrap_err()), "player_restart_failed");
+    let crashed = wait_for(&e.events, 4000, |ev| ev.state == EventState::RestartFailed)
+        .expect("restartFailed");
+    assert_eq!(
+        serde_json::to_value(&crashed).unwrap()["errorCode"],
+        "player_worker_crashed"
+    );
+    assert_eq!(
+        code_of(&e.svc.seek(10.0).unwrap_err()),
+        "player_restart_failed"
+    );
+    assert_eq!(
+        code_of(&e.svc.control(ControlAction::StepForward).unwrap_err()),
+        "player_restart_failed"
+    );
     // 다시 시도
     e.script.fail_spawns.store(0, Ordering::SeqCst);
     let r = e.svc.restart().expect("restart");
@@ -512,7 +895,10 @@ fn t_player_reload_01_without_engine_is_a_non_blocking_no_op() {
     let started = Instant::now();
     svc.on_page_reload();
     svc.on_page_reload();
-    assert!(started.elapsed() < Duration::from_millis(500), "must not wait for the player");
+    assert!(
+        started.elapsed() < Duration::from_millis(500),
+        "must not wait for the player"
+    );
     assert!(events.lock().unwrap().is_empty());
 }
 
@@ -521,7 +907,9 @@ fn t_player_reload_01_without_engine_is_a_non_blocking_no_op() {
 fn t_player_reload_02_reload_closes_the_player() {
     let fx = fixture();
     let e = engine(&fx);
-    e.svc.open(&fx.reuse, fx.wav_id, canvas(), true, None, None, None).expect("open");
+    e.svc
+        .open(&fx.reuse, fx.wav_id, canvas(), true, None, None, None)
+        .expect("open");
     let started = Instant::now();
     e.svc.on_page_reload();
     assert!(started.elapsed() < Duration::from_millis(200), "비차단");
@@ -540,12 +928,22 @@ fn t_player_reload_02_reload_closes_the_player() {
 fn t_player_reload_03_open_after_reload_is_not_closed_by_the_pending_close() {
     let fx = fixture();
     let e = engine(&fx);
-    e.svc.open(&fx.reuse, fx.wav_id, canvas(), true, None, None, None).expect("open");
+    e.svc
+        .open(&fx.reuse, fx.wav_id, canvas(), true, None, None, None)
+        .expect("open");
     e.svc.on_page_reload();
-    let r = e.svc.open(&fx.reuse, fx.wav_id, canvas(), true, None, None, None).expect("reopen");
+    let r = e
+        .svc
+        .open(&fx.reuse, fx.wav_id, canvas(), true, None, None, None)
+        .expect("reopen");
     assert_eq!(r.session_id, 2);
     e.svc.seek(500.0).unwrap();
-    assert!(wait_for(&e.events, 2000, |ev| ev.session_id == 2 && ev.time_ms == 500).is_some(), "새로 연 재생이 유지된다");
+    assert!(
+        wait_for(&e.events, 2000, |ev| ev.session_id == 2
+            && ev.time_ms == 500)
+        .is_some(),
+        "새로 연 재생이 유지된다"
+    );
 }
 
 #[test]
@@ -559,11 +957,16 @@ fn t_ipc_eject_04_prepare_closes_the_player_only_when_the_open_asset_is_on_that_
         IngestDeps {
             pool: Arc::clone(&fx.pool),
             clock: Arc::new(SystemClock),
-            volumes: Arc::new(crate::volume_commands::eject_tests::MediaVolume(fx.media.clone())),
+            volumes: Arc::new(crate::volume_commands::eject_tests::MediaVolume(
+                fx.media.clone(),
+            )),
             identity: Arc::new(WindowsFileIdentity),
             hasher: Arc::new(Blake3Hasher),
         },
-        IngestConfig { auto_excludes: vec![fx.data.clone()], ..IngestConfig::default() },
+        IngestConfig {
+            auto_excludes: vec![fx.data.clone()],
+            ..IngestConfig::default()
+        },
     );
     fx.pool
         .write(Priority::High, |c| {
@@ -576,7 +979,10 @@ fn t_ipc_eject_04_prepare_closes_the_player_only_when_the_open_asset_is_on_that_
     svc.set_current_asset_for_test(Some(9_999_999));
     ingest.prepare_volume_eject(1).unwrap();
     // Assert 1: 건드리지 않는다
-    assert!(svc.is_other_asset(fx.wav_id), "an asset on another volume stays open");
+    assert!(
+        svc.is_other_asset(fx.wav_id),
+        "an asset on another volume stays open"
+    );
     // Act 2: 이 디스크의 자산이 열려 있다
     ingest.resume_volume_watch(1).unwrap();
     svc.set_current_asset_for_test(Some(fx.wav_id));
@@ -592,7 +998,9 @@ fn t_ipc_player_release_01_golden_release_message_is_forwarded_to_the_worker() {
     // Arrange: 열린 재생의 현재 epoch 로 golden 의 epoch 만 바꾼다
     let fx = fixture();
     let e = engine(&fx);
-    e.svc.open(&fx.reuse, fx.wav_id, canvas(), false, None, None, None).expect("open");
+    e.svc
+        .open(&fx.reuse, fx.wav_id, canvas(), false, None, None, None)
+        .expect("open");
     let epoch = e.svc.host.current_epoch();
     assert!(epoch > 0);
     let mut msg = fixture_json()["releaseMsg"].clone();
@@ -600,7 +1008,15 @@ fn t_ipc_player_release_01_golden_release_message_is_forwarded_to_the_worker() {
     // Act
     e.svc.release_slots(msg).expect("valid release");
     // Assert: 워커가 같은 epoch·슬롯 목록으로 Release 를 받는다
-    let got = || e.script.commands().into_iter().find_map(|c| if let Command::Release { epoch, slots } = c { Some((epoch, slots)) } else { None });
+    let got = || {
+        e.script.commands().into_iter().find_map(|c| {
+            if let Command::Release { epoch, slots } = c {
+                Some((epoch, slots))
+            } else {
+                None
+            }
+        })
+    };
     let end = Instant::now() + Duration::from_secs(2);
     while got().is_none() && Instant::now() < end {
         std::thread::sleep(Duration::from_millis(10));
@@ -615,14 +1031,20 @@ fn t_ipc_player_release_01_golden_release_message_is_forwarded_to_the_worker() {
 fn t_ipc_player_release_02_invalid_release_messages_are_rejected_without_reaching_the_worker() {
     let fx = fixture();
     let e = engine(&fx);
-    e.svc.open(&fx.reuse, fx.wav_id, canvas(), false, None, None, None).expect("open");
+    e.svc
+        .open(&fx.reuse, fx.wav_id, canvas(), false, None, None, None)
+        .expect("open");
     let epoch = e.svc.host.current_epoch();
     let fixt = fixture_json();
     let list = fixt["invalidReleaseMessages"].as_array().expect("list");
     assert!(!list.is_empty());
     // fixture 의 JSON 문자열 항목(= 문자열 메시지)도 값으로는 문자열이라 거부된다
     for v in list {
-        assert_eq!(code_of(&e.svc.release_slots(v.clone()).unwrap_err()), "invalid_input", "{v}");
+        assert_eq!(
+            code_of(&e.svc.release_slots(v.clone()).unwrap_err()),
+            "invalid_input",
+            "{v}"
+        );
     }
     // 현재 epoch 로 보내도 형식 오류는 거부 — 알 수 없는 필드, 타입 오류, 음수·소수 epoch, 누락, 빈 값
     let ok = |epoch: serde_json::Value| serde_json::json!({"mam": "player.v1", "k": "release", "epoch": epoch, "slots": [{"slot": 0, "seq": 1}]});
@@ -630,11 +1052,28 @@ fn t_ipc_player_release_02_invalid_release_messages_are_rejected_without_reachin
     extra["extra"] = serde_json::json!(1);
     let mut slot_extra = ok(serde_json::json!(epoch));
     slot_extra["slots"][0]["x"] = serde_json::json!(2);
-    for bad in [extra, slot_extra, ok(serde_json::json!(-1)), ok(serde_json::json!(1.5)), ok(serde_json::json!("1")), serde_json::json!({}), serde_json::Value::Null, serde_json::json!([]), serde_json::json!(7)] {
-        assert_eq!(code_of(&e.svc.release_slots(bad.clone()).unwrap_err()), "invalid_input", "{bad}");
+    for bad in [
+        extra,
+        slot_extra,
+        ok(serde_json::json!(-1)),
+        ok(serde_json::json!(1.5)),
+        ok(serde_json::json!("1")),
+        serde_json::json!({}),
+        serde_json::Value::Null,
+        serde_json::json!([]),
+        serde_json::json!(7),
+    ] {
+        assert_eq!(
+            code_of(&e.svc.release_slots(bad.clone()).unwrap_err()),
+            "invalid_input",
+            "{bad}"
+        );
     }
     // Assert: 거부된 메시지는 에러 본문에 값을 싣지 않고, 워커에 Release 가 가지 않는다
-    let err = e.svc.release_slots(serde_json::json!({"secret": "Users-someone-secret"})).unwrap_err();
+    let err = e
+        .svc
+        .release_slots(serde_json::json!({"secret": "Users-someone-secret"}))
+        .unwrap_err();
     assert!(!serde_json::to_string(&err).unwrap().contains("someone"));
     std::thread::sleep(Duration::from_millis(150));
     assert_eq!(e.script.count(|c| matches!(c, Command::Release { .. })), 0);
@@ -645,13 +1084,31 @@ fn t_ipc_player_release_02_invalid_release_messages_are_rejected_without_reachin
 fn t_ipc_player_release_03_epoch_zero_and_slot_count_boundaries() {
     let fx = fixture();
     let e = engine(&fx);
-    e.svc.open(&fx.reuse, fx.wav_id, canvas(), false, None, None, None).expect("open");
+    e.svc
+        .open(&fx.reuse, fx.wav_id, canvas(), false, None, None, None)
+        .expect("open");
     let epoch = e.svc.host.current_epoch();
     let msg = |epoch: u64, n: u64, slot: u32| serde_json::json!({"mam": "player.v1", "k": "release", "epoch": epoch, "slots": (0..n).map(|i| serde_json::json!({"slot": slot, "seq": i + 1})).collect::<Vec<_>>()});
-    assert_eq!(code_of(&e.svc.release_slots(msg(0, 1, 0)).unwrap_err()), "invalid_input", "epoch 0");
-    assert_eq!(code_of(&e.svc.release_slots(msg(epoch, 0, 0)).unwrap_err()), "invalid_input", "빈 슬롯");
-    assert_eq!(code_of(&e.svc.release_slots(msg(epoch, 9, 0)).unwrap_err()), "invalid_input", "9 슬롯");
-    assert_eq!(code_of(&e.svc.release_slots(msg(epoch, 1, 3)).unwrap_err()), "invalid_input", "slot 3");
+    assert_eq!(
+        code_of(&e.svc.release_slots(msg(0, 1, 0)).unwrap_err()),
+        "invalid_input",
+        "epoch 0"
+    );
+    assert_eq!(
+        code_of(&e.svc.release_slots(msg(epoch, 0, 0)).unwrap_err()),
+        "invalid_input",
+        "빈 슬롯"
+    );
+    assert_eq!(
+        code_of(&e.svc.release_slots(msg(epoch, 9, 0)).unwrap_err()),
+        "invalid_input",
+        "9 슬롯"
+    );
+    assert_eq!(
+        code_of(&e.svc.release_slots(msg(epoch, 1, 3)).unwrap_err()),
+        "invalid_input",
+        "slot 3"
+    );
     e.svc.release_slots(msg(epoch, 1, 2)).expect("1 슬롯");
     e.svc.release_slots(msg(epoch, 8, 0)).expect("8 슬롯");
 }
@@ -661,16 +1118,25 @@ fn t_ipc_player_release_03_epoch_zero_and_slot_count_boundaries() {
 fn t_ipc_player_release_04_stale_epoch_is_accepted_but_dropped_by_the_host() {
     let fx = fixture();
     let e = engine(&fx);
-    e.svc.open(&fx.reuse, fx.wav_id, canvas(), false, None, None, None).expect("open");
+    e.svc
+        .open(&fx.reuse, fx.wav_id, canvas(), false, None, None, None)
+        .expect("open");
     let epoch = e.svc.host.current_epoch();
     let stale = fixture_json()["releaseMsg"].clone(); // golden 의 epoch 3 — 현재 epoch 와 다르다
     assert_ne!(stale["epoch"].as_u64(), Some(epoch));
-    e.svc.release_slots(stale).expect("a stale epoch is not an error");
+    e.svc
+        .release_slots(stale)
+        .expect("a stale epoch is not an error");
     e.svc.release_slots(serde_json::json!({"mam": "player.v1", "k": "release", "epoch": epoch + 1, "slots": [{"slot": 0, "seq": 1}]})).expect("future epoch is not an error");
     // 큐 순서 보장용 동기 호출 뒤에도 Release 가 없다
     e.svc.seek(0.0).unwrap();
     std::thread::sleep(Duration::from_millis(150));
-    assert_eq!(e.script.count(|c| matches!(c, Command::Release { .. })), 0, "{:?}", e.script.commands());
+    assert_eq!(
+        e.script.count(|c| matches!(c, Command::Release { .. })),
+        0,
+        "{:?}",
+        e.script.commands()
+    );
 }
 
 // 분류: External (엔진 없음/열린 재생 없음 — 막히거나 오류 없이 반환)
@@ -679,11 +1145,18 @@ fn t_ipc_player_release_05_without_engine_or_session_is_a_non_blocking_no_op() {
     let fx = fixture();
     let (svc, events) = no_engine(&fx);
     let started = Instant::now();
-    svc.release_slots(fixture_json()["releaseMsg"].clone()).expect("no engine is not an error");
+    svc.release_slots(fixture_json()["releaseMsg"].clone())
+        .expect("no engine is not an error");
     assert!(started.elapsed() < Duration::from_millis(500));
     let e = engine(&fx);
-    e.svc.release_slots(fixture_json()["releaseMsg"].clone()).expect("no session is not an error");
-    assert_eq!(e.script.spawns.load(Ordering::SeqCst), 0, "반환이 워커를 띄우지 않는다");
+    e.svc
+        .release_slots(fixture_json()["releaseMsg"].clone())
+        .expect("no session is not an error");
+    assert_eq!(
+        e.script.spawns.load(Ordering::SeqCst),
+        0,
+        "반환이 워커를 띄우지 않는다"
+    );
     assert!(events.lock().unwrap().is_empty());
 }
 
@@ -693,13 +1166,53 @@ fn t_resume_player_01_open_sends_start_ms_to_the_worker_and_validates_it_first()
     let fx = fixture();
     // Arrange / Act: 시작 위치 있음 / 없음
     let e = engine(&fx);
-    e.svc.open(&fx.reuse, fx.wav_id, canvas(), false, None, None, Some(12_345)).expect("open");
-    e.svc.open(&fx.reuse, fx.wav_id, canvas(), false, None, None, None).expect("open");
+    e.svc
+        .open(
+            &fx.reuse,
+            fx.wav_id,
+            canvas(),
+            false,
+            None,
+            None,
+            Some(12_345),
+        )
+        .expect("open");
+    e.svc
+        .open(&fx.reuse, fx.wav_id, canvas(), false, None, None, None)
+        .expect("open");
     // Assert
-    let opens: Vec<_> = e.script.commands().into_iter().filter_map(|c| match c { Command::Open { start_ms, .. } => Some(start_ms), _ => None }).collect();
+    let opens: Vec<_> = e
+        .script
+        .commands()
+        .into_iter()
+        .filter_map(|c| match c {
+            Command::Open { start_ms, .. } => Some(start_ms),
+            _ => None,
+        })
+        .collect();
     assert_eq!(opens, [Some(12_345), None]);
     // Validation: 범위 밖 값은 없는 자산 오류보다 먼저 invalid_input
     let (svc, _events) = no_engine(&fx);
-    assert_eq!(code_of(&svc.open(&fx.reuse, 9_999_999, canvas(), true, None, None, Some(u64::MAX)).unwrap_err()), "invalid_input");
-    assert_eq!(code_of(&svc.open(&fx.reuse, 9_999_999, canvas(), true, None, None, Some(1000)).unwrap_err()), "asset_offline");
+    assert_eq!(
+        code_of(
+            &svc.open(
+                &fx.reuse,
+                9_999_999,
+                canvas(),
+                true,
+                None,
+                None,
+                Some(u64::MAX)
+            )
+            .unwrap_err()
+        ),
+        "invalid_input"
+    );
+    assert_eq!(
+        code_of(
+            &svc.open(&fx.reuse, 9_999_999, canvas(), true, None, None, Some(1000))
+                .unwrap_err()
+        ),
+        "asset_offline"
+    );
 }

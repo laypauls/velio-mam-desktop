@@ -20,7 +20,10 @@ fn add(env: &Env, dir: &str) -> i64 {
 }
 
 fn start_scan(env: &Env, id: i64, path: &str) {
-    env.ingest.env().progress.start(id, path.into(), 7, env.clock_now());
+    env.ingest
+        .env()
+        .progress
+        .start(id, path.into(), 7, env.clock_now());
 }
 
 fn insert_job(env: &Env, kind: &str, folder_id: Option<i64>, status: &str) {
@@ -117,7 +120,7 @@ fn t_hidescan_05_hidden_scan_jobs_are_excluded_in_every_status() {
     insert_job(&env, "scan", Some(h), "failed");
 
     // Act
-    let c = summary(&env).counts[&JobKind::Scan].clone();
+    let c = summary(&env).counts[&JobKind::Scan];
 
     // Assert
     assert_eq!((c.pending, c.running, c.failed), (0, 0, 0));
@@ -185,5 +188,8 @@ fn t_hidescan_08_counts_query_plan_uses_indexes_for_both_halves() {
 
     // Assert
     println!("{plan:#?}");
-    assert!(plan.iter().any(|p| p.contains("idx_jobs_kind_status")), "{plan:?}");
+    assert!(
+        plan.iter().any(|p| p.contains("idx_jobs_kind_status")),
+        "{plan:?}"
+    );
 }
