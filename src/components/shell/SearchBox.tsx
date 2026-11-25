@@ -29,6 +29,7 @@ export function SearchBox() {
   const mode = useSearchStore((s) => s.mode)
   const [text, setText] = useState(query)
   const [focused, setFocused] = useState(false)
+  const [focusWithin, setFocusWithin] = useState(false)
   const recent = useRecentSearches()
   const tagAc = useTagAutocomplete({ text, setText, focused })
   // 제목은 편집이 켜져 있을 때만 검색 대상이다 (백엔드 규칙) — 설정을 받기 전에는 파일명 기준 문구
@@ -65,9 +66,21 @@ export function SearchBox() {
 
   const items = recent.data ?? []
   const showRecent = focused && text === "" && items.length > 0
+  // 박스 안 어디든 포커스가 있거나, 검색어·태그 칩이 남아 있으면 확장
+  const expanded = focusWithin || text.trim() !== "" || tagAc.chips.length > 0
 
   return (
-    <div className="relative w-full min-w-0 max-w-xl flex-1">
+    // 폭 제한(평소 max-w-xs → 확장 max-w-xl)은 래퍼(TopBarSearch)가 `data-expanded` 를 보고 건다 — 필터 버튼이 함께 밀리도록
+    <div
+      data-testid="search-box"
+      data-expanded={expanded ? "true" : "false"}
+      className="relative w-full min-w-0 flex-1"
+      onFocus={() => setFocusWithin(true)}
+      onBlur={(e) => {
+        // 모드 토글·칩 삭제 버튼 등 박스 안 다른 요소로 포커스가 옮겨가면 확장을 유지한다
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocusWithin(false)
+      }}
+    >
       <div className="absolute top-1/2 left-1.5 z-10 -translate-y-1/2">
         <SearchModeToggle />
       </div>

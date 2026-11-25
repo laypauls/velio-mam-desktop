@@ -41,9 +41,10 @@ export function TopBarSearch() {
         data-testid="top-search"
         data-open={open ? "true" : undefined}
         className={cn(
-          "flex min-w-0 max-w-xl flex-1 items-center gap-2",
+          // 평소 max-w-xs, SearchBox 가 확장(data-expanded)이면 max-w-xl — 폭 전환은 여기서 해야 오른쪽 필터 버튼이 함께 움직인다
+          "flex min-w-0 max-w-xs flex-1 items-center gap-2 transition-[max-width] duration-150 has-data-[expanded=true]:max-w-xl motion-reduce:transition-none",
           open
-            ? "@max-[420px]:absolute @max-[420px]:inset-0 @max-[420px]:z-20 @max-[420px]:max-w-none @max-[420px]:bg-background @max-[420px]:px-2"
+            ? "@max-[420px]:absolute @max-[420px]:inset-0 @max-[420px]:z-20 @max-[420px]:max-w-none! @max-[420px]:bg-background @max-[420px]:px-2"
             : "@max-[420px]:hidden"
         )}
         onBlur={(e) => {
