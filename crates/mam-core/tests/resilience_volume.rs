@@ -471,7 +471,10 @@ fn t_res_09b_unplugged_volume_with_no_known_mount_stays_offline_and_unregistered
 
     // Assert: 다른 디스크를 같은 볼륨으로 오인해 재연결하지 않는다
     // `present`(연결된 볼륨 목록, 새 디스크 감지용)는 상태 변화가 아니다 - 전환이 없다는 것만 본다
-    assert!(report.went_online.is_empty() && report.went_offline.is_empty(), "{report:?}");
+    assert!(
+        report.went_online.is_empty() && report.went_offline.is_empty(),
+        "{report:?}"
+    );
     assert_eq!(count(&w.db.conn, "SELECT count(*) FROM volumes"), 1);
     let avail: String =
         w.db.conn

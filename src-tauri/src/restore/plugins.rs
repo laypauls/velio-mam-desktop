@@ -69,7 +69,10 @@ pub fn merge_plugins(conn: &Connection, kept: &KeptPlugins) -> rusqlite::Result<
         };
         put_row(conn, GRANTED, id, &granted_to_raw(&allowed))?;
     }
-    for id in backup_cursors.keys().filter(|id| !kept.installed.contains_key(*id)) {
+    for id in backup_cursors
+        .keys()
+        .filter(|id| !kept.installed.contains_key(*id))
+    {
         let _ = delete_plugin(conn, id); // 잘못된 ID 는 `load_prefixed` 가 이미 거른다
     }
     Ok(())

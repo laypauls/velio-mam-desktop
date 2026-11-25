@@ -7,7 +7,9 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::mpsc::{Receiver, channel};
 use std::sync::{Arc, Mutex};
 
-use super::detector::{ChangeDetector, DetectError, DetectorOptions, ProbeResult, WatchHandle, WatchTarget};
+use super::detector::{
+    ChangeDetector, DetectError, DetectorOptions, ProbeResult, WatchHandle, WatchTarget,
+};
 use super::detectors::ScanOnly;
 use super::detectors::os_events::report_health;
 use super::health::SourceHealth;
@@ -62,7 +64,8 @@ fn fixture(auto: &[&'static str]) -> Fixture {
     let clock = Arc::new(Clock(AtomicI64::new(T0)));
     let sink = Arc::new(Mutex::new(None));
     let (tx, rx) = channel();
-    let all: Vec<Arc<dyn ChangeDetector>> = vec![Arc::new(Parking(Arc::clone(&sink))), Arc::new(ScanOnly)];
+    let all: Vec<Arc<dyn ChangeDetector>> =
+        vec![Arc::new(Parking(Arc::clone(&sink))), Arc::new(ScanOnly)];
     let shared: SharedClock = clock.clone();
     let m = WatchManager::with_clock(tx, Arc::new(DetectorRegistry::new(all, auto)), shared);
     Fixture { clock, sink, m, rx }
@@ -91,14 +94,24 @@ fn t_health_01_started_detector_is_ok_without_a_signal_and_a_signal_stamps_the_i
     // Arrange
     let f = fixture(&["parking"]);
     let sink = f.start();
-    assert_eq!(f.m.health(1), Some(SourceHealth::Ok { last_signal_at: None }));
+    assert_eq!(
+        f.m.health(1),
+        Some(SourceHealth::Ok {
+            last_signal_at: None
+        })
+    );
 
     // Act
     f.advance(5_000);
     sink.signal();
 
     // Assert
-    assert_eq!(f.m.health(1), Some(SourceHealth::Ok { last_signal_at: Some(T0 + 5_000) }));
+    assert_eq!(
+        f.m.health(1),
+        Some(SourceHealth::Ok {
+            last_signal_at: Some(T0 + 5_000)
+        })
+    );
     assert_eq!(f.m.health(2), None, "an unwatched folder has no health");
 }
 
@@ -124,7 +137,12 @@ fn t_health_02_degraded_keeps_its_start_time_until_recovered_and_a_signal_does_n
         })
     );
     sink.recovered();
-    assert_eq!(f.m.health(1), Some(SourceHealth::Ok { last_signal_at: Some(T0 + 20_000) }));
+    assert_eq!(
+        f.m.health(1),
+        Some(SourceHealth::Ok {
+            last_signal_at: Some(T0 + 20_000)
+        })
+    );
 }
 
 #[test]
@@ -138,7 +156,12 @@ fn t_health_03_a_timed_degraded_state_expires_exactly_at_its_hold_time() {
     f.advance(59_999);
     assert!(matches!(f.m.health(1), Some(SourceHealth::Degraded { since, .. }) if since == T0));
     f.advance(1);
-    assert_eq!(f.m.health(1), Some(SourceHealth::Ok { last_signal_at: None }));
+    assert_eq!(
+        f.m.health(1),
+        Some(SourceHealth::Ok {
+            last_signal_at: None
+        })
+    );
 }
 
 #[test]
@@ -158,7 +181,12 @@ fn t_health_04_reports_from_a_replaced_or_stopped_sink_are_ignored() {
     fresh.signal();
 
     // Assert
-    assert_eq!(f.m.health(1), Some(SourceHealth::Ok { last_signal_at: Some(T0 + 1_000) }));
+    assert_eq!(
+        f.m.health(1),
+        Some(SourceHealth::Ok {
+            last_signal_at: Some(T0 + 1_000)
+        })
+    );
     f.m.stop_all();
     assert_eq!(f.m.health(1), None);
 }
@@ -177,11 +205,21 @@ fn t_health_05_os_events_reports_overflow_and_errors_as_degraded_and_changes_as_
     // Act / Assert: 변경 -> 신호
     f.advance(1_000);
     report_health(&sink, false, &path);
-    assert_eq!(f.m.health(1), Some(SourceHealth::Ok { last_signal_at: Some(T0 + 1_000) }));
+    assert_eq!(
+        f.m.health(1),
+        Some(SourceHealth::Ok {
+            last_signal_at: Some(T0 + 1_000)
+        })
+    );
     // 변경이 없는 이벤트(접근 등)는 아무것도 바꾸지 않는다
     f.advance(1_000);
     report_health(&sink, false, &[]);
-    assert_eq!(f.m.health(1), Some(SourceHealth::Ok { last_signal_at: Some(T0 + 1_000) }));
+    assert_eq!(
+        f.m.health(1),
+        Some(SourceHealth::Ok {
+            last_signal_at: Some(T0 + 1_000)
+        })
+    );
     // 넘침 -> 짧게 저하, 곧 정상
     report_health(&sink, false, &rescan);
     assert_eq!(
@@ -197,7 +235,10 @@ fn t_health_05_os_events_reports_overflow_and_errors_as_degraded_and_changes_as_
     report_health(&sink, true, &rescan);
     assert!(matches!(
         f.m.health(1),
-        Some(SourceHealth::Degraded { reason_key: "watch.health.error", .. })
+        Some(SourceHealth::Degraded {
+            reason_key: "watch.health.error",
+            ..
+        })
     ));
 }
 
@@ -208,15 +249,29 @@ fn t_health_06_scan_only_reports_nothing_and_stays_ok() {
     f.m.start(&target(), None, None);
 
     // Assert
-    assert_eq!(f.m.health(1), Some(SourceHealth::Ok { last_signal_at: None }));
+    assert_eq!(
+        f.m.health(1),
+        Some(SourceHealth::Ok {
+            last_signal_at: None
+        })
+    );
 }
 
 #[test]
 fn t_health_07_json_uses_a_state_tag_and_camel_case_fields() {
-    let ok = serde_json::to_value(SourceHealth::Ok { last_signal_at: Some(5) }).unwrap();
+    let ok = serde_json::to_value(SourceHealth::Ok {
+        last_signal_at: Some(5),
+    })
+    .unwrap();
     assert_eq!(ok, serde_json::json!({"state": "ok", "lastSignalAt": 5}));
-    let none = serde_json::to_value(SourceHealth::Ok { last_signal_at: None }).unwrap();
-    assert_eq!(none, serde_json::json!({"state": "ok", "lastSignalAt": null}));
+    let none = serde_json::to_value(SourceHealth::Ok {
+        last_signal_at: None,
+    })
+    .unwrap();
+    assert_eq!(
+        none,
+        serde_json::json!({"state": "ok", "lastSignalAt": null})
+    );
     let bad = serde_json::to_value(SourceHealth::Degraded {
         since: 7,
         reason_key: "watch.health.overflow",

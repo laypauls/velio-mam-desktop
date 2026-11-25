@@ -33,12 +33,22 @@ impl ActivityLog {
     }
 
     /// 조건이 참이 될 때까지 조건 변수로 기다린다. 제한 시간 안에 안 되면 false
-    pub(crate) fn wait_until(&self, timeout: Duration, pred: impl Fn(&HostActivity) -> bool) -> bool {
+    pub(crate) fn wait_until(
+        &self,
+        timeout: Duration,
+        pred: impl Fn(&HostActivity) -> bool,
+    ) -> bool {
         let deadline = Instant::now() + timeout;
         let mut g = self.guard();
         while !pred(&g) {
-            let Some(left) = deadline.checked_duration_since(Instant::now()) else { return false };
-            g = self.cv.wait_timeout(g, left).unwrap_or_else(|p| p.into_inner()).0;
+            let Some(left) = deadline.checked_duration_since(Instant::now()) else {
+                return false;
+            };
+            g = self
+                .cv
+                .wait_timeout(g, left)
+                .unwrap_or_else(|p| p.into_inner())
+                .0;
         }
         true
     }

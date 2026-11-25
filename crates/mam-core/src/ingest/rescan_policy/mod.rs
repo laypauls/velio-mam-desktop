@@ -88,7 +88,10 @@ pub fn parse_policy(raw: &Value) -> Result<RescanPolicy, PolicyError> {
     let Value::Object(obj) = raw else {
         return Err(err("rescanPolicy"));
     };
-    if obj.keys().any(|k| !matches!(k.as_str(), "trigger" | "window" | "onStart")) {
+    if obj
+        .keys()
+        .any(|k| !matches!(k.as_str(), "trigger" | "window" | "onStart"))
+    {
         return Err(err("rescanPolicy"));
     }
     let Some(Value::Object(trigger)) = obj.get("trigger") else {
@@ -176,7 +179,10 @@ impl RescanPolicy {
 /// 저장된 정책 텍스트의 유효 정책. NULL = 전역 기본, 해석 불가(JSON 아님·검증 실패) = 전역 기본 + `InvalidFallback`.
 pub fn effective_policy(stored: Option<&str>, default_hours: u32) -> (RescanPolicy, PolicySource) {
     let Some(text) = stored else {
-        return (RescanPolicy::default_interval(default_hours), PolicySource::Default);
+        return (
+            RescanPolicy::default_interval(default_hours),
+            PolicySource::Default,
+        );
     };
     match serde_json::from_str::<Value>(text)
         .map_err(|_| err("rescanPolicy"))

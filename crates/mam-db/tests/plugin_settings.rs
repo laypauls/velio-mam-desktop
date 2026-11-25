@@ -7,10 +7,12 @@ mod common;
 use std::collections::BTreeSet;
 
 use common::{count, insert_asset, migrated_db, seed_kv, seed_task};
-use mam_db::plugin_data::{data_plugin_ids, purge_uninstalled, purge_uninstalled_with, tables_exist};
+use mam_db::plugin_data::{
+    data_plugin_ids, purge_uninstalled, purge_uninstalled_with, tables_exist,
+};
 use mam_db::plugin_settings::{
-    ENABLED, FEED_CURSOR, GRANTED, INSTALLED, delete_plugin, delete_prefixed, get, granted_to_raw, key,
-    load_prefixed, parse_enabled, parse_granted, put, valid_id,
+    ENABLED, FEED_CURSOR, GRANTED, INSTALLED, delete_plugin, delete_prefixed, get, granted_to_raw,
+    key, load_prefixed, parse_enabled, parse_granted, put, valid_id,
 };
 use rusqlite::Connection;
 
@@ -26,7 +28,10 @@ fn t_pdb_07_keys_reject_empty_or_colon_ids_and_range_query_has_exact_bounds() {
     assert!(key(ENABLED, "a:b").is_err());
     assert!(!valid_id("") && !valid_id("x:") && valid_id("x"));
     assert!(put(c, ENABLED, "a:b", "true").is_err());
-    assert_eq!(count(c, "SELECT COUNT(*) FROM settings WHERE key LIKE 'plugin_%'"), 0);
+    assert_eq!(
+        count(c, "SELECT COUNT(*) FROM settings WHERE key LIKE 'plugin_%'"),
+        0
+    );
 
     // 범위 질의: 같은 접두어만, 이웃 키(접두어가 같지만 구분자가 다른 키)는 제외
     put(c, ENABLED, "p1", "true").unwrap();
@@ -43,8 +48,18 @@ fn t_pdb_07_keys_reject_empty_or_colon_ids_and_range_query_has_exact_bounds() {
     delete_plugin(c, "p1").unwrap();
     assert!(load_prefixed(c, INSTALLED).unwrap().is_empty());
     assert_eq!(load_prefixed(c, ENABLED).unwrap().len(), 1);
-    assert_eq!(delete_prefixed(c, ENABLED).unwrap(), 2, "p2 + the empty-id junk row inside the range");
-    assert_eq!(count(c, "SELECT COUNT(*) FROM settings WHERE key IN ('plugin_enabled', 'plugin_enabled;z', 'plugin_enabled:')"), 2);
+    assert_eq!(
+        delete_prefixed(c, ENABLED).unwrap(),
+        2,
+        "p2 + the empty-id junk row inside the range"
+    );
+    assert_eq!(
+        count(
+            c,
+            "SELECT COUNT(*) FROM settings WHERE key IN ('plugin_enabled', 'plugin_enabled;z', 'plugin_enabled:')"
+        ),
+        2
+    );
 }
 
 #[test]
@@ -61,8 +76,16 @@ fn t_pdb_08_plugin_keys_are_invisible_to_settings_load_and_values_parse_defensiv
     // Assert: 설정 로드는 이 키를 모르는 키로 무시한다 (경고도 없다)
     assert_eq!(format!("{before:?}"), format!("{after:?}"));
     assert!(warnings.is_empty(), "{warnings:?}");
-    assert!(parse_enabled("true") && !parse_enabled("false") && !parse_enabled("1") && !parse_enabled("garbage"));
-    assert_eq!(parse_granted("[\"b\",\"a\",1,null,\"a\"]"), set(&["a", "b"]));
+    assert!(
+        parse_enabled("true")
+            && !parse_enabled("false")
+            && !parse_enabled("1")
+            && !parse_enabled("garbage")
+    );
+    assert_eq!(
+        parse_granted("[\"b\",\"a\",1,null,\"a\"]"),
+        set(&["a", "b"])
+    );
     assert!(parse_granted("not json").is_empty() && parse_granted("{}").is_empty());
     assert_eq!(granted_to_raw(&set(&["z", "a"])), "[\"a\",\"z\"]");
 }
@@ -90,7 +113,10 @@ fn t_pdb_09_purge_uninstalled_deletes_only_other_plugins_rows_in_batches_and_is_
     seed(c, "keep", &assets, 3);
     seed(c, "gone1", &assets, 4);
     seed(c, "gone2", &assets[..1], 0);
-    assert_eq!(data_plugin_ids(c).unwrap(), set(&["gone1", "gone2", "keep"]));
+    assert_eq!(
+        data_plugin_ids(c).unwrap(),
+        set(&["gone1", "gone2", "keep"])
+    );
 
     // Act
     let removed = purge_uninstalled_with(c, &set(&["keep"]), 2).unwrap();
@@ -98,12 +124,31 @@ fn t_pdb_09_purge_uninstalled_deletes_only_other_plugins_rows_in_batches_and_is_
     // Assert: gone1 = 5 + 4 + 5, gone2 = 1 + 1
     assert_eq!(removed, 14 + 2);
     assert_eq!(data_plugin_ids(c).unwrap(), set(&["keep"]));
-    assert_eq!(count(c, "SELECT COUNT(*) FROM plugin_kv JOIN plugins USING (plugin_ref) WHERE plugin_id = 'keep'"), 8);
-    assert_eq!(count(c, "SELECT COUNT(*) FROM plugin_tasks JOIN plugins USING (plugin_ref) WHERE plugin_id = 'keep'"), 5);
-    assert_eq!(purge_uninstalled(c, &set(&["keep"])).unwrap(), 0, "idempotent");
+    assert_eq!(
+        count(
+            c,
+            "SELECT COUNT(*) FROM plugin_kv JOIN plugins USING (plugin_ref) WHERE plugin_id = 'keep'"
+        ),
+        8
+    );
+    assert_eq!(
+        count(
+            c,
+            "SELECT COUNT(*) FROM plugin_tasks JOIN plugins USING (plugin_ref) WHERE plugin_id = 'keep'"
+        ),
+        5
+    );
+    assert_eq!(
+        purge_uninstalled(c, &set(&["keep"])).unwrap(),
+        0,
+        "idempotent"
+    );
     // 아무것도 설치되지 않았으면 모두 지운다
     assert_eq!(purge_uninstalled(c, &BTreeSet::new()).unwrap(), 13);
-    assert_eq!(count(c, "SELECT COUNT(*) FROM plugin_kv") + count(c, "SELECT COUNT(*) FROM plugin_tasks"), 0);
+    assert_eq!(
+        count(c, "SELECT COUNT(*) FROM plugin_kv") + count(c, "SELECT COUNT(*) FROM plugin_tasks"),
+        0
+    );
 }
 
 #[test]
@@ -129,7 +174,11 @@ fn t_pdb_13_get_reads_one_row_and_fails_closed_for_missing_or_invalid_ids() {
     // Act / Assert
     assert_eq!(get(c, ENABLED, "com.a").unwrap().as_deref(), Some("true"));
     assert_eq!(get(c, ENABLED, "com.b").unwrap().as_deref(), Some("false"));
-    assert_eq!(get(c, GRANTED, "com.a").unwrap(), None, "다른 접두어는 별개");
+    assert_eq!(
+        get(c, GRANTED, "com.a").unwrap(),
+        None,
+        "다른 접두어는 별개"
+    );
     assert_eq!(get(c, ENABLED, "com.zzz").unwrap(), None);
     assert_eq!(get(c, ENABLED, "").unwrap(), None);
     assert_eq!(get(c, ENABLED, "a:b").unwrap(), None);

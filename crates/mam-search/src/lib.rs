@@ -25,6 +25,6 @@ pub use error::{Result, SearchError};
 pub use index::{IndexOptions, SearchIndex, UpsertOutcome};
 pub use query::FilenameStrategy;
 pub use retry_dir::{RetryDirectory, RetryPolicy};
+pub use search::{Filters, Hit, MAX_LIMIT, MAX_WINDOW, Range, SearchRequest, Sort};
 pub use userfield::{UserFieldValue, UserValue, keyword_key};
 pub use userfield_filter::UserFieldCondition;
-pub use search::{Filters, Hit, MAX_LIMIT, MAX_WINDOW, Range, SearchRequest, Sort};

@@ -30,7 +30,10 @@ fn tasks(fx: &Fx, n: usize) -> Vec<(i64, i64)> {
     }
     fx.pool
         .write(Priority::High, |c| {
-            with_immediate_tx(c, |tx| plugin_tasks::run_all_batch(tx, PLUGIN, &[("meta", &["image"])], 0, 1000, 1).map(|_| ()))?;
+            with_immediate_tx(c, |tx| {
+                plugin_tasks::run_all_batch(tx, PLUGIN, &[("meta", &["image"])], 0, 1000, 1)
+                    .map(|_| ())
+            })?;
             Ok(())
         })
         .unwrap();
@@ -45,9 +48,24 @@ fn t_pgw_race_01_first_kv_set_and_provider_record_keep_the_meter_equal_to_the_db
         // Arrange: 계량기가 아직 없는 새 게이트웨이 (첫 쓰기 경합)
         let fx = Arc::new(Fx::new());
         let plugin = fx.full_plugin(PLUGIN);
-        fx.pool.write(Priority::High, |c| { put(c, INSTALLED, PLUGIN, r#"{"version":"1.0.0","installedAt":1}"#).unwrap(); Ok(()) }).unwrap();
+        fx.pool
+            .write(Priority::High, |c| {
+                put(
+                    c,
+                    INSTALLED,
+                    PLUGIN,
+                    r#"{"version":"1.0.0","installedAt":1}"#,
+                )
+                .unwrap();
+                Ok(())
+            })
+            .unwrap();
         let pairs = tasks(&fx, PER_THREAD);
-        assert_eq!(fx.gw.kv_meter_used(PLUGIN), None, "round {round}: meter starts uninitialized");
+        assert_eq!(
+            fx.gw.kv_meter_used(PLUGIN),
+            None,
+            "round {round}: meter starts uninitialized"
+        );
         let gate = Arc::new(Barrier::new(2));
 
         // Act: provider 기록(자산별 KV)과 명령 `kv.set`(전역 키) 을 동시에
@@ -56,8 +74,19 @@ fn t_pgw_race_01_first_kv_set_and_provider_record_keep_the_meter_equal_to_the_db
             thread::spawn(move || {
                 gate.wait();
                 for (task, asset) in pairs {
-                    let done = Completion { task_id: task, processed_rev: 1 };
-                    fx.gw.record_provider_output(PLUGIN, asset, json!({"kv": {"from-provider": "p".repeat(40)}}), done, soon()).unwrap();
+                    let done = Completion {
+                        task_id: task,
+                        processed_rev: 1,
+                    };
+                    fx.gw
+                        .record_provider_output(
+                            PLUGIN,
+                            asset,
+                            json!({"kv": {"from-provider": "p".repeat(40)}}),
+                            done,
+                            soon(),
+                        )
+                        .unwrap();
                 }
             })
         };
@@ -66,7 +95,13 @@ fn t_pgw_race_01_first_kv_set_and_provider_record_keep_the_meter_equal_to_the_db
             thread::spawn(move || {
                 gate.wait();
                 for i in 0..PER_THREAD {
-                    fx.call(&plugin, &[], "kv.set", json!({"key": format!("cmd-{i}"), "value": "v".repeat(30)})).unwrap();
+                    fx.call(
+                        &plugin,
+                        &[],
+                        "kv.set",
+                        json!({"key": format!("cmd-{i}"), "value": "v".repeat(30)}),
+                    )
+                    .unwrap();
                 }
             })
         };
@@ -76,7 +111,11 @@ fn t_pgw_race_01_first_kv_set_and_provider_record_keep_the_meter_equal_to_the_db
         // Assert: 어느 쪽 delta 도 사라지지 않았다
         let sum = db_sum(&fx);
         assert!(sum > 0);
-        assert_eq!(fx.gw.kv_meter_used(PLUGIN), Some(sum), "round {round}: meter must equal SUM(cost) in the DB");
+        assert_eq!(
+            fx.gw.kv_meter_used(PLUGIN),
+            Some(sum),
+            "round {round}: meter must equal SUM(cost) in the DB"
+        );
     }
 }
 
@@ -85,20 +124,35 @@ fn t_pgw_race_02_first_kv_set_initializes_from_existing_rows_inside_the_writer()
     // Arrange: 계량기 없이 DB 에 이미 행이 있다 (앱 재시작 직후)
     let fx = Fx::with_cfg(|c| c.kv_quota_bytes = 400);
     let plugin = fx.full_plugin(PLUGIN);
-    fx.call(&plugin, &[], "kv.set", json!({"key": "old", "value": "x".repeat(100)})).unwrap();
+    fx.call(
+        &plugin,
+        &[],
+        "kv.set",
+        json!({"key": "old", "value": "x".repeat(100)}),
+    )
+    .unwrap();
     fx.gw.forget_plugin(PLUGIN);
     assert_eq!(fx.gw.kv_meter_used(PLUGIN), None);
 
     // Act
-    fx.call(&plugin, &[], "kv.set", json!({"key": "new", "value": 1})).unwrap();
+    fx.call(&plugin, &[], "kv.set", json!({"key": "new", "value": 1}))
+        .unwrap();
 
     // Assert
     assert_eq!(fx.gw.kv_meter_used(PLUGIN), Some(db_sum(&fx)));
     // 실패 경로: 상한을 넘는 쓰기는 거부되고 계량기·DB 는 그대로
     let before = db_sum(&fx);
-    let err = fx.call(&plugin, &[], "kv.set", json!({"key": "huge", "value": "z".repeat(500)}));
+    let err = fx.call(
+        &plugin,
+        &[],
+        "kv.set",
+        json!({"key": "huge", "value": "z".repeat(500)}),
+    );
     assert!(err.is_err(), "over quota is rejected");
-    assert_eq!((fx.gw.kv_meter_used(PLUGIN), db_sum(&fx)), (Some(before), before));
+    assert_eq!(
+        (fx.gw.kv_meter_used(PLUGIN), db_sum(&fx)),
+        (Some(before), before)
+    );
 }
 
 #[test]
@@ -109,12 +163,20 @@ fn t_pgw_race_03_meter_is_initialized_only_inside_the_writer() {
     let ghost = 9_999_999;
 
     // Act
-    let err = fx.call(&plugin, &[ghost], "kv.set", json!({"key": "k", "value": 1, "assetId": ghost})).unwrap_err();
+    let err = fx
+        .call(
+            &plugin,
+            &[ghost],
+            "kv.set",
+            json!({"key": "k", "value": 1, "assetId": ghost}),
+        )
+        .unwrap_err();
 
     // Assert: 거부된 쓰기는 계량기를 건드리지 않는다 (예전에는 writer 밖에서 먼저 초기화했다 — 경합 창)
     assert_eq!(err.code, "not_found");
     assert_eq!(fx.gw.kv_meter_used(PLUGIN), None);
     // 이어서 정상 쓰기는 writer 안에서 초기화한다
-    fx.call(&plugin, &[], "kv.set", json!({"key": "k", "value": 1})).unwrap();
+    fx.call(&plugin, &[], "kv.set", json!({"key": "k", "value": 1}))
+        .unwrap();
     assert_eq!(fx.gw.kv_meter_used(PLUGIN), Some(db_sum(&fx)));
 }

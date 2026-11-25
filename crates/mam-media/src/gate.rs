@@ -55,7 +55,10 @@ pub struct SidecarGate {
 impl std::fmt::Debug for SidecarGate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let g = guard(&self.state);
-        f.debug_struct("SidecarGate").field("blocked", &g.blocked).field("running", &g.running.len()).finish()
+        f.debug_struct("SidecarGate")
+            .field("blocked", &g.blocked)
+            .field("running", &g.running.len())
+            .finish()
     }
 }
 
@@ -88,7 +91,11 @@ impl SidecarGate {
         let p = dir_prefix(prefix);
         let g = guard(&self.state);
         let mut pids = Vec::new();
-        for e in g.running.values().filter(|e| e.args.iter().any(|a| under(a, &p))) {
+        for e in g
+            .running
+            .values()
+            .filter(|e| e.args.iter().any(|a| under(a, &p)))
+        {
             e.cancel.store(true, Ordering::SeqCst);
             let pid = e.pid.load(Ordering::SeqCst);
             if pid != 0 {
@@ -114,27 +121,41 @@ impl SidecarGate {
         let deadline = Instant::now() + timeout;
         let mut g = guard(&self.state);
         loop {
-            if !g.running.values().any(|e| e.args.iter().any(|a| under(a, &p))) {
+            if !g
+                .running
+                .values()
+                .any(|e| e.args.iter().any(|a| under(a, &p)))
+            {
                 return true;
             }
             let left = deadline.saturating_duration_since(Instant::now());
             if left.is_zero() {
                 return false;
             }
-            g = self.cv.wait_timeout(g, left).unwrap_or_else(|p| p.into_inner()).0;
+            g = self
+                .cv
+                .wait_timeout(g, left)
+                .unwrap_or_else(|p| p.into_inner())
+                .0;
         }
     }
 
     /// 실행 직전 등록. 차단된 경로를 쓰면 `None`. 반환 핸들이 살아 있는 동안 "실행 중" 이다.
     pub(crate) fn enter(self: &Arc<Self>, args: &[OsString]) -> Option<Entered> {
-        let args: Vec<String> = args.iter().map(|a| a.to_string_lossy().into_owned()).collect();
+        let args: Vec<String> = args
+            .iter()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
         let mut g = guard(&self.state);
         if g.blocked.iter().any(|b| args.iter().any(|a| under(a, b))) {
             return None;
         }
         let id = g.next;
         g.next += 1;
-        let (cancel, pid) = (Arc::new(AtomicBool::new(false)), Arc::new(AtomicU32::new(0)));
+        let (cancel, pid) = (
+            Arc::new(AtomicBool::new(false)),
+            Arc::new(AtomicU32::new(0)),
+        );
         g.running.insert(
             id,
             Entry {
@@ -199,7 +220,10 @@ mod tests {
         assert!(gate.enter(&a("e:/Data/a.mp4")).is_none());
         assert!(gate.enter(&a(r"\\?\E:\data\a.mp4")).is_none());
         assert!(gate.enter(&a(r"D:\data\a.mp4")).is_some());
-        assert!(gate.enter(&a(r"E2:\x")).is_some(), "other drive prefix is not a match");
+        assert!(
+            gate.enter(&a(r"E2:\x")).is_some(),
+            "other drive prefix is not a match"
+        );
         gate.unblock(r"E:\");
         assert!(gate.enter(&a(r"E:\data\a.mp4")).is_some());
     }

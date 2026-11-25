@@ -49,7 +49,10 @@ impl JobQueue {
 
     /// 지금 실행 중인 작업 (등록 순서 무관).
     pub fn running_jobs(&self) -> Vec<Job> {
-        lock(&self.inflight.map).values().map(|(j, _)| j.clone()).collect()
+        lock(&self.inflight.map)
+            .values()
+            .map(|(j, _)| j.clone())
+            .collect()
     }
 
     /// 해당 작업들에 취소를 요청한다 (체크포인트에서 `Yielded` 로 끝나 대기열에 남는다). 켠 개수를 돌려준다.
@@ -74,7 +77,12 @@ impl JobQueue {
             if left.is_zero() {
                 return false;
             }
-            g = self.inflight.cv.wait_timeout(g, left).unwrap_or_else(|p| p.into_inner()).0;
+            g = self
+                .inflight
+                .cv
+                .wait_timeout(g, left)
+                .unwrap_or_else(|p| p.into_inner())
+                .0;
         }
     }
 }

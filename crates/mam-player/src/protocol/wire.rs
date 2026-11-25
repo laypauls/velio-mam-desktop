@@ -38,7 +38,10 @@ pub fn decode_line<'a, T: Deserialize<'a>>(line: &'a str) -> Result<T, WireError
 /// 줄 하나를 `max` 바이트까지만 읽는다. 반환 0 = EOF. 개행 없이 `max` 를 넘기면 `InvalidData` (무한히 쌓지 않는다)
 pub fn read_bounded_line<R: BufRead>(r: &mut R, buf: &mut String, max: usize) -> io::Result<usize> {
     let mut bytes = Vec::new();
-    let n = r.by_ref().take(max as u64 + 1).read_until(b'\n', &mut bytes)?;
+    let n = r
+        .by_ref()
+        .take(max as u64 + 1)
+        .read_until(b'\n', &mut bytes)?;
     if n > max && bytes.last() != Some(&b'\n') {
         return Err(io::Error::new(io::ErrorKind::InvalidData, "line too long"));
     }
@@ -64,10 +67,19 @@ mod tests {
     #[test]
     fn t_player_proto_02_malformed_lines_are_errors_not_panics() {
         assert_eq!(decode_line::<serde_json::Value>(""), Err(WireError::Empty));
-        assert_eq!(decode_line::<serde_json::Value>("  \r\n"), Err(WireError::Empty));
-        assert!(matches!(decode_line::<serde_json::Value>("{nope"), Err(WireError::Json(_))));
+        assert_eq!(
+            decode_line::<serde_json::Value>("  \r\n"),
+            Err(WireError::Empty)
+        );
+        assert!(matches!(
+            decode_line::<serde_json::Value>("{nope"),
+            Err(WireError::Json(_))
+        ));
         let long = format!("\"{}\"", "x".repeat(MAX_LINE_BYTES + 1));
-        assert_eq!(decode_line::<serde_json::Value>(&long), Err(WireError::TooLong));
+        assert_eq!(
+            decode_line::<serde_json::Value>(&long),
+            Err(WireError::TooLong)
+        );
         let ok: serde_json::Value = decode_line("{\"a\":2}\r\n").unwrap();
         assert_eq!(ok["a"], 2);
     }
@@ -78,7 +90,12 @@ mod tests {
         let mut huge = Cursor::new(vec![b'a'; 100]);
         let mut buf = String::new();
         // Act / Assert
-        assert_eq!(read_bounded_line(&mut huge, &mut buf, 10).unwrap_err().kind(), io::ErrorKind::InvalidData);
+        assert_eq!(
+            read_bounded_line(&mut huge, &mut buf, 10)
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::InvalidData
+        );
         let mut two = Cursor::new(b"one\ntwo\n".to_vec());
         buf.clear();
         assert_eq!(read_bounded_line(&mut two, &mut buf, 10).unwrap(), 4);

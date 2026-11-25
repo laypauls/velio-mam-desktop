@@ -21,7 +21,9 @@ enum SetOutcome {
 }
 
 pub(crate) fn cost(key: &str, value_len: usize) -> i64 {
-    i64::try_from(key.len().saturating_add(value_len)).unwrap_or(i64::MAX).saturating_add(ROW_OVERHEAD)
+    i64::try_from(key.len().saturating_add(value_len))
+        .unwrap_or(i64::MAX)
+        .saturating_add(ROW_OVERHEAD)
 }
 
 impl Gateway {
@@ -40,11 +42,14 @@ impl Gateway {
         let asset = Self::kv_asset(cx, &p.asset_id)?;
         let plugin = cx.plugin.as_str().to_owned();
         let key = p.key;
-        let raw = self.pool.read_until(self.read_deadline(cx), move |c| Ok(plugin_kv::get(c, &plugin, asset, &key)?))?;
+        let raw = self.pool.read_until(self.read_deadline(cx), move |c| {
+            Ok(plugin_kv::get(c, &plugin, asset, &key)?)
+        })?;
         match raw {
             None => Ok(json!({ "found": false })),
             Some(text) => {
-                let value: Value = serde_json::from_str(&text).map_err(|_| GwError::internal("stored kv value is not JSON"))?;
+                let value: Value = serde_json::from_str(&text)
+                    .map_err(|_| GwError::internal("stored kv value is not JSON"))?;
                 Ok(json!({ "found": true, "value": value }))
             }
         }
@@ -62,7 +67,14 @@ impl Gateway {
         let asset = Self::kv_asset(cx, &p.asset_id)?;
         let plugin = cx.plugin.as_str().to_owned();
         let mut keys = self.pool.read_until(self.read_deadline(cx), move |c| {
-            Ok(plugin_kv::list_keys(c, &plugin, asset, p.prefix.as_deref(), p.cursor.as_deref(), limit + 1)?)
+            Ok(plugin_kv::list_keys(
+                c,
+                &plugin,
+                asset,
+                p.prefix.as_deref(),
+                p.cursor.as_deref(),
+                limit + 1,
+            )?)
         })?;
         // 한 개 더 읽어 다음 페이지가 있는지 안다 (끝이면 nextCursor 는 null)
         let next = if keys.len() > limit {
@@ -78,7 +90,8 @@ impl Gateway {
         let p = parse::<KvSetParams>(params)?;
         params::key(&p.key)?;
         let asset = Self::kv_asset(cx, &p.asset_id)?;
-        let text = serde_json::to_string(&p.value).map_err(|_| GwError::BadRequest("invalid params"))?;
+        let text =
+            serde_json::to_string(&p.value).map_err(|_| GwError::BadRequest("invalid params"))?;
         if text.len() > self.cfg.kv_value_max_bytes {
             return Err(GwError::TooLarge("value too large"));
         }
@@ -86,29 +99,31 @@ impl Gateway {
         let meter = self.meters.of(&plugin);
         let (key, limit, now) = (p.key, self.cfg.kv_quota_bytes, self.clock.now_ms());
         let new_cost = cost(&key, text.len());
-        let outcome = self.pool.write_until(Priority::Low, self.write_deadline(cx), move |c| {
-            if let Some(a) = asset
-                && !assets::exists(c, a)?
-            {
-                return Ok(SetOutcome::NoAsset);
-            }
-            // 첫 쓰기 초기화도 writer 안에서 한다 — `record_provider_output` 의 계량기 갱신과 같은 스레드에서 직렬화된다 (손실 갱신 방지)
-            if !meter.ready() {
-                meter.reset(plugin_kv::sum_cost(c, &plugin)?);
-            }
-            let old = plugin_kv::row_cost(c, &plugin, asset, &key)?.unwrap_or(0);
-            let delta = new_cost - old;
-            if !meter.fits(delta, limit) {
-                // CASCADE 삭제 등으로 카운터가 실제보다 높을 수 있다 — 거부 전에 합계를 한 번 다시 센다
-                meter.reset(plugin_kv::sum_cost(c, &plugin)?);
-                if !meter.fits(delta, limit) {
-                    return Ok(SetOutcome::Quota);
+        let outcome = self
+            .pool
+            .write_until(Priority::Low, self.write_deadline(cx), move |c| {
+                if let Some(a) = asset
+                    && !assets::exists(c, a)?
+                {
+                    return Ok(SetOutcome::NoAsset);
                 }
-            }
-            plugin_kv::upsert(c, &plugin, asset, &key, &text, now)?;
-            meter.apply(delta);
-            Ok(SetOutcome::Done)
-        })?;
+                // 첫 쓰기 초기화도 writer 안에서 한다 — `record_provider_output` 의 계량기 갱신과 같은 스레드에서 직렬화된다 (손실 갱신 방지)
+                if !meter.ready() {
+                    meter.reset(plugin_kv::sum_cost(c, &plugin)?);
+                }
+                let old = plugin_kv::row_cost(c, &plugin, asset, &key)?.unwrap_or(0);
+                let delta = new_cost - old;
+                if !meter.fits(delta, limit) {
+                    // CASCADE 삭제 등으로 카운터가 실제보다 높을 수 있다 — 거부 전에 합계를 한 번 다시 센다
+                    meter.reset(plugin_kv::sum_cost(c, &plugin)?);
+                    if !meter.fits(delta, limit) {
+                        return Ok(SetOutcome::Quota);
+                    }
+                }
+                plugin_kv::upsert(c, &plugin, asset, &key, &text, now)?;
+                meter.apply(delta);
+                Ok(SetOutcome::Done)
+            })?;
         match outcome {
             SetOutcome::Done => Ok(json!({})),
             SetOutcome::Quota => Err(GwError::Quota("kv quota exceeded")),
@@ -123,14 +138,16 @@ impl Gateway {
         let plugin = cx.plugin.as_str().to_owned();
         let meter: Arc<_> = self.meters.of(&plugin);
         let key = p.key;
-        let deleted = self.pool.write_until(Priority::Low, self.write_deadline(cx), move |c| {
-            let old = plugin_kv::row_cost(c, &plugin, asset, &key)?;
-            let deleted = plugin_kv::delete(c, &plugin, asset, &key)?;
-            if let (true, Some(old)) = (deleted, old) {
-                meter.apply(-old);
-            }
-            Ok(deleted)
-        })?;
+        let deleted = self
+            .pool
+            .write_until(Priority::Low, self.write_deadline(cx), move |c| {
+                let old = plugin_kv::row_cost(c, &plugin, asset, &key)?;
+                let deleted = plugin_kv::delete(c, &plugin, asset, &key)?;
+                if let (true, Some(old)) = (deleted, old) {
+                    meter.apply(-old);
+                }
+                Ok(deleted)
+            })?;
         Ok(json!({ "deleted": deleted }))
     }
 }

@@ -8,7 +8,8 @@ use std::path::{Path, PathBuf};
 use mam_core::storage::is_same_or_inside;
 use mam_plugin_manifest::limits::{MAX_LOCALE_BYTES, MAX_MANIFEST_BYTES};
 use mam_plugin_manifest::{
-    L10N_DIR, LocaleBundle, LocaleError, MANIFEST_FILE_NAME, Manifest, ManifestError, check_engine, parse_locale_file, parse_manifest,
+    L10N_DIR, LocaleBundle, LocaleError, MANIFEST_FILE_NAME, Manifest, ManifestError, check_engine,
+    parse_locale_file, parse_manifest,
 };
 use semver::Version;
 
@@ -35,7 +36,11 @@ fn short(s: &str) -> String {
 }
 
 fn invalid_utf8() -> ManifestError {
-    ManifestError::Json { line: 1, column: 1, message: "file is not valid UTF-8".to_owned() }
+    ManifestError::Json {
+        line: 1,
+        column: 1,
+        message: "file is not valid UTF-8".to_owned(),
+    }
 }
 
 /// 폴더를 읽는다. `app` 이 있으면 `engines.mam` 을 확인한다(부팅은 `None` — Incompatible 로 구분해 싣는다).
@@ -48,12 +53,21 @@ pub(crate) fn read_package(dir: &Path, app: Option<&Version>) -> Result<Package,
     }
     let (locale_files, locales) = read_locales(dir, &canon_dir)?;
     let (main_rel, main_source) = read_main(dir, &canon_dir, &manifest)?;
-    Ok(Package { manifest, manifest_text, locale_files, locales, main_rel, main_source })
+    Ok(Package {
+        manifest,
+        manifest_text,
+        locale_files,
+        locales,
+        main_rel,
+        main_source,
+    })
 }
 
 /// 일반 파일이고 실제 위치가 `canon_dir` 안인가 (링크·정션 탈출 차단)
 fn regular_inside(path: &Path, canon_dir: &Path) -> Option<fs::Metadata> {
-    let meta = fs::symlink_metadata(path).ok().filter(fs::Metadata::is_file)?;
+    let meta = fs::symlink_metadata(path)
+        .ok()
+        .filter(fs::Metadata::is_file)?;
     let real = fs::canonicalize(path).ok()?;
     is_same_or_inside(&real, canon_dir).then_some(meta)
 }
@@ -63,14 +77,24 @@ fn read_manifest_text(dir: &Path, canon_dir: &Path) -> Result<String, InstallErr
     let meta = regular_inside(&path, canon_dir).ok_or(InstallError::ManifestMissing)?;
     if meta.len() > MAX_MANIFEST_BYTES as u64 {
         let len = usize::try_from(meta.len()).unwrap_or(usize::MAX);
-        return Err(ManifestError::TooLarge { len, max: MAX_MANIFEST_BYTES }.into());
+        return Err(ManifestError::TooLarge {
+            len,
+            max: MAX_MANIFEST_BYTES,
+        }
+        .into());
     }
-    let too_large = || ManifestError::TooLarge { len: MAX_MANIFEST_BYTES + 1, max: MAX_MANIFEST_BYTES };
+    let too_large = || ManifestError::TooLarge {
+        len: MAX_MANIFEST_BYTES + 1,
+        max: MAX_MANIFEST_BYTES,
+    };
     let bytes = read_bounded(&path, MAX_MANIFEST_BYTES as u64)?.ok_or_else(too_large)?;
     String::from_utf8(bytes).map_err(|_| invalid_utf8().into())
 }
 
-fn read_locales(dir: &Path, canon_dir: &Path) -> Result<(Vec<(String, String)>, LocaleBundle), InstallError> {
+fn read_locales(
+    dir: &Path,
+    canon_dir: &Path,
+) -> Result<(Vec<(String, String)>, LocaleBundle), InstallError> {
     let (mut files, mut bundle) = (Vec::new(), LocaleBundle::default());
     let l10n = dir.join(L10N_DIR);
     // 폴더 자체가 링크·정션이면 없는 것으로 본다
@@ -83,7 +107,9 @@ fn read_locales(dir: &Path, canon_dir: &Path) -> Result<(Vec<(String, String)>, 
             return Err(InstallError::TooManyLocaleFiles);
         }
         let path = entry?.path();
-        let stem = (path.extension().is_some_and(|e| e == "json")).then(|| path.file_stem().and_then(|s| s.to_str()).map(str::to_owned)).flatten();
+        let stem = (path.extension().is_some_and(|e| e == "json"))
+            .then(|| path.file_stem().and_then(|s| s.to_str()).map(str::to_owned))
+            .flatten();
         if let Some(stem) = stem {
             candidates.push((stem, path));
         }
@@ -93,27 +119,47 @@ fn read_locales(dir: &Path, canon_dir: &Path) -> Result<(Vec<(String, String)>, 
     }
     candidates.sort();
     for (stem, path) in candidates {
-        let loc_err = |source: LocaleError| InstallError::Locale { file_stem: short(&stem), source };
-        let Some(meta) = regular_inside(&path, canon_dir) else { continue };
+        let loc_err = |source: LocaleError| InstallError::Locale {
+            file_stem: short(&stem),
+            source,
+        };
+        let Some(meta) = regular_inside(&path, canon_dir) else {
+            continue;
+        };
         if meta.len() > MAX_LOCALE_BYTES as u64 {
             return Err(loc_err(LocaleError::TooLarge));
         }
-        let bytes = read_bounded(&path, MAX_LOCALE_BYTES as u64)?.ok_or_else(|| loc_err(LocaleError::TooLarge))?;
-        let text = String::from_utf8(bytes)
-            .map_err(|_| loc_err(LocaleError::Json { line: 1, column: 1, message: "file is not valid UTF-8".to_owned() }))?;
-        bundle.insert(&stem, parse_locale_file(&text).map_err(&loc_err)?).map_err(&loc_err)?;
+        let bytes = read_bounded(&path, MAX_LOCALE_BYTES as u64)?
+            .ok_or_else(|| loc_err(LocaleError::TooLarge))?;
+        let text = String::from_utf8(bytes).map_err(|_| {
+            loc_err(LocaleError::Json {
+                line: 1,
+                column: 1,
+                message: "file is not valid UTF-8".to_owned(),
+            })
+        })?;
+        bundle
+            .insert(&stem, parse_locale_file(&text).map_err(&loc_err)?)
+            .map_err(&loc_err)?;
         files.push((stem, text));
     }
     Ok((files, bundle))
 }
 
-fn read_main(dir: &Path, canon_dir: &Path, manifest: &Manifest) -> Result<(PathBuf, String), InstallError> {
+fn read_main(
+    dir: &Path,
+    canon_dir: &Path,
+    manifest: &Manifest,
+) -> Result<(PathBuf, String), InstallError> {
     let rel = manifest.main.to_relative_path();
     let real = fs::canonicalize(dir.join(&rel)).map_err(|_| InstallError::MainMissing)?;
     if !is_same_or_inside(&real, canon_dir) {
         return Err(InstallError::MainEscapes);
     }
-    let meta = fs::metadata(&real).ok().filter(fs::Metadata::is_file).ok_or(InstallError::MainMissing)?;
+    let meta = fs::metadata(&real)
+        .ok()
+        .filter(fs::Metadata::is_file)
+        .ok_or(InstallError::MainMissing)?;
     if meta.len() > MAX_MAIN_BYTES {
         return Err(InstallError::MainTooLarge);
     }
@@ -126,7 +172,9 @@ fn read_main(dir: &Path, canon_dir: &Path, manifest: &Manifest) -> Result<(PathB
 pub(crate) fn read_bounded(path: &Path, max: u64) -> std::io::Result<Option<Vec<u8>>> {
     use std::io::Read;
     let mut bytes = Vec::new();
-    fs::File::open(path)?.take(max.saturating_add(1)).read_to_end(&mut bytes)?;
+    fs::File::open(path)?
+        .take(max.saturating_add(1))
+        .read_to_end(&mut bytes)?;
     Ok((bytes.len() as u64 <= max).then_some(bytes))
 }
 
@@ -143,7 +191,10 @@ mod tests {
         std::fs::write(&p, vec![b'a'; 10]).unwrap();
         assert_eq!(read_bounded(&p, 10).unwrap().map(|b| b.len()), Some(10));
         assert_eq!(read_bounded(&p, 11).unwrap().map(|b| b.len()), Some(10));
-        assert!(read_bounded(&p, 9).unwrap().is_none(), "one byte over the bound");
+        assert!(
+            read_bounded(&p, 9).unwrap().is_none(),
+            "one byte over the bound"
+        );
         assert!(read_bounded(&p, 0).unwrap().is_none());
         std::fs::write(&p, b"").unwrap();
         assert_eq!(read_bounded(&p, 0).unwrap().map(|b| b.len()), Some(0));

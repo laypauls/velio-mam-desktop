@@ -76,20 +76,56 @@ fn t_ipc_22_relocate_outcome_serializes_as_camel_case_folder_and_count() {
     fx.ingest.jobs().pause(Some(JobKind::Scan)).unwrap();
 
     // Act
-    let out = fx.ingest.relocate_folder(first.folder_id, fx.other.to_str().unwrap()).unwrap();
+    let out = fx
+        .ingest
+        .relocate_folder(first.folder_id, fx.other.to_str().unwrap())
+        .unwrap();
     let value = serde_json::to_value(&out).unwrap();
 
     // Assert
-    let mut top: Vec<&str> = value.as_object().unwrap().keys().map(String::as_str).collect();
+    let mut top: Vec<&str> = value
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
     top.sort_unstable();
     assert_eq!(top, ["folder", "relocated"]);
-    assert_eq!(value["relocated"], 0, "nothing was scanned yet, so no location to move");
-    let mut keys: Vec<&str> = value["folder"].as_object().unwrap().keys().map(String::as_str).collect();
+    assert_eq!(
+        value["relocated"], 0,
+        "nothing was scanned yet, so no location to move"
+    );
+    let mut keys: Vec<&str> = value["folder"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
     keys.sort_unstable();
     keys.retain(|k| *k != "watchHealth"); // 감시가 신호를 받은 뒤에만 실리는 선택 필드
     assert_eq!(
         keys,
-        ["alias", "assetCount", "availability", "ejectPrepared", "ejectable", "folderId", "hidden", "lastFullScanAt", "mediaTypes", "nextRescanAt", "path", "rescanPolicy", "scanState", "volumeKind", "volumeLabel", "watchActive", "watchFallbackKey", "watchMode", "watchOptions"]
+        [
+            "alias",
+            "assetCount",
+            "availability",
+            "ejectPrepared",
+            "ejectable",
+            "folderId",
+            "hidden",
+            "lastFullScanAt",
+            "mediaTypes",
+            "nextRescanAt",
+            "path",
+            "rescanPolicy",
+            "scanState",
+            "volumeKind",
+            "volumeLabel",
+            "watchActive",
+            "watchFallbackKey",
+            "watchMode",
+            "watchOptions"
+        ]
     );
     assert_eq!(value["folder"]["folderId"], first.folder_id);
     assert!(value["folder"]["path"].as_str().unwrap().ends_with("other"));
@@ -102,7 +138,11 @@ fn t_ipc_23_relocate_validation_errors_reach_the_caller_as_contract_codes() {
     let first = fx.ingest.add_folder(fx.media.to_str().unwrap()).unwrap();
     fx.ingest.add_folder(fx.other.to_str().unwrap()).unwrap();
     let go = |id: i64, p: &std::path::Path| {
-        CommandError::from(fx.ingest.relocate_folder(id, p.to_str().unwrap()).unwrap_err())
+        CommandError::from(
+            fx.ingest
+                .relocate_folder(id, p.to_str().unwrap())
+                .unwrap_err(),
+        )
     };
 
     // Act
@@ -114,7 +154,13 @@ fn t_ipc_23_relocate_validation_errors_reach_the_caller_as_contract_codes() {
 
     // Assert
     assert_eq!(
-        [same.code(), other_itself.code(), nested.code(), into_other.code(), unknown.code()],
+        [
+            same.code(),
+            other_itself.code(),
+            nested.code(),
+            into_other.code(),
+            unknown.code()
+        ],
         [
             ErrorCode::AlreadyRegistered,
             ErrorCode::AlreadyRegistered,

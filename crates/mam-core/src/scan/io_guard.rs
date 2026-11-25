@@ -108,7 +108,11 @@ impl IoGuard {
 
     /// 볼륨에서 지금 살아 있는 검사 스레드 수 (막힌 것 포함)
     pub fn live_checks(&self, volume_id: i64) -> usize {
-        lock(&self.reg).threads.get(&volume_id).copied().unwrap_or(0)
+        lock(&self.reg)
+            .threads
+            .get(&volume_id)
+            .copied()
+            .unwrap_or(0)
     }
 
     /// 제한 시간을 넘긴(또는 상한 때문에 걸지 않은) 검사 누계 (진단용)
@@ -155,8 +159,10 @@ impl IoGuard {
                     state: Mutex::new(SlotState::<T>::Running),
                     cv: Condvar::new(),
                 });
-                reg.inflight
-                    .insert(key.to_owned(), Arc::clone(&slot) as Arc<dyn Any + Send + Sync>);
+                reg.inflight.insert(
+                    key.to_owned(),
+                    Arc::clone(&slot) as Arc<dyn Any + Send + Sync>,
+                );
                 (slot, true)
             }
         };
@@ -186,7 +192,13 @@ impl IoGuard {
     }
 
     /// 작업 스레드를 시작한다. 시작하지 못하면 예약을 되돌리고 false.
-    fn spawn_worker<T, F>(self: &Arc<Self>, key: &str, volume_id: i64, slot: &Arc<Slot<T>>, f: F) -> bool
+    fn spawn_worker<T, F>(
+        self: &Arc<Self>,
+        key: &str,
+        volume_id: i64,
+        slot: &Arc<Slot<T>>,
+        f: F,
+    ) -> bool
     where
         T: Clone + Send + 'static,
         F: FnOnce() -> T + Send + 'static,

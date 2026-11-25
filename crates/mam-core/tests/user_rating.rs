@@ -118,7 +118,10 @@ fn t_rating_02_boundaries_0_and_5_are_accepted_and_6_or_more_is_rejected_without
     let (rev, events) = (revision(&f, a), outbox_count(&f));
     for bad in [6u8, 7, 255] {
         assert!(
-            matches!(f.ud.set_rating(&[a], bad), Err(IngestError::InvalidInput(_))),
+            matches!(
+                f.ud.set_rating(&[a], bad),
+                Err(IngestError::InvalidInput(_))
+            ),
             "{bad}"
         );
     }
@@ -151,7 +154,11 @@ fn t_rating_03_same_value_is_a_noop_and_zero_keeps_the_row() {
         (revision(&f, a), revision(&f, b), outbox_count(&f)),
         (rev_a, rev_b, events)
     );
-    assert_eq!(stored(&f, b), None, "setting 0 on a rowless asset must not create a row");
+    assert_eq!(
+        stored(&f, b),
+        None,
+        "setting 0 on a rowless asset must not create a row"
+    );
 
     // Act: a 는 이미 3, b 만 바뀐다 -> 바뀐 자산만 +1
     f.ud.set_rating(&[a, b], 3).unwrap();
@@ -302,7 +309,10 @@ fn t_rating_08_saved_filters_without_rating_fields_still_deserialize_and_new_fie
     assert_eq!((f.rating_min, f.rating_max), (None, None));
     assert!(f.is_default());
     f.rating_min = Some(0);
-    assert!(!f.is_default(), "a rating bound (even 0 = unrated) is a condition");
+    assert!(
+        !f.is_default(),
+        "a rating bound (even 0 = unrated) is a condition"
+    );
     f.rating_min = None;
     f.rating_max = Some(5);
     assert!(!f.is_default());

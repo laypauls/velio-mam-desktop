@@ -25,7 +25,10 @@ pub struct BreakerConfig {
 impl Default for BreakerConfig {
     /// 제안값(미측정): 10분 3회
     fn default() -> Self {
-        Self { max_faults: 3, window: Duration::from_secs(600) }
+        Self {
+            max_faults: 3,
+            window: Duration::from_secs(600),
+        }
     }
 }
 
@@ -39,12 +42,20 @@ pub struct Breaker {
 
 impl Breaker {
     pub fn new(cfg: BreakerConfig) -> Self {
-        Self { cfg, events: VecDeque::new(), disabled: false }
+        Self {
+            cfg,
+            events: VecDeque::new(),
+            disabled: false,
+        }
     }
 
     /// 결함 1건 기록. 비활성이 됐으면 true
     pub fn record(&mut self, now: Instant) -> bool {
-        while self.events.front().is_some_and(|t| now.saturating_duration_since(*t) >= self.cfg.window) {
+        while self
+            .events
+            .front()
+            .is_some_and(|t| now.saturating_duration_since(*t) >= self.cfg.window)
+        {
             self.events.pop_front();
         }
         self.events.push_back(now);

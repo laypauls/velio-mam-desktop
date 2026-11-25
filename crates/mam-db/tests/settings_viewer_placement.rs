@@ -16,7 +16,11 @@ fn patch(v: Value) -> Map<String, Value> {
 }
 
 fn put_raw(conn: &Connection, key: &str, raw: &str) {
-    conn.execute("INSERT INTO settings (key, value) VALUES (?1, ?2)", [key, raw]).unwrap();
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?1, ?2)",
+        [key, raw],
+    )
+    .unwrap();
 }
 
 fn placement_json(s: &mam_db::Settings) -> Value {
@@ -37,19 +41,39 @@ fn t_settings_vplace_02_left_and_right_round_trip_across_reload() {
     for want in ["left", "right"] {
         let s = settings::update(&mut db.conn, &patch(json!({"viewerPlacement": want}))).unwrap();
         assert_eq!(placement_json(&s), json!(want));
-        assert_eq!(placement_json(&settings::load(&db.conn).unwrap().0), json!(want));
+        assert_eq!(
+            placement_json(&settings::load(&db.conn).unwrap().0),
+            json!(want)
+        );
     }
 }
 
 #[test]
 fn t_settings_vplace_03_invalid_values_are_rejected_and_change_nothing() {
     let mut db = migrated_db();
-    for bad in [json!("top"), json!(1), json!(null), json!(""), json!("Left"), json!(true), json!(["left"])] {
-        let err = settings::update(&mut db.conn, &patch(json!({"viewerPlacement": bad.clone()})))
-            .unwrap_err();
-        assert!(matches!(&err, SettingsError::Invalid(f) if f == "viewerPlacement"), "{bad}");
+    for bad in [
+        json!("top"),
+        json!(1),
+        json!(null),
+        json!(""),
+        json!("Left"),
+        json!(true),
+        json!(["left"]),
+    ] {
+        let err = settings::update(
+            &mut db.conn,
+            &patch(json!({"viewerPlacement": bad.clone()})),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(&err, SettingsError::Invalid(f) if f == "viewerPlacement"),
+            "{bad}"
+        );
     }
-    let rows: i64 = db.conn.query_row("SELECT COUNT(*) FROM settings", [], |r| r.get(0)).unwrap();
+    let rows: i64 = db
+        .conn
+        .query_row("SELECT COUNT(*) FROM settings", [], |r| r.get(0))
+        .unwrap();
     assert_eq!(rows, 0);
 }
 

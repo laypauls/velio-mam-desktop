@@ -12,13 +12,20 @@ pub trait VolumeEndpoint {
 }
 
 fn unavailable(cause: &dyn std::fmt::Display) -> CommandError {
-    CommandError::logged(ErrorCode::AudioDeviceUnavailable, "audio device is not available", cause)
+    CommandError::logged(
+        ErrorCode::AudioDeviceUnavailable,
+        "audio device is not available",
+        cause,
+    )
 }
 
 /// `delta` 검증(유한, -1..=1) -> 현재값 + delta 를 0..1 로 자르고 0.01 단위로 반올림해 설정 -> 설정한 값
 pub fn step_volume(endpoint: &dyn VolumeEndpoint, delta: f64) -> Result<f64, CommandError> {
     if !delta.is_finite() || !(-1.0..=1.0).contains(&delta) {
-        return Err(CommandError::new(ErrorCode::InvalidInput, "delta must be a finite number within -1..1"));
+        return Err(CommandError::new(
+            ErrorCode::InvalidInput,
+            "delta must be a finite number within -1..1",
+        ));
     }
     let current = endpoint.get().map_err(|e| unavailable(&e))?;
     let next = ((f64::from(current) + delta).clamp(0.0, 1.0) * 100.0).round() / 100.0;
@@ -30,8 +37,12 @@ pub fn step_volume(endpoint: &dyn VolumeEndpoint, delta: f64) -> Result<f64, Com
 mod core_audio {
     use super::VolumeEndpoint;
     use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
-    use windows::Win32::Media::Audio::{IMMDeviceEnumerator, MMDeviceEnumerator, eMultimedia, eRender};
-    use windows::Win32::System::Com::{CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoUninitialize};
+    use windows::Win32::Media::Audio::{
+        IMMDeviceEnumerator, MMDeviceEnumerator, eMultimedia, eRender,
+    };
+    use windows::Win32::System::Com::{
+        CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoUninitialize,
+    };
 
     /// 스레드의 COM 아파트 수명. 이 스레드가 초기화에 성공했을 때만(S_OK/S_FALSE) 해제한다.
     /// 이미 다른 모델로 초기화돼 있으면(RPC_E_CHANGED_MODE) 그대로 쓰고 해제하지 않는다
@@ -43,7 +54,9 @@ mod core_audio {
         pub fn enter() -> Self {
             // SAFETY: 이 스레드에서 짝이 맞는 CoUninitialize 를 Drop 에서 부른다
             let hr = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
-            Self { initialized: hr.is_ok() }
+            Self {
+                initialized: hr.is_ok(),
+            }
         }
     }
 
@@ -64,9 +77,14 @@ mod core_audio {
             // SAFETY: COM 호출 - 호출자가 COM 을 초기화한 스레드다
             unsafe {
                 let enumerator: IMMDeviceEnumerator =
-                    CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).map_err(|e| e.to_string())?;
-                let device = enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia).map_err(|e| e.to_string())?;
-                let volume = device.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None).map_err(|e| e.to_string())?;
+                    CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
+                        .map_err(|e| e.to_string())?;
+                let device = enumerator
+                    .GetDefaultAudioEndpoint(eRender, eMultimedia)
+                    .map_err(|e| e.to_string())?;
+                let volume = device
+                    .Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None)
+                    .map_err(|e| e.to_string())?;
                 Ok(Self(volume))
             }
         }
@@ -80,7 +98,8 @@ mod core_audio {
 
         fn set(&self, scalar: f32) -> Result<(), String> {
             // SAFETY: 이벤트 컨텍스트 GUID 는 쓰지 않는다(null)
-            unsafe { self.0.SetMasterVolumeLevelScalar(scalar, std::ptr::null()) }.map_err(|e| e.to_string())
+            unsafe { self.0.SetMasterVolumeLevelScalar(scalar, std::ptr::null()) }
+                .map_err(|e| e.to_string())
         }
     }
 }
@@ -116,7 +135,10 @@ impl VolumeEndpoint for NoDevice {
 #[tauri::command]
 pub async fn system_volume_step(delta: f64) -> Result<f64, CommandError> {
     if !delta.is_finite() || !(-1.0..=1.0).contains(&delta) {
-        return Err(CommandError::new(ErrorCode::InvalidInput, "delta must be a finite number within -1..1"));
+        return Err(CommandError::new(
+            ErrorCode::InvalidInput,
+            "delta must be a finite number within -1..1",
+        ));
     }
     tauri::async_runtime::spawn_blocking(move || step_default_device(delta))
         .await
@@ -138,12 +160,21 @@ mod tests {
     }
 
     fn stub(level: f32) -> Stub {
-        Stub { level: Cell::new(level), fail_get: false, fail_set: false, sets: Cell::new(0) }
+        Stub {
+            level: Cell::new(level),
+            fail_get: false,
+            fail_set: false,
+            sets: Cell::new(0),
+        }
     }
 
     impl VolumeEndpoint for Stub {
         fn get(&self) -> Result<f32, String> {
-            if self.fail_get { Err("no endpoint".into()) } else { Ok(self.level.get()) }
+            if self.fail_get {
+                Err("no endpoint".into())
+            } else {
+                Ok(self.level.get())
+            }
         }
         fn set(&self, scalar: f32) -> Result<(), String> {
             if self.fail_set {
@@ -202,13 +233,19 @@ mod tests {
     fn t_sysvol_05_device_failures_map_to_audio_device_unavailable() {
         let mut no_get = stub(0.5);
         no_get.fail_get = true;
-        assert_eq!(step_volume(&no_get, 0.05).unwrap_err().code(), ErrorCode::AudioDeviceUnavailable);
+        assert_eq!(
+            step_volume(&no_get, 0.05).unwrap_err().code(),
+            ErrorCode::AudioDeviceUnavailable
+        );
         let mut no_set = stub(0.5);
         no_set.fail_set = true;
         let err = step_volume(&no_set, 0.05).unwrap_err();
         assert_eq!(err.code(), ErrorCode::AudioDeviceUnavailable);
         // 사용자 메시지는 고정 문구 - COM 상세를 싣지 않는다
-        assert_eq!(serde_json::to_value(&err).unwrap(), serde_json::json!({"code": "audio_device_unavailable", "message": "audio device is not available"}));
+        assert_eq!(
+            serde_json::to_value(&err).unwrap(),
+            serde_json::json!({"code": "audio_device_unavailable", "message": "audio device is not available"})
+        );
     }
 
     // 분류: Validation - 명령 경계에서도 잘못된 delta 는 장치 접근 전에 거부된다 (실제 음량은 바꾸지 않는다)

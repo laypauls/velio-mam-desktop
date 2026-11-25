@@ -14,7 +14,10 @@ use std::time::{Duration, Instant};
 use common::*;
 use mam_db::Priority;
 use mam_plugin_gateway::Gateway;
-use mam_plugin_host::{CallCx, HostApi, HostConfig, HostError, HostState, InvokeError, InvokeKind, InvokeScope, LogLevel, PluginHost, SystemClock};
+use mam_plugin_host::{
+    CallCx, HostApi, HostConfig, HostError, HostState, InvokeError, InvokeKind, InvokeScope,
+    LogLevel, PluginHost, SystemClock,
+};
 use mam_plugin_manifest::{Permission as P, PluginId};
 use serde_json::{Value, json};
 
@@ -25,13 +28,23 @@ fn worker_exe() -> PathBuf {
             return PathBuf::from(p);
         }
         let test_exe = std::env::current_exe().expect("test exe path");
-        let profile_dir = test_exe.parent().and_then(Path::parent).expect("profile dir").to_path_buf();
-        let mut cmd = std::process::Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()));
+        let profile_dir = test_exe
+            .parent()
+            .and_then(Path::parent)
+            .expect("profile dir")
+            .to_path_buf();
+        let mut cmd =
+            std::process::Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()));
         cmd.args(["build", "-p", "mam-plugin-worker", "--quiet"]);
         if profile_dir.file_name().is_some_and(|n| n == "release") {
             cmd.arg("--release");
         }
-        assert!(cmd.status().expect("run cargo build for the worker").success(), "building mam-plugin-worker failed");
+        assert!(
+            cmd.status()
+                .expect("run cargo build for the worker")
+                .success(),
+            "building mam-plugin-worker failed"
+        );
         let exe = profile_dir.join("mam-plugin-worker.exe");
         assert!(exe.exists(), "worker not found at {}", exe.display());
         exe
@@ -55,15 +68,31 @@ impl HostApi for Counting {
     }
 }
 
-fn host(fx: &Fx, pid: &PluginId, source: &str, tweak: impl FnOnce(&mut HostConfig)) -> (PluginHost, Arc<Counting>) {
-    let api = Arc::new(Counting { inner: Arc::clone(&fx.gw), calls: AtomicUsize::new(0) });
+fn host(
+    fx: &Fx,
+    pid: &PluginId,
+    source: &str,
+    tweak: impl FnOnce(&mut HostConfig),
+) -> (PluginHost, Arc<Counting>) {
+    let api = Arc::new(Counting {
+        inner: Arc::clone(&fx.gw),
+        calls: AtomicUsize::new(0),
+    });
     let mut cfg = HostConfig::new(worker_exe(), source.to_owned());
     tweak(&mut cfg);
-    (PluginHost::new(pid.clone(), cfg, api.clone(), Arc::new(SystemClock)), api)
+    (
+        PluginHost::new(pid.clone(), cfg, api.clone(), Arc::new(SystemClock)),
+        api,
+    )
 }
 
 fn run(h: &PluginHost, cmd: &str, assets: &[i64], params: Value) -> Result<Value, InvokeError> {
-    h.invoke(InvokeKind::Command, cmd, params, InvokeScope::new(assets.to_vec()).unwrap())
+    h.invoke(
+        InvokeKind::Command,
+        cmd,
+        params,
+        InvokeScope::new(assets.to_vec()).unwrap(),
+    )
 }
 
 const FULL_PLUGIN: &str = r#"
@@ -92,15 +121,32 @@ fn t_pgw_38_js_plugin_uses_asset_kv_tag_and_derived_through_the_real_worker_and_
     let out = run(&h, "run", &[id], json!({"id": id})).unwrap();
     // Assert: 반환값
     assert_eq!(out["a"]["fileName"], "photo.jpg");
-    assert_eq!(out["got"], json!({"found": true, "value": {"name": "photo.jpg", "한글": [1, 2]}}));
+    assert_eq!(
+        out["got"],
+        json!({"found": true, "value": {"name": "photo.jpg", "한글": [1, 2]}})
+    );
     assert_eq!(out["list"], json!({"keys": ["seen"], "nextCursor": null}));
     assert_eq!(out["tag"], json!({"added": 2}));
-    assert_eq!((out["mime"].clone(), out["b64"].clone()), (json!("image/webp"), json!("string")));
+    assert_eq!(
+        (out["mime"].clone(), out["b64"].clone()),
+        (json!("image/webp"), json!("string"))
+    );
     assert!(out["len"].as_u64().unwrap() > 0);
     // Assert: DB 상태 — 플러그인 네임스페이스 키 2개(전역·자산), 태그 2개, revision 1회, outbox 우선순위 1
     assert_eq!(fx.count("SELECT COUNT(*) FROM plugin_kv JOIN plugins USING (plugin_ref) WHERE plugin_id = 'com.example.e2e'"), 2);
-    assert_eq!(fx.count(&format!("SELECT COUNT(*) FROM asset_tags WHERE asset_id = {id}")), 2);
-    assert_eq!(fx.count(&format!("SELECT revision FROM media_assets WHERE asset_id = {id}")), 2, "초기 1 + 태그 추가 1");
+    assert_eq!(
+        fx.count(&format!(
+            "SELECT COUNT(*) FROM asset_tags WHERE asset_id = {id}"
+        )),
+        2
+    );
+    assert_eq!(
+        fx.count(&format!(
+            "SELECT revision FROM media_assets WHERE asset_id = {id}"
+        )),
+        2,
+        "초기 1 + 태그 추가 1"
+    );
     assert_eq!(fx.count(&format!("SELECT priority FROM search_outbox WHERE asset_id = {id} ORDER BY event_id DESC LIMIT 1")), 1);
     assert_eq!(snapshot(&fx.lib), before, "원본 불변");
     h.shutdown();
@@ -110,8 +156,16 @@ fn t_pgw_38_js_plugin_uses_asset_kv_tag_and_derived_through_the_real_worker_and_
 fn t_pgw_39_js_sees_error_codes_for_denied_permissions_forged_ids_and_extra_params() {
     // Arrange: asset.read.metadata 만 허용
     let fx = Fx::new();
-    let pid = fx.plugin("com.example.deny", &P::ALL, Some(&granted_json(&[P::AssetReadMetadata])), Some("true"));
-    let (id, other) = (fx.add_asset("image", "a/x.jpg"), fx.add_asset("image", "a/y.jpg"));
+    let pid = fx.plugin(
+        "com.example.deny",
+        &P::ALL,
+        Some(&granted_json(&[P::AssetReadMetadata])),
+        Some("true"),
+    );
+    let (id, other) = (
+        fx.add_asset("image", "a/x.jpg"),
+        fx.add_asset("image", "a/y.jpg"),
+    );
     let src = r#"
       const code = (m, p) => { try { mam.host.call(m, p); return 'no error'; } catch (e) { return [e.code, e.message]; } };
       mam.commands.register('probe', (p) => ({
@@ -128,8 +182,14 @@ fn t_pgw_39_js_sees_error_codes_for_denied_permissions_forged_ids_and_extra_para
     // Act
     let out = run(&h, "probe", &[id], json!({"id": id, "other": other})).unwrap();
     // Assert: JS 예외의 .code 와 정적 메시지
-    assert_eq!(out["denied"], json!(["permission_denied", "permission denied: kv.read"]));
-    assert_eq!(out["deniedTag"], json!(["permission_denied", "permission denied: tag.write"]));
+    assert_eq!(
+        out["denied"],
+        json!(["permission_denied", "permission denied: kv.read"])
+    );
+    assert_eq!(
+        out["deniedTag"],
+        json!(["permission_denied", "permission denied: tag.write"])
+    );
     assert_eq!(out["forged"], json!(["not_found", "asset not found"]));
     assert_eq!(out["pluginId"], json!(["bad_request", "invalid params"]));
     assert_eq!(out["unknown"], json!(["unknown_method", "unknown method"]));
@@ -143,7 +203,12 @@ fn t_pgw_39_js_sees_error_codes_for_denied_permissions_forged_ids_and_extra_para
 fn t_pgw_40_revocation_during_a_running_call_takes_effect_without_deadlock() {
     // Arrange: 권한이 있는 동안 계속 kv.get 을 부르는 명령
     let fx = Arc::new(Fx::new());
-    let pid = fx.plugin("com.example.revoke", &P::ALL, Some(&granted_json(&[P::KvRead])), Some("true"));
+    let pid = fx.plugin(
+        "com.example.revoke",
+        &P::ALL,
+        Some(&granted_json(&[P::KvRead])),
+        Some("true"),
+    );
     let src = r#"
       mam.commands.register('loop', () => {
         for (let i = 0; i < 9000; i++) {
@@ -169,7 +234,10 @@ fn t_pgw_40_revocation_during_a_running_call_takes_effect_without_deadlock() {
     revoker.join().unwrap();
     // Assert
     assert_eq!(out["code"], "permission_denied");
-    assert!(out["i"].as_u64().unwrap() >= 50, "철회 전에는 허용됐다: {out}");
+    assert!(
+        out["i"].as_u64().unwrap() >= 50,
+        "철회 전에는 허용됐다: {out}"
+    );
     h.shutdown();
 }
 
@@ -190,7 +258,14 @@ fn t_pgw_41_ten_thousand_host_calls_hit_the_message_cap_and_kv_stays_consistent(
     // Assert: 폭주로 워커 종료, 부분 쓰기 없음 — 10 개 키 모두 완전한 JSON 정수이고 키 번호와 값이 맞는다
     assert_eq!(e, InvokeError::Flood);
     assert_eq!(h.state(), HostState::Idle);
-    let rows: Vec<(String, String)> = fx.read(|c| c.prepare("SELECT key, value FROM plugin_kv ORDER BY key").unwrap().query_map([], |r| Ok((r.get(0).unwrap(), r.get(1).unwrap()))).unwrap().map(Result::unwrap).collect());
+    let rows: Vec<(String, String)> = fx.read(|c| {
+        c.prepare("SELECT key, value FROM plugin_kv ORDER BY key")
+            .unwrap()
+            .query_map([], |r| Ok((r.get(0).unwrap(), r.get(1).unwrap())))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
+    });
     assert_eq!(rows.len(), 10);
     for (k, v) in rows {
         let n: i64 = v.parse().expect("정수 JSON");
@@ -220,7 +295,9 @@ fn t_pgw_42_worker_killed_mid_write_leaves_db_consistent_and_the_retry_is_idempo
     let (h, _) = host(&fx, &pid, src, |_| {});
     let h = Arc::new(h);
     run(&h, "warm", &[], json!(null)).unwrap();
-    let HostState::Running { pid: worker_pid } = h.state() else { panic!("worker should be running") };
+    let HostState::Running { pid: worker_pid } = h.state() else {
+        panic!("worker should be running")
+    };
     let (started_tx, started_rx) = mpsc::channel();
     let (release_tx, release_rx) = mpsc::channel::<()>();
     let blocker = {
@@ -244,23 +321,57 @@ fn t_pgw_42_worker_killed_mid_write_leaves_db_consistent_and_the_retry_is_idempo
     while fx.pool.pending_writes() < 1 && Instant::now() < until {
         std::thread::yield_now();
     }
-    assert!(fx.pool.pending_writes() >= 1, "쓰기가 큐에 올라와 있어야 한다");
+    assert!(
+        fx.pool.pending_writes() >= 1,
+        "쓰기가 큐에 올라와 있어야 한다"
+    );
     // Act: 워커를 PID 로만 종료하고 쓰기 스레드를 푼다
-    let st = std::process::Command::new("taskkill").args(["/PID", &worker_pid.to_string(), "/F"]).stdout(std::process::Stdio::null()).status().unwrap();
+    let st = std::process::Command::new("taskkill")
+        .args(["/PID", &worker_pid.to_string(), "/F"])
+        .stdout(std::process::Stdio::null())
+        .status()
+        .unwrap();
     assert!(st.success());
     release_tx.send(()).unwrap();
     blocker.join().unwrap();
     let first = caller.join().unwrap();
     // Assert: 호출은 실패(워커 종료)하지만 이미 큐에 있던 쓰기는 하나의 완전한 트랜잭션으로 끝났다
     assert!(first.is_err(), "{first:?}");
-    assert_eq!(fx.count(&format!("SELECT COUNT(*) FROM asset_tags WHERE asset_id = {id}")), 1);
-    assert_eq!(fx.count("SELECT COUNT(*) FROM plugin_kv"), 0, "죽은 워커는 두 번째 호출을 보내지 못했다");
-    let (rev, outbox) = (fx.count(&format!("SELECT revision FROM media_assets WHERE asset_id = {id}")), fx.count("SELECT COUNT(*) FROM search_outbox"));
+    assert_eq!(
+        fx.count(&format!(
+            "SELECT COUNT(*) FROM asset_tags WHERE asset_id = {id}"
+        )),
+        1
+    );
+    assert_eq!(
+        fx.count("SELECT COUNT(*) FROM plugin_kv"),
+        0,
+        "죽은 워커는 두 번째 호출을 보내지 못했다"
+    );
+    let (rev, outbox) = (
+        fx.count(&format!(
+            "SELECT revision FROM media_assets WHERE asset_id = {id}"
+        )),
+        fx.count("SELECT COUNT(*) FROM search_outbox"),
+    );
     // Act 2: 재시도 — 새 워커, 같은 요청
-    assert_eq!(run(&h, "work", &[id], json!({"id": id})).unwrap(), json!("ok"));
+    assert_eq!(
+        run(&h, "work", &[id], json!({"id": id})).unwrap(),
+        json!("ok")
+    );
     // Assert 2: 태그는 그대로 1개(no-op, revision·outbox 불변), KV 는 이제 완성
-    assert_eq!(fx.count(&format!("SELECT COUNT(*) FROM asset_tags WHERE asset_id = {id}")), 1);
-    assert_eq!(fx.count(&format!("SELECT revision FROM media_assets WHERE asset_id = {id}")), rev);
+    assert_eq!(
+        fx.count(&format!(
+            "SELECT COUNT(*) FROM asset_tags WHERE asset_id = {id}"
+        )),
+        1
+    );
+    assert_eq!(
+        fx.count(&format!(
+            "SELECT revision FROM media_assets WHERE asset_id = {id}"
+        )),
+        rev
+    );
     assert_eq!(fx.count("SELECT COUNT(*) FROM search_outbox"), outbox);
     assert_eq!(fx.count("SELECT COUNT(*) FROM plugin_kv"), 1);
     h.shutdown();

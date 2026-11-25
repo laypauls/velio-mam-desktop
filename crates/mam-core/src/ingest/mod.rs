@@ -9,10 +9,10 @@ mod known;
 mod newvol;
 pub(crate) mod pending;
 mod purge_ops;
-pub mod rescan_policy;
 mod relocate;
 mod remote_api;
 mod removal;
+pub mod rescan_policy;
 mod stall;
 mod stop;
 mod summary;
@@ -31,9 +31,11 @@ use crate::hash::ContentHasher;
 use crate::identity::FileIdentityProvider;
 use crate::jobs::{ExecutorRegistry, JobExecutor, JobKind, JobQueue, JobRunner, NewJob};
 use crate::processing::{HashExecutor, MetaExecutor, ProcessingEnv, ThumbExecutor};
-use crate::scan::{IngestError, IoGuard, IoGuardConfig, ScanEnv, ScanExecutor, ScanProgressCell, apply_path};
-use crate::volume::VolumeProvider;
+use crate::scan::{
+    IngestError, IoGuard, IoGuardConfig, ScanEnv, ScanExecutor, ScanProgressCell, apply_path,
+};
 use crate::secret::{Dpapi, SecretBox};
+use crate::volume::VolumeProvider;
 use crate::watch::remote::hub::{HubDeps, HubRefs};
 use crate::watch::remote::{RemoteHub, SshConnector};
 use crate::watch::{DdpAudit, DetectorRegistry, FanotifyFeed, WatchManager, WatchMsg};
@@ -43,16 +45,16 @@ pub use eject::{EjectHook, EjectPrepared, EjectScope};
 pub use known::KnownVolume;
 pub use newvol::{PENDING_CHANGED_EVENT, PendingChangedPayload, PendingListener, PendingVolume};
 pub use pending::{
-    DbCommitter,
-    ExclusiveOutcome, MAX_ATTEMPTS, PendingConfig, PendingKind, PendingPassReport, PendingRow, SCAN_RECENT_GUARD_MS,
-    SettleGate,
+    DbCommitter, ExclusiveOutcome, MAX_ATTEMPTS, PendingConfig, PendingKind, PendingPassReport,
+    PendingRow, SCAN_RECENT_GUARD_MS, SettleGate,
 };
 pub use purge_ops::LegacyCleanupReport;
+pub use relocate::RelocateOutcome;
 pub use remote_api::{RemoteSourceInput, RemoteTestResult};
 pub use removal::{
-    BackupHook, EmbeddingsChangedHook, FolderRemovalProgress, REMOVAL_PROGRESS_EVENT, RemovalListener, RemovalRun,
+    BackupHook, EmbeddingsChangedHook, FolderRemovalProgress, REMOVAL_PROGRESS_EVENT,
+    RemovalListener, RemovalRun,
 };
-pub use relocate::RelocateOutcome;
 pub use stall::{STALL_LOG_EVERY_MS, StallEvent};
 pub use summary::{JobSummary, ScanProgressView};
 pub use supervisor::SuperviseReport;
@@ -102,8 +104,11 @@ impl Default for IngestConfig {
             concurrency: JobKind::ALL.map(JobKind::default_concurrency),
             io_guard: IoGuardConfig::default(),
             detectors: Arc::new(
-                DetectorRegistry::platform_default_with(vec![Arc::new(DdpAudit::new(Arc::clone(&remote))), Arc::new(FanotifyFeed::new(Arc::clone(&remote)))])
-                    .with_ref_resolver(Arc::new(HubRefs(Arc::clone(&remote)))),
+                DetectorRegistry::platform_default_with(vec![
+                    Arc::new(DdpAudit::new(Arc::clone(&remote))),
+                    Arc::new(FanotifyFeed::new(Arc::clone(&remote))),
+                ])
+                .with_ref_resolver(Arc::new(HubRefs(Arc::clone(&remote)))),
             ),
             local_zone: Arc::new(rescan_policy::OsLocalZone),
             remote,
@@ -353,7 +358,10 @@ impl Ingest {
         if threads_abandoned == 0 {
             self.end_run();
         } else {
-            tracing::warn!(threads_abandoned, "watch threads did not finish in time; run marker kept");
+            tracing::warn!(
+                threads_abandoned,
+                "watch threads did not finish in time; run marker kept"
+            );
         }
         tracing::info!(
             watchers_ms,

@@ -53,7 +53,10 @@ impl Ingest {
         if running.is_empty() {
             return Ok(None);
         }
-        let hidden = self.env.pool.read(|c| Ok(crate::scan::hidden_folder_ids(c)))??;
+        let hidden = self
+            .env
+            .pool
+            .read(|c| Ok(crate::scan::hidden_folder_ids(c)))??;
         Ok(running
             .into_iter()
             .find(|p| !hidden.contains(&(p.folder_id as u64)))

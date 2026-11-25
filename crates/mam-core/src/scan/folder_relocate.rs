@@ -99,11 +99,9 @@ fn relocate_inner(
     check_overlap(&tx, new_volume, &target.path_key, Some(folder_id))?;
     // 새 경로 아래에 다른 출처의 활성 위치가 남아 있으면 (유일 인덱스 충돌·자산 뒤섞임 방지) 거부한다
     let (new_lo, new_hi) = key_range(&target.path_key);
-    let orphans: bool = tx.query_row(
-        ORPHAN_SQL,
-        params![new_volume, new_lo, new_hi],
-        |r| r.get(0),
-    )?;
+    let orphans: bool = tx.query_row(ORPHAN_SQL, params![new_volume, new_lo, new_hi], |r| {
+        r.get(0)
+    })?;
     if orphans {
         tracing::warn!(folder_id, "relocation target already has active locations");
         return Err(IngestError::NestedFolder {
@@ -152,11 +150,15 @@ fn relocate_inner(
             )?;
             for (location_id, asset_id, rel_path, key) in &rows {
                 let new_key = rebase_key(key, &old.path_key, &target.path_key);
-                let new_rel = rebase_rel(rel_path, &old.rel_root, &target.rel_root).unwrap_or_else(|| {
-                    tracing::warn!(location_id, "rel_path does not start with the folder root; rebuilt from key");
-                    let suffix = key_suffix(key, &old.path_key).replace('/', "\\");
-                    join_rel(&target.rel_root, &suffix)
-                });
+                let new_rel =
+                    rebase_rel(rel_path, &old.rel_root, &target.rel_root).unwrap_or_else(|| {
+                        tracing::warn!(
+                            location_id,
+                            "rel_path does not start with the folder root; rebuilt from key"
+                        );
+                        let suffix = key_suffix(key, &old.path_key).replace('/', "\\");
+                        join_rel(&target.rel_root, &suffix)
+                    });
                 ins.execute(params![location_id, asset_id, new_rel, new_key])?;
             }
         }
@@ -260,19 +262,31 @@ mod tests {
         for (name, sql) in [("batch", BATCH_SQL), ("orphan", ORPHAN_SQL)] {
             // Act
             let n = if name == "batch" { 4 } else { 3 };
-            let params: Vec<rusqlite::types::Value> =
-                vec![1.into(), "a/".to_string().into(), "a0".to_string().into(), 5000.into()];
+            let params: Vec<rusqlite::types::Value> = vec![
+                1.into(),
+                "a/".to_string().into(),
+                "a0".to_string().into(),
+                5000.into(),
+            ];
             let plan: Vec<String> = {
                 let mut stmt = conn.prepare(&format!("EXPLAIN QUERY PLAN {sql}")).unwrap();
-                stmt.query_map(rusqlite::params_from_iter(params.iter().take(n)), |r| r.get::<_, String>(3))
-                    .unwrap()
-                    .map(Result::unwrap)
-                    .collect()
+                stmt.query_map(rusqlite::params_from_iter(params.iter().take(n)), |r| {
+                    r.get::<_, String>(3)
+                })
+                .unwrap()
+                .map(Result::unwrap)
+                .collect()
             };
             // Assert
             let text = plan.join(" / ");
-            assert!(text.contains("uq_file_locations_active_path"), "{name}: {text}");
-            assert!(!text.contains("idx_file_locations_volume"), "{name}: {text}");
+            assert!(
+                text.contains("uq_file_locations_active_path"),
+                "{name}: {text}"
+            );
+            assert!(
+                !text.contains("idx_file_locations_volume"),
+                "{name}: {text}"
+            );
             assert!(!text.contains("SCAN file_locations"), "{name}: {text}");
             eprintln!("EXPLAIN {name}: {text}");
         }
@@ -290,7 +304,10 @@ mod tests {
             }
         }
         mam_db::migrate(&mut conn, &dir.path().join("bk"), &Fixed).unwrap();
-        let cache = |c: &Connection| c.query_row("PRAGMA cache_size", [], |r| r.get::<_, i64>(0)).unwrap();
+        let cache = |c: &Connection| {
+            c.query_row("PRAGMA cache_size", [], |r| r.get::<_, i64>(0))
+                .unwrap()
+        };
         let before = cache(&conn);
         let target = RelocateTarget {
             info: VolumeInfo {
@@ -335,14 +352,24 @@ mod tests {
 
     #[test]
     fn t_relocate_11c_rebase_rel_mixed_separators_and_empty_roots() {
-        assert_eq!(rebase_rel("a/b\\c.jpg", "A", "z").as_deref(), Some("z\\b\\c.jpg"));
-        assert_eq!(rebase_rel("a\\c.jpg", "", "z").as_deref(), Some("z\\a\\c.jpg"));
+        assert_eq!(
+            rebase_rel("a/b\\c.jpg", "A", "z").as_deref(),
+            Some("z\\b\\c.jpg")
+        );
+        assert_eq!(
+            rebase_rel("a\\c.jpg", "", "z").as_deref(),
+            Some("z\\a\\c.jpg")
+        );
         assert_eq!(rebase_rel("a\\c.jpg", "a", "").as_deref(), Some("c.jpg"));
     }
 
     #[test]
     fn t_relocate_11d_rebase_rel_prefix_mismatch_or_no_tail_is_none() {
         assert_eq!(rebase_rel("other\\c.jpg", "a", "z"), None);
-        assert_eq!(rebase_rel("a", "a", "z"), None, "the root itself has no file part");
+        assert_eq!(
+            rebase_rel("a", "a", "z"),
+            None,
+            "the root itself has no file part"
+        );
     }
 }

@@ -29,7 +29,11 @@ impl Serialize for WireTag {
 impl<'de> Deserialize<'de> for WireTag {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         let v = String::deserialize(d)?;
-        if v == PLAYER_WIRE_TAG { Ok(WireTag) } else { Err(de::Error::custom("unknown wire tag")) }
+        if v == PLAYER_WIRE_TAG {
+            Ok(WireTag)
+        } else {
+            Err(de::Error::custom("unknown wire tag"))
+        }
     }
 }
 
@@ -70,7 +74,17 @@ impl BufferInfo {
     /// 해상도에서 stride·size 를 계산한다
     pub fn new(epoch: u64, slot: u32, w: u32, h: u32) -> Self {
         let stride = stride_for(w);
-        Self { mam: WireTag, epoch, slot, count: SLOT_COUNT, size: stride as u64 * h as u64, w, h, stride, fmt: PixelFormat::Bgr0 }
+        Self {
+            mam: WireTag,
+            epoch,
+            slot,
+            count: SLOT_COUNT,
+            size: stride as u64 * h as u64,
+            w,
+            h,
+            stride,
+            fmt: PixelFormat::Bgr0,
+        }
     }
 }
 
@@ -90,8 +104,26 @@ pub struct FrameMsgOut {
 }
 
 impl FrameMsgOut {
-    pub fn new(epoch: u64, slot: u32, seq: u64, w: u32, h: u32, stride: u32, render_done_ms: f64) -> Self {
-        Self { mam: WireTag, k: FrameKind::Frame, epoch, slot, seq, w, h, stride, render_done_ms }
+    pub fn new(
+        epoch: u64,
+        slot: u32,
+        seq: u64,
+        w: u32,
+        h: u32,
+        stride: u32,
+        render_done_ms: f64,
+    ) -> Self {
+        Self {
+            mam: WireTag,
+            k: FrameKind::Frame,
+            epoch,
+            slot,
+            seq,
+            w,
+            h,
+            stride,
+            render_done_ms,
+        }
     }
 }
 
@@ -114,7 +146,12 @@ pub struct ReleaseMsgIn {
 
 impl ReleaseMsgIn {
     pub fn new(epoch: u64, slots: Vec<SlotRef>) -> Self {
-        Self { mam: WireTag, k: ReleaseKind::Release, epoch, slots }
+        Self {
+            mam: WireTag,
+            k: ReleaseKind::Release,
+            epoch,
+            slots,
+        }
     }
 }
 
@@ -136,7 +173,8 @@ pub fn parse_release(body: &str) -> Result<ReleaseMsgIn, ReleaseReject> {
     if body.len() > MAX_RELEASE_BODY {
         return Err(ReleaseReject::TooLarge);
     }
-    let value: serde_json::Value = serde_json::from_str(body).map_err(|_| ReleaseReject::Malformed)?;
+    let value: serde_json::Value =
+        serde_json::from_str(body).map_err(|_| ReleaseReject::Malformed)?;
     validate_release_value(value)
 }
 
@@ -146,7 +184,10 @@ pub fn validate_release_value(value: serde_json::Value) -> Result<ReleaseMsgIn, 
         return Err(ReleaseReject::NotObject);
     }
     let msg: ReleaseMsgIn = serde_json::from_value(value).map_err(|_| ReleaseReject::Malformed)?;
-    if msg.slots.is_empty() || msg.slots.len() > MAX_RELEASE_SLOTS || msg.slots.iter().any(|s| s.slot >= SLOT_COUNT) {
+    if msg.slots.is_empty()
+        || msg.slots.len() > MAX_RELEASE_SLOTS
+        || msg.slots.iter().any(|s| s.slot >= SLOT_COUNT)
+    {
         return Err(ReleaseReject::BadSlots);
     }
     Ok(msg)
@@ -160,7 +201,8 @@ mod tests {
     // 분류: Happy(golden) / Validation(거부 목록) / Boundary(크기·슬롯 수)
 
     fn fixture() -> Value {
-        let raw = include_str!("../../../../src/test/fixtures/player-wire.json").replace("\r\n", "\n");
+        let raw =
+            include_str!("../../../../src/test/fixtures/player-wire.json").replace("\r\n", "\n");
         serde_json::from_str(&raw).expect("fixture json")
     }
 
@@ -169,17 +211,43 @@ mod tests {
         // Arrange
         let fx = fixture();
         // Act / Assert: serde 가 만드는 모양 = 프론트(vitest)와 공유하는 fixture
-        let info = BufferInfo { mam: WireTag, epoch: 3, slot: 1, count: 3, size: 3_686_400, w: 1280, h: 720, stride: 5120, fmt: PixelFormat::Bgr0 };
+        let info = BufferInfo {
+            mam: WireTag,
+            epoch: 3,
+            slot: 1,
+            count: 3,
+            size: 3_686_400,
+            w: 1280,
+            h: 720,
+            stride: 5120,
+            fmt: PixelFormat::Bgr0,
+        };
         assert_eq!(serde_json::to_value(info).unwrap(), fx["bufferInfo"]);
-        assert_eq!(BufferInfo::new(3, 1, 1280, 720), info, "stride/size 계산이 fixture 와 같다");
+        assert_eq!(
+            BufferInfo::new(3, 1, 1280, 720),
+            info,
+            "stride/size 계산이 fixture 와 같다"
+        );
         let frame = FrameMsgOut::new(3, 1, 42, 1280, 720, 5120, 1_763_550_000_123.5);
         assert_eq!(serde_json::to_value(frame).unwrap(), fx["frameMsg"]);
-        let release = ReleaseMsgIn::new(3, vec![SlotRef { slot: 0, seq: 41 }, SlotRef { slot: 1, seq: 42 }]);
+        let release = ReleaseMsgIn::new(
+            3,
+            vec![SlotRef { slot: 0, seq: 41 }, SlotRef { slot: 1, seq: 42 }],
+        );
         assert_eq!(serde_json::to_value(&release).unwrap(), fx["releaseMsg"]);
         // 반대 방향: fixture 가 그대로 역직렬화된다
-        assert_eq!(serde_json::from_value::<BufferInfo>(fx["bufferInfo"].clone()).unwrap(), info);
-        assert_eq!(serde_json::from_value::<FrameMsgOut>(fx["frameMsg"].clone()).unwrap(), frame);
-        assert_eq!(parse_release(&fx["releaseMsg"].to_string()).unwrap(), release);
+        assert_eq!(
+            serde_json::from_value::<BufferInfo>(fx["bufferInfo"].clone()).unwrap(),
+            info
+        );
+        assert_eq!(
+            serde_json::from_value::<FrameMsgOut>(fx["frameMsg"].clone()).unwrap(),
+            frame
+        );
+        assert_eq!(
+            parse_release(&fx["releaseMsg"].to_string()).unwrap(),
+            release
+        );
     }
 
     #[test]
@@ -190,30 +258,71 @@ mod tests {
         for (i, v) in list.iter().enumerate() {
             // WebView2 는 JS 가 보낸 값을 JSON 으로 돌려준다 — 문자열 메시지는 JSON 문자열이 된다
             let body = serde_json::to_string(v).unwrap();
-            assert!(parse_release(&body).is_err(), "#{i} must be rejected: {body}");
+            assert!(
+                parse_release(&body).is_err(),
+                "#{i} must be rejected: {body}"
+            );
         }
         // 이유별 확인
-        assert_eq!(parse_release(&serde_json::to_string(&list[0]).unwrap()), Err(ReleaseReject::NotObject), "문자열 메시지");
-        assert_eq!(parse_release(&serde_json::to_string(&list[1]).unwrap()), Err(ReleaseReject::Malformed), "mam 불일치");
-        assert_eq!(parse_release(&serde_json::to_string(&list[2]).unwrap()), Err(ReleaseReject::Malformed), "알 수 없는 k");
-        assert_eq!(parse_release(&serde_json::to_string(&list[3]).unwrap()), Err(ReleaseReject::BadSlots), "slot 범위 밖");
-        assert_eq!(parse_release(&serde_json::to_string(&list[4]).unwrap()), Err(ReleaseReject::BadSlots), "9 슬롯");
+        assert_eq!(
+            parse_release(&serde_json::to_string(&list[0]).unwrap()),
+            Err(ReleaseReject::NotObject),
+            "문자열 메시지"
+        );
+        assert_eq!(
+            parse_release(&serde_json::to_string(&list[1]).unwrap()),
+            Err(ReleaseReject::Malformed),
+            "mam 불일치"
+        );
+        assert_eq!(
+            parse_release(&serde_json::to_string(&list[2]).unwrap()),
+            Err(ReleaseReject::Malformed),
+            "알 수 없는 k"
+        );
+        assert_eq!(
+            parse_release(&serde_json::to_string(&list[3]).unwrap()),
+            Err(ReleaseReject::BadSlots),
+            "slot 범위 밖"
+        );
+        assert_eq!(
+            parse_release(&serde_json::to_string(&list[4]).unwrap()),
+            Err(ReleaseReject::BadSlots),
+            "9 슬롯"
+        );
     }
 
     #[test]
     fn t_player_wire_03_oversize_unknown_keys_and_non_objects_are_rejected() {
         // 크기
-        let big = format!(r#"{{"mam":"player.v1","k":"release","epoch":1,"slots":[{{"slot":0,"seq":1}}],"pad":"{}"}}"#, "x".repeat(MAX_RELEASE_BODY));
+        let big = format!(
+            r#"{{"mam":"player.v1","k":"release","epoch":1,"slots":[{{"slot":0,"seq":1}}],"pad":"{}"}}"#,
+            "x".repeat(MAX_RELEASE_BODY)
+        );
         assert_eq!(parse_release(&big), Err(ReleaseReject::TooLarge));
         // 알 수 없는 키 (최상위·슬롯)
-        assert_eq!(parse_release(r#"{"mam":"player.v1","k":"release","epoch":1,"slots":[{"slot":0,"seq":1}],"extra":1}"#), Err(ReleaseReject::Malformed));
-        assert_eq!(parse_release(r#"{"mam":"player.v1","k":"release","epoch":1,"slots":[{"slot":0,"seq":1,"x":2}]}"#), Err(ReleaseReject::Malformed));
+        assert_eq!(
+            parse_release(
+                r#"{"mam":"player.v1","k":"release","epoch":1,"slots":[{"slot":0,"seq":1}],"extra":1}"#
+            ),
+            Err(ReleaseReject::Malformed)
+        );
+        assert_eq!(
+            parse_release(
+                r#"{"mam":"player.v1","k":"release","epoch":1,"slots":[{"slot":0,"seq":1,"x":2}]}"#
+            ),
+            Err(ReleaseReject::Malformed)
+        );
         // 객체가 아닌 값
         for v in ["[]", "null", "42", "true", r#""release""#] {
             assert_eq!(parse_release(v), Err(ReleaseReject::NotObject), "{v}");
         }
         // 깨진 JSON·음수 epoch·소수 seq
-        for v in ["", "{", r#"{"mam":"player.v1","k":"release","epoch":-1,"slots":[{"slot":0,"seq":1}]}"#, r#"{"mam":"player.v1","k":"release","epoch":1,"slots":[{"slot":0,"seq":1.5}]}"#] {
+        for v in [
+            "",
+            "{",
+            r#"{"mam":"player.v1","k":"release","epoch":-1,"slots":[{"slot":0,"seq":1}]}"#,
+            r#"{"mam":"player.v1","k":"release","epoch":1,"slots":[{"slot":0,"seq":1.5}]}"#,
+        ] {
             assert_eq!(parse_release(v), Err(ReleaseReject::Malformed), "{v}");
         }
     }
@@ -221,7 +330,9 @@ mod tests {
     #[test]
     fn t_player_wire_04_slot_count_boundaries() {
         let mk = |n: usize| {
-            let slots: Vec<Value> = (0..n).map(|i| serde_json::json!({"slot": i as u32 % 3, "seq": i + 1})).collect();
+            let slots: Vec<Value> = (0..n)
+                .map(|i| serde_json::json!({"slot": i as u32 % 3, "seq": i + 1}))
+                .collect();
             serde_json::json!({"mam":"player.v1","k":"release","epoch":1,"slots":slots}).to_string()
         };
         assert_eq!(parse_release(&mk(0)), Err(ReleaseReject::BadSlots));
@@ -238,6 +349,9 @@ mod tests {
         for v in fx["invalidReleaseMessages"].as_array().unwrap() {
             assert!(validate_release_value(v.clone()).is_err(), "{v}");
         }
-        assert_eq!(validate_release_value(Value::String("x".into())), Err(ReleaseReject::NotObject));
+        assert_eq!(
+            validate_release_value(Value::String("x".into())),
+            Err(ReleaseReject::NotObject)
+        );
     }
 }

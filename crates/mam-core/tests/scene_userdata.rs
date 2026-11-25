@@ -27,7 +27,10 @@ impl Fx {
         drop(conn);
         let pool = Arc::new(DbPool::open(&db, 2).unwrap());
         let clock: SharedClock = Arc::new(SystemClock);
-        Self { dir, ud: Arc::new(UserData::new(pool, clock)) }
+        Self {
+            dir,
+            ud: Arc::new(UserData::new(pool, clock)),
+        }
     }
 
     fn raw(&self) -> Connection {
@@ -84,7 +87,11 @@ fn t_scene_08_get_reports_none_for_a_video_without_a_row_and_not_found_for_unkno
     // Assert
     assert_eq!(none.state, SceneStateView::None);
     assert!(none.cuts.is_empty() && none.sensitivity.is_none() && none.updated_at.is_none());
-    assert_eq!(image.state, SceneStateView::None, "조회는 영상 여부를 따지지 않는다");
+    assert_eq!(
+        image.state,
+        SceneStateView::None,
+        "조회는 영상 여부를 따지지 않는다"
+    );
     assert!(matches!(missing, IngestError::NotFound));
 }
 
@@ -99,17 +106,35 @@ fn t_scene_08_edits_reject_non_video_missing_and_inactive_assets_without_writing
 
     // Act / Assert
     for id in [1, 2] {
-        assert!(matches!(fx.ud.scene_cut_add(id, 100), Err(IngestError::InvalidInput("mediaType"))), "{id}");
+        assert!(
+            matches!(
+                fx.ud.scene_cut_add(id, 100),
+                Err(IngestError::InvalidInput("mediaType"))
+            ),
+            "{id}"
+        );
         assert!(matches!(
             fx.ud.scene_cut_remove(id, 100, CutSource::User),
             Err(IngestError::InvalidInput("mediaType"))
         ));
-        assert!(matches!(fx.ud.scene_cuts_clear_auto(id), Err(IngestError::InvalidInput("mediaType"))));
+        assert!(matches!(
+            fx.ud.scene_cuts_clear_auto(id),
+            Err(IngestError::InvalidInput("mediaType"))
+        ));
     }
     for id in [3, 4, 99] {
-        assert!(matches!(fx.ud.scene_cut_add(id, 100), Err(IngestError::NotFound)), "{id}");
-        assert!(matches!(fx.ud.scene_cut_remove(id, 100, CutSource::Auto), Err(IngestError::NotFound)));
-        assert!(matches!(fx.ud.scene_cuts_clear_auto(id), Err(IngestError::NotFound)));
+        assert!(
+            matches!(fx.ud.scene_cut_add(id, 100), Err(IngestError::NotFound)),
+            "{id}"
+        );
+        assert!(matches!(
+            fx.ud.scene_cut_remove(id, 100, CutSource::Auto),
+            Err(IngestError::NotFound)
+        ));
+        assert!(matches!(
+            fx.ud.scene_cuts_clear_auto(id),
+            Err(IngestError::NotFound)
+        ));
     }
     assert_eq!(fx.count("SELECT COUNT(*) FROM asset_scene_cuts"), 0);
 }
@@ -123,7 +148,13 @@ fn t_scene_08_add_validates_ms_against_duration_and_reports_the_merged_contract_
 
     // Act
     for bad in [-1, 60_001, i64::MAX] {
-        assert!(matches!(fx.ud.scene_cut_add(1, bad), Err(IngestError::InvalidInput("ms"))), "{bad}");
+        assert!(
+            matches!(
+                fx.ud.scene_cut_add(1, bad),
+                Err(IngestError::InvalidInput("ms"))
+            ),
+            "{bad}"
+        );
     }
     let out = fx.ud.scene_cut_add(1, 20_000).unwrap();
     let edge = fx.ud.scene_cut_add(1, 60_000).unwrap();
@@ -131,13 +162,20 @@ fn t_scene_08_add_validates_ms_against_duration_and_reports_the_merged_contract_
     // Assert: ms 오름차순 병합 + 출처 구분, 추출 지문 유지
     assert_eq!(
         out.cuts,
-        vec![cut(10_000, CutSource::Auto), cut(20_000, CutSource::User), cut(30_000, CutSource::Auto)]
+        vec![
+            cut(10_000, CutSource::Auto),
+            cut(20_000, CutSource::User),
+            cut(30_000, CutSource::Auto)
+        ]
     );
     assert_eq!((out.asset_id, out.state), (1, SceneStateView::Done));
     assert_eq!(out.sensitivity, Some(SceneSensitivity::Medium));
     assert_eq!(edge.cuts.last(), Some(&cut(60_000, CutSource::User)));
     let json = serde_json::to_value(&out).unwrap();
-    assert_eq!(json["cuts"][1], serde_json::json!({"ms": 20_000, "source": "user"}));
+    assert_eq!(
+        json["cuts"][1],
+        serde_json::json!({"ms": 20_000, "source": "user"})
+    );
     assert_eq!(json["suppressedCount"], 0);
     assert_eq!(json["state"], "done");
 }
@@ -169,8 +207,14 @@ fn t_scene_08_add_within_one_frame_of_an_existing_cut_is_a_noop_and_cap_is_enfor
         }
         tx.commit().unwrap();
     }
-    assert!(matches!(fx.ud.scene_cut_add(2, 9_000_000), Err(IngestError::InvalidInput("cuts"))));
-    assert_eq!(fx.ud.scene_cut_add(2, 1000).unwrap().cuts.len(), MAX_USER_CUTS);
+    assert!(matches!(
+        fx.ud.scene_cut_add(2, 9_000_000),
+        Err(IngestError::InvalidInput("cuts"))
+    ));
+    assert_eq!(
+        fx.ud.scene_cut_add(2, 1000).unwrap().cuts.len(),
+        MAX_USER_CUTS
+    );
 }
 
 #[test]
@@ -188,12 +232,18 @@ fn t_scene_09_remove_auto_is_remembered_user_is_forgotten_and_both_are_idempoten
     let after_user = fx.ud.scene_cut_remove(1, 20_010, CutSource::User).unwrap();
 
     // Assert
-    assert_eq!(after_auto.cuts, vec![cut(20_000, CutSource::User), cut(30_000, CutSource::Auto)]);
+    assert_eq!(
+        after_auto.cuts,
+        vec![cut(20_000, CutSource::User), cut(30_000, CutSource::Auto)]
+    );
     assert_eq!(after_auto.suppressed_count, 1);
     assert_eq!(again.cuts, after_auto.cuts, "멱등");
     assert_eq!(wrong_source.cuts, after_auto.cuts, "출처가 다르면 no-op");
     assert_eq!(after_user.cuts, vec![cut(30_000, CutSource::Auto)]);
-    assert_eq!(after_user.suppressed_count, 1, "사용자 컷은 기억하지 않는다");
+    assert_eq!(
+        after_user.suppressed_count, 1,
+        "사용자 컷은 기억하지 않는다"
+    );
     // 행이 없는 영상에서의 제거는 no-op 이고 행을 만들지 않는다
     fx.video(2);
     let none = fx.ud.scene_cut_remove(2, 5000, CutSource::Auto).unwrap();
@@ -218,7 +268,10 @@ fn t_scene_09_clear_auto_keeps_user_cuts_and_a_later_detection_does_not_revive_t
     assert_eq!(cleared.cuts, vec![cut(20_000, CutSource::User)]);
     assert_eq!(cleared.suppressed_count, 3);
     assert_eq!(again.cuts, cleared.cuts);
-    assert_eq!(redetected.cuts, vec![cut(20_000, CutSource::User), cut(55_000, CutSource::Auto)]);
+    assert_eq!(
+        redetected.cuts,
+        vec![cut(20_000, CutSource::User), cut(55_000, CutSource::Auto)]
+    );
     assert_eq!(redetected.suppressed_count, 3);
 }
 
@@ -240,9 +293,20 @@ fn t_scene_09_failure_and_unknown_stored_values_map_to_contract_codes() {
     let b = fx.ud.scene_cuts_get(2).unwrap();
 
     // Assert
-    assert_eq!((a.state, a.error, a.sensitivity, a.updated_at), (SceneStateView::Failed, Some(SceneFailure::OutputTooLarge), None, Some(7)));
+    assert_eq!(
+        (a.state, a.error, a.sensitivity, a.updated_at),
+        (
+            SceneStateView::Failed,
+            Some(SceneFailure::OutputTooLarge),
+            None,
+            Some(7)
+        )
+    );
     assert_eq!(b.error, Some(SceneFailure::Other));
-    assert_eq!(serde_json::to_value(&a).unwrap()["error"], "output_too_large");
+    assert_eq!(
+        serde_json::to_value(&a).unwrap()["error"],
+        "output_too_large"
+    );
 }
 
 #[test]

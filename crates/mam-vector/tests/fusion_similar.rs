@@ -201,7 +201,9 @@ fn t_fus_10_min_score_stops_at_the_threshold_and_ends_paging() {
     // Arrange: 제한 없는 정답에서 중간 항목의 점수를 기준으로 삼는다
     let fx = fixture();
     let qf = query_frames(&fx, 2);
-    let all = find_similar(&fx.idx, &query(&qf, &[2], 100, None), &asset_of).unwrap().items;
+    let all = find_similar(&fx.idx, &query(&qf, &[2], 100, None), &asset_of)
+        .unwrap()
+        .items;
     assert!(all.len() > 6);
     let min = all[5].1;
     let want: Vec<(u64, f32)> = all.iter().copied().filter(|i| i.1 >= min).collect();

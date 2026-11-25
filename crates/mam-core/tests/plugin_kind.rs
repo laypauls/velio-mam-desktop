@@ -30,7 +30,9 @@ fn restarted(env: &Env) -> Arc<JobQueue> {
 fn env_with_volume() -> Env {
     let env = Env::new();
     std::fs::create_dir_all(env.path("lib")).unwrap();
-    env.ingest.add_folder(env.path("lib").to_str().unwrap()).unwrap();
+    env.ingest
+        .add_folder(env.path("lib").to_str().unwrap())
+        .unwrap();
     env
 }
 
@@ -46,7 +48,10 @@ fn t_pjob_26_kind_definition() {
     assert_eq!(JobKind::Plugin.default_priority(), 70);
     assert_eq!(JobKind::Plugin.default_concurrency(), 1);
     // 일시정지 마스크(AtomicU8)의 마지막 비트 — 다른 종류와 겹치지 않는다
-    assert_eq!(JobKind::ALL.iter().position(|k| *k == JobKind::Plugin), Some(7));
+    assert_eq!(
+        JobKind::ALL.iter().position(|k| *k == JobKind::Plugin),
+        Some(7)
+    );
     assert_eq!(serde_json::to_value(JobKind::Plugin).unwrap(), "plugin");
     let lowest = JobKind::ALL.iter().map(|k| k.default_priority()).max();
     assert_eq!(lowest, Some(70), "plugin runs after every other kind");
@@ -64,10 +69,21 @@ fn t_pjob_26_pause_bit_survives_save_and_restore() {
     let q2 = restarted(&env);
 
     // Assert: 저장은 이름 `plugin` 만, 복원 뒤에도 그 종류만 멈춰 있다
-    assert_eq!(saved, JobPauseState { all: false, kinds: vec!["plugin".to_owned()] });
+    assert_eq!(
+        saved,
+        JobPauseState {
+            all: false,
+            kinds: vec!["plugin".to_owned()]
+        }
+    );
     assert_eq!(q2.paused_kinds(), vec![JobKind::Plugin]);
     assert!(q2.is_paused(JobKind::Plugin));
-    assert!(JobKind::ALL.into_iter().filter(|k| *k != JobKind::Plugin).all(|k| !q2.is_paused(k)));
+    assert!(
+        JobKind::ALL
+            .into_iter()
+            .filter(|k| *k != JobKind::Plugin)
+            .all(|k| !q2.is_paused(k))
+    );
     // 재개하면 비트가 지워지고 그 상태도 저장된다
     q2.resume(Some(JobKind::Plugin)).unwrap();
     assert!(!restarted(&env).is_paused(JobKind::Plugin));
@@ -79,7 +95,13 @@ fn t_pjob_26_unknown_kind_names_in_saved_pause_are_ignored() {
     let env = Env::new();
     env.pool
         .write(Priority::High, |c| {
-            save_job_pause(c, &JobPauseState { all: false, kinds: vec!["plugin".into(), "from-the-future".into()] })?;
+            save_job_pause(
+                c,
+                &JobPauseState {
+                    all: false,
+                    kinds: vec!["plugin".into(), "from-the-future".into()],
+                },
+            )?;
             Ok(())
         })
         .unwrap();
@@ -105,7 +127,10 @@ fn t_pjob_26_plugin_rows_are_claimed_one_at_a_time_after_other_kinds() {
 
     // Act
     assert!(q.recover().is_ok());
-    let first = q.claim_next(&JobKind::ALL).unwrap().expect("the thumb job comes first (priority 20)");
+    let first = q
+        .claim_next(&JobKind::ALL)
+        .unwrap()
+        .expect("the thumb job comes first (priority 20)");
     let second = q.claim_next(&JobKind::ALL).unwrap().expect("a plugin job");
     let third = q.claim_next(&JobKind::ALL).unwrap();
 
@@ -119,7 +144,10 @@ fn t_pjob_26_plugin_rows_are_claimed_one_at_a_time_after_other_kinds() {
     assert_eq!((plugin.pending, plugin.running, plugin.failed), (1, 1, 1));
     // 수동 재시도(전체)가 plugin 의 failed 도 대기로 돌린다
     assert!(q.retry_failed(Some(JobKind::Plugin)).is_ok());
-    assert_eq!(env.count("SELECT COUNT(*) FROM jobs WHERE kind = 'plugin' AND status = 'failed'"), 0);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM jobs WHERE kind = 'plugin' AND status = 'failed'"),
+        0
+    );
 }
 
 #[test]
@@ -138,9 +166,26 @@ fn t_pjob_26_asset_purge_removes_plugin_kind_jobs_of_the_asset() {
 
     // Act
     let target = ids[..1].to_vec();
-    env.pool.write(Priority::High, move |c| Ok(mam_core::purge::purge_assets(c, 1, &target))).unwrap().unwrap();
+    env.pool
+        .write(Priority::High, move |c| {
+            Ok(mam_core::purge::purge_assets(c, 1, &target))
+        })
+        .unwrap()
+        .unwrap();
 
     // Assert: 대상 자산의 plugin 작업만 사라진다
-    assert_eq!(env.count(&format!("SELECT COUNT(*) FROM jobs WHERE kind = 'plugin' AND asset_id = {}", ids[0])), 0);
-    assert_eq!(env.count(&format!("SELECT COUNT(*) FROM jobs WHERE kind = 'plugin' AND asset_id = {}", ids[1])), 1);
+    assert_eq!(
+        env.count(&format!(
+            "SELECT COUNT(*) FROM jobs WHERE kind = 'plugin' AND asset_id = {}",
+            ids[0]
+        )),
+        0
+    );
+    assert_eq!(
+        env.count(&format!(
+            "SELECT COUNT(*) FROM jobs WHERE kind = 'plugin' AND asset_id = {}",
+            ids[1]
+        )),
+        1
+    );
 }

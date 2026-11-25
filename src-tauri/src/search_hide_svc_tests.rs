@@ -23,15 +23,27 @@ fn t_hide_svc_01_hidden_folder_is_excluded_from_keyword_and_filter_only_search_w
     // Arrange: 폴더 1 = 자산 1·2, 자산 3 은 관리 폴더 밖(USB)
     let fx = fixture();
     ready(&fx, 3);
-    assert_eq!(sorted_ids(&fx, &request("")), [1, 2, 3], "숨김 없음 = 변화 없음");
+    assert_eq!(
+        sorted_ids(&fx, &request("")),
+        [1, 2, 3],
+        "숨김 없음 = 변화 없음"
+    );
 
     // Act
     set_hidden_flag(&fx, 1, true);
 
     // Assert: 색인 대기 없이 즉시 반영 (질의 시점 필터)
     assert_eq!(sorted_ids(&fx, &request("")), [3], "텍스트 없는 질의");
-    assert_eq!(sorted_ids(&fx, &request("beach")), Vec::<i64>::new(), "키워드 질의");
-    assert_eq!(sorted_ids(&fx, &request("forest")), [3], "다른 폴더 자산은 유지");
+    assert_eq!(
+        sorted_ids(&fx, &request("beach")),
+        Vec::<i64>::new(),
+        "키워드 질의"
+    );
+    assert_eq!(
+        sorted_ids(&fx, &request("forest")),
+        [3],
+        "다른 폴더 자산은 유지"
+    );
     assert_eq!(fx.search.search(&request("")).unwrap().total, 1);
 
     // Act: 해제
@@ -62,8 +74,16 @@ fn t_hide_svc_02_folder_scope_and_collection_scope_still_show_hidden_folder_item
     set_hidden_flag(&fx, 1, true);
 
     // Assert
-    assert_eq!(sorted_ids(&fx, &scoped), [1, 2], "폴더 범위 지정 시 숨김 폴더 내용 표시");
-    assert_eq!(sorted_ids(&fx, &in_collection), [1, 3], "컬렉션 보기는 숨김 폴더 항목도 표시");
+    assert_eq!(
+        sorted_ids(&fx, &scoped),
+        [1, 2],
+        "폴더 범위 지정 시 숨김 폴더 내용 표시"
+    );
+    assert_eq!(
+        sorted_ids(&fx, &in_collection),
+        [1, 3],
+        "컬렉션 보기는 숨김 폴더 항목도 표시"
+    );
     assert_eq!(sorted_ids(&fx, &request("")), [3], "그 외 보기는 숨김");
 }
 
@@ -83,8 +103,15 @@ fn t_hide_svc_03_a_cursor_issued_before_the_toggle_is_stale_after_it() {
     set_hidden_flag(&fx, 1, true);
 
     // Assert
-    assert_eq!(code_of(fx.search.search(&next).unwrap_err()), ErrorCode::InvalidInput);
-    assert_eq!(ids_of(&fx.search.search(&first).unwrap()), [3], "처음부터 다시 조회하면 정상");
+    assert_eq!(
+        code_of(fx.search.search(&next).unwrap_err()),
+        ErrorCode::InvalidInput
+    );
+    assert_eq!(
+        ids_of(&fx.search.search(&first).unwrap()),
+        [3],
+        "처음부터 다시 조회하면 정상"
+    );
 }
 
 #[test]
@@ -94,7 +121,10 @@ fn t_hide_svc_04_a_folder_being_removed_stays_excluded_so_its_docs_do_not_reappe
     ready(&fx, 3);
     fx.pool
         .write(mam_db::Priority::High, |c| {
-            Ok(c.execute("UPDATE managed_folders SET hidden = 1, enabled = 0 WHERE folder_id = 1", []))
+            Ok(c.execute(
+                "UPDATE managed_folders SET hidden = 1, enabled = 0 WHERE folder_id = 1",
+                [],
+            ))
         })
         .unwrap()
         .unwrap();

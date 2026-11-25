@@ -78,7 +78,10 @@ fn t_hash_edge_03_exactly_8k_is_head_plus_tail() {
     // Act / Assert: 앞 4K + 뒤 4K = 전체
     assert_eq!(
         sig_of(&p),
-        expected(&[&bytes[..EDGE_LEN], &bytes[EDGE_LEN..]], bytes.len() as u64)
+        expected(
+            &[&bytes[..EDGE_LEN], &bytes[EDGE_LEN..]],
+            bytes.len() as u64
+        )
     );
 }
 
@@ -93,10 +96,7 @@ fn t_hash_edge_04_over_8k_signs_only_head_and_tail() {
         // Act / Assert
         assert_eq!(
             sig_of(&p),
-            expected(
-                &[&bytes[..EDGE_LEN], &bytes[len - EDGE_LEN..]],
-                len as u64
-            ),
+            expected(&[&bytes[..EDGE_LEN], &bytes[len - EDGE_LEN..]], len as u64),
             "len {len}"
         );
     }
@@ -119,7 +119,11 @@ fn t_hash_edge_04b_sig_is_a_candidate_filter_middle_only_difference_is_the_same_
     longer.push(0);
 
     // Act / Assert
-    assert_eq!(sig_of(&pa), sig_of(&pb), "middle-only difference is invisible");
+    assert_eq!(
+        sig_of(&pa),
+        sig_of(&pb),
+        "middle-only difference is invisible"
+    );
     assert_ne!(sig_of(&pa), sig_of(&write(&dir, "f.bin", &front)));
     assert_ne!(sig_of(&pa), sig_of(&write(&dir, "k.bin", &back)));
     assert_ne!(sig_of(&pa), sig_of(&write(&dir, "l.bin", &longer)));
@@ -191,7 +195,10 @@ fn t_hash_edge_00_original_is_untouched_and_the_trait_default_reads_the_real_fil
     let bytes = pattern(30_000);
     let p = write(&dir, "o.bin", &bytes);
     set_mtime(&p, 1_600_000_000_000);
-    let before = (fs::read(&p).unwrap(), fs::metadata(&p).unwrap().modified().unwrap());
+    let before = (
+        fs::read(&p).unwrap(),
+        fs::metadata(&p).unwrap().modified().unwrap(),
+    );
 
     // Act: 트레이트 기본 구현 (주입 가능한 경로)
     let r = mam_core::Blake3Hasher
@@ -203,6 +210,9 @@ fn t_hash_edge_00_original_is_untouched_and_the_trait_default_reads_the_real_fil
     assert_eq!(r.modified_ms, 1_600_000_000_000);
     assert_eq!(
         before,
-        (fs::read(&p).unwrap(), fs::metadata(&p).unwrap().modified().unwrap())
+        (
+            fs::read(&p).unwrap(),
+            fs::metadata(&p).unwrap().modified().unwrap()
+        )
     );
 }

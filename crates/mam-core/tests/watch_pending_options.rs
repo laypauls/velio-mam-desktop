@@ -23,7 +23,11 @@ fn scan(env: &Env, id: i64) {
 }
 
 fn registered(env: &Env) -> i64 {
-    let id = env.ingest.add_folder(env.path("lib").to_str().unwrap()).unwrap().folder_id;
+    let id = env
+        .ingest
+        .add_folder(env.path("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id;
     scan(env, id);
     env.clock.advance(5_000);
     id
@@ -46,7 +50,9 @@ fn passes(env: &Env, n: usize) {
 
 fn clear_jobs(env: &Env) {
     env.pool
-        .write(mam_db::Priority::Low, |c| Ok(c.execute("DELETE FROM jobs", [])?))
+        .write(mam_db::Priority::Low, |c| {
+            Ok(c.execute("DELETE FROM jobs", [])?)
+        })
         .unwrap();
 }
 
@@ -57,7 +63,12 @@ fn marker_rows(env: &Env) -> i64 {
 /// 주입 시계 기준 `delta_ms` 뒤(음수 = 전)로 수정 시각을 맞춘다 (픽스처만).
 fn set_mtime(env: &Env, p: &std::path::Path, delta_ms: i64) {
     let t = SystemTime::UNIX_EPOCH + Duration::from_millis((env.clock_now() + delta_ms) as u64);
-    OpenOptions::new().write(true).open(p).unwrap().set_modified(t).unwrap();
+    OpenOptions::new()
+        .write(true)
+        .open(p)
+        .unwrap()
+        .set_modified(t)
+        .unwrap();
 }
 
 fn new_ingest(env: &Env) -> Arc<Ingest> {
@@ -92,12 +103,21 @@ fn t_pending_20_exclusive_open_check_on_keeps_a_file_pending_while_a_writer_hold
     let id = registered(&env);
     let view = env
         .ingest
-        .set_folder_watch_mode(id, Some("os_events".into()), Some(json!({"exclusiveOpenCheck": true})))
+        .set_folder_watch_mode(
+            id,
+            Some("os_events".into()),
+            Some(json!({"exclusiveOpenCheck": true})),
+        )
         .unwrap();
     assert_eq!(view.watch_options, None);
     let (p, handle) = writer_held(&env, "lib/w.jpg");
-    let before = snapshot(&env.vol.join("lib")).into_iter().filter(|e| e.0 == "a.jpg").collect::<Vec<_>>();
-    env.ingest.queue_watch_change(id, &p, PendingKind::Path).unwrap();
+    let before = snapshot(&env.vol.join("lib"))
+        .into_iter()
+        .filter(|e| e.0 == "a.jpg")
+        .collect::<Vec<_>>();
+    env.ingest
+        .queue_watch_change(id, &p, PendingKind::Path)
+        .unwrap();
 
     // Act: 표본은 몇 번이고 같지만 쓰기 핸들이 열려 있다
     passes(&env, 8);
@@ -114,8 +134,14 @@ fn t_pending_20_exclusive_open_check_on_keeps_a_file_pending_while_a_writer_hold
     // Assert 2
     assert_eq!(assets(&env), 2);
     assert_eq!(rows(&env), 0);
-    let after = snapshot(&env.vol.join("lib")).into_iter().filter(|e| e.0 == "a.jpg").collect::<Vec<_>>();
-    assert_eq!(before, after, "the probe opens read-only and never changes originals");
+    let after = snapshot(&env.vol.join("lib"))
+        .into_iter()
+        .filter(|e| e.0 == "a.jpg")
+        .collect::<Vec<_>>();
+    assert_eq!(
+        before, after,
+        "the probe opens read-only and never changes originals"
+    );
 }
 
 #[test]
@@ -125,21 +151,34 @@ fn t_pending_21_exclusive_open_check_on_by_default_and_explicit_off_applies_on_s
     env.write("lib/a.jpg", 1);
     let id = registered(&env);
     let (p, handle) = writer_held(&env, "lib/w.jpg");
-    env.ingest.queue_watch_change(id, &p, PendingKind::Path).unwrap();
+    env.ingest
+        .queue_watch_change(id, &p, PendingKind::Path)
+        .unwrap();
 
     // Act: 표본은 같지만 쓰기 핸들이 열려 있다
     passes(&env, 6);
 
     // Assert: 기본값만으로 반영을 미룬다
-    assert_eq!(assets(&env), 1, "default-on check must hold a file open for write");
+    assert_eq!(
+        assets(&env),
+        1,
+        "default-on check must hold a file open for write"
+    );
     assert_eq!(rows(&env), 1);
 
     // Act 2: 명시적으로 끄면 크기·수정 시각만으로 반영 (false 는 기본값이 아니므로 저장된다)
     let off = env
         .ingest
-        .set_folder_watch_mode(id, Some("os_events".into()), Some(json!({"exclusiveOpenCheck": false})))
+        .set_folder_watch_mode(
+            id,
+            Some("os_events".into()),
+            Some(json!({"exclusiveOpenCheck": false})),
+        )
         .unwrap();
-    assert_eq!(off.watch_options, Some(json!({"exclusiveOpenCheck": false})));
+    assert_eq!(
+        off.watch_options,
+        Some(json!({"exclusiveOpenCheck": false}))
+    );
     passes(&env, 4);
 
     // Assert 2
@@ -148,20 +187,41 @@ fn t_pending_21_exclusive_open_check_on_by_default_and_explicit_off_applies_on_s
     drop(handle);
 
     // Validation: 불리언이 아닌 값·알 수 없는 키는 거부, 기본값(true)은 저장하지 않는다
-    for bad in [json!({"exclusiveOpenCheck": "yes"}), json!({"exclusiveOpenCheck": 1}), json!({"nope": true})] {
-        let r = env.ingest.set_folder_watch_mode(id, Some("os_events".into()), Some(bad.clone()));
-        assert!(matches!(r, Err(IngestError::InvalidInput("watchOptions"))), "{bad}");
+    for bad in [
+        json!({"exclusiveOpenCheck": "yes"}),
+        json!({"exclusiveOpenCheck": 1}),
+        json!({"nope": true}),
+    ] {
+        let r = env
+            .ingest
+            .set_folder_watch_mode(id, Some("os_events".into()), Some(bad.clone()));
+        assert!(
+            matches!(r, Err(IngestError::InvalidInput("watchOptions"))),
+            "{bad}"
+        );
     }
     let on = env
         .ingest
-        .set_folder_watch_mode(id, Some("scan_only".into()), Some(json!({"exclusiveOpenCheck": true})))
+        .set_folder_watch_mode(
+            id,
+            Some("scan_only".into()),
+            Some(json!({"exclusiveOpenCheck": true})),
+        )
         .unwrap();
     assert_eq!(on.watch_options, None, "default value is not stored");
     let off2 = env
         .ingest
-        .set_folder_watch_mode(id, Some("scan_only".into()), Some(json!({"exclusiveOpenCheck": false})))
+        .set_folder_watch_mode(
+            id,
+            Some("scan_only".into()),
+            Some(json!({"exclusiveOpenCheck": false})),
+        )
         .unwrap();
-    assert_eq!(off2.watch_options, Some(json!({"exclusiveOpenCheck": false})), "accepted by any detector");
+    assert_eq!(
+        off2.watch_options,
+        Some(json!({"exclusiveOpenCheck": false})),
+        "accepted by any detector"
+    );
 }
 
 #[test]
@@ -171,10 +231,16 @@ fn t_pending_22_exclusive_open_check_does_not_block_a_directory_row() {
     env.write("lib/a.jpg", 1);
     let id = registered(&env);
     env.ingest
-        .set_folder_watch_mode(id, Some("os_events".into()), Some(json!({"exclusiveOpenCheck": true})))
+        .set_folder_watch_mode(
+            id,
+            Some("os_events".into()),
+            Some(json!({"exclusiveOpenCheck": true})),
+        )
         .unwrap();
     env.write("lib/d/x.jpg", 2);
-    env.ingest.queue_watch_change(id, &env.path("lib/d"), PendingKind::Subtree).unwrap();
+    env.ingest
+        .queue_watch_change(id, &env.path("lib/d"), PendingKind::Subtree)
+        .unwrap();
 
     // Act
     passes(&env, 6);
@@ -190,9 +256,19 @@ fn t_pending_23_unclean_shutdown_marker_schedules_one_rescan_for_realtime_folder
     let env = Env::new();
     env.write("lib1/a.jpg", 1);
     env.write("lib2/b.jpg", 2);
-    let rt = env.ingest.add_folder(env.path("lib1").to_str().unwrap()).unwrap().folder_id;
-    let so = env.ingest.add_folder(env.path("lib2").to_str().unwrap()).unwrap().folder_id;
-    env.ingest.set_folder_watch_mode(so, Some("scan_only".into()), None).unwrap();
+    let rt = env
+        .ingest
+        .add_folder(env.path("lib1").to_str().unwrap())
+        .unwrap()
+        .folder_id;
+    let so = env
+        .ingest
+        .add_folder(env.path("lib2").to_str().unwrap())
+        .unwrap()
+        .folder_id;
+    env.ingest
+        .set_folder_watch_mode(so, Some("scan_only".into()), None)
+        .unwrap();
     clear_jobs(&env);
 
     // Act 1: 첫 실행 — 표식 없음 -> 예약 없음, 표식이 남는다
@@ -221,7 +297,10 @@ fn t_pending_23_unclean_shutdown_marker_schedules_one_rescan_for_realtime_folder
     restarted.end_run();
     assert_eq!(marker_rows(&env), 0);
     let clean = new_ingest(&env);
-    assert!(clean.begin_run().unwrap().is_empty(), "clean shutdown leaves no marker");
+    assert!(
+        clean.begin_run().unwrap().is_empty(),
+        "clean shutdown leaves no marker"
+    );
     assert_eq!(env.count("SELECT COUNT(*) FROM jobs"), 0);
     // begin_run 하지 않은 서비스의 종료는 남의 표식을 지우지 않는다
     new_ingest(&env).end_run();
@@ -239,7 +318,11 @@ fn t_pending_24_scan_defers_recently_modified_and_future_files_to_the_settle_gat
     set_mtime(&env, &fresh, -5_000);
     set_mtime(&env, &future, 3_600_000);
     let before = snapshot(&env.vol);
-    let id = env.ingest.add_folder(env.path("lib").to_str().unwrap()).unwrap().folder_id;
+    let id = env
+        .ingest
+        .add_folder(env.path("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id;
 
     // Act
     scan(&env, id);
@@ -247,7 +330,10 @@ fn t_pending_24_scan_defers_recently_modified_and_future_files_to_the_settle_gat
     // Assert 1: 오래된 파일만 등록, 나머지는 source=scan 으로 대기열에
     assert_eq!(assets(&env), 1);
     assert_eq!(rows(&env), 2);
-    assert_eq!(env.count("SELECT COUNT(*) FROM watch_pending WHERE source = 'scan'"), 2);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM watch_pending WHERE source = 'scan'"),
+        2
+    );
     assert_eq!(env.count("SELECT COUNT(*) FROM scan_errors"), 0);
 
     // Act 2: 안정화 표본이 3회 같으면 반영된다 (시계 비교가 아니라 표본 비교 — 미래 시각 파일도 같다)
@@ -256,7 +342,11 @@ fn t_pending_24_scan_defers_recently_modified_and_future_files_to_the_settle_gat
     // Assert 2
     assert_eq!(assets(&env), 3);
     assert_eq!(rows(&env), 0);
-    assert_eq!(snapshot(&env.vol), before, "originals unchanged (content + mtime)");
+    assert_eq!(
+        snapshot(&env.vol),
+        before,
+        "originals unchanged (content + mtime)"
+    );
 }
 
 #[test]
@@ -265,7 +355,11 @@ fn t_pending_25_scan_does_not_mark_an_existing_asset_missing_when_its_file_was_j
     let env = Env::with_config(|c, _| c.pending.recent_guard_ms = 60_000);
     let f = env.write("lib/a.jpg", 1);
     set_mtime(&env, &f, -3_600_000);
-    let id = env.ingest.add_folder(env.path("lib").to_str().unwrap()).unwrap().folder_id;
+    let id = env
+        .ingest
+        .add_folder(env.path("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id;
     scan(&env, id);
     assert_eq!(assets(&env), 1);
     env.clock.advance(1_000);
@@ -277,10 +371,15 @@ fn t_pending_25_scan_does_not_mark_an_existing_asset_missing_when_its_file_was_j
 
     // Assert 1: 기존 자산은 missing 도 superseded 도 아니다
     assert_eq!(
-        env.count("SELECT COUNT(*) FROM file_locations WHERE presence = 'present' AND detached_at IS NULL"),
+        env.count(
+            "SELECT COUNT(*) FROM file_locations WHERE presence = 'present' AND detached_at IS NULL"
+        ),
         1
     );
-    assert_eq!(env.count("SELECT COUNT(*) FROM media_assets WHERE status = 'active'"), 1);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM media_assets WHERE status = 'active'"),
+        1
+    );
     assert_eq!(assets(&env), 1);
     assert_eq!(rows(&env), 1);
 
@@ -289,8 +388,14 @@ fn t_pending_25_scan_does_not_mark_an_existing_asset_missing_when_its_file_was_j
 
     // Assert 2
     assert_eq!(rows(&env), 0);
-    assert_eq!(env.count("SELECT COUNT(*) FROM media_assets WHERE status = 'active'"), 1);
-    assert_eq!(env.count("SELECT COUNT(*) FROM media_assets WHERE status = 'superseded'"), 1);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM media_assets WHERE status = 'active'"),
+        1
+    );
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM media_assets WHERE status = 'superseded'"),
+        1
+    );
 }
 
 #[test]
@@ -298,7 +403,11 @@ fn t_pending_26_guard_is_off_by_default_so_a_plain_scan_registers_fresh_files() 
     // 회귀: 기본 설정(0)에서는 방금 만든 파일도 스캔이 바로 등록한다 (기존 동작)
     let env = Env::new();
     env.write("lib/fresh.jpg", 1);
-    let id = env.ingest.add_folder(env.path("lib").to_str().unwrap()).unwrap().folder_id;
+    let id = env
+        .ingest
+        .add_folder(env.path("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id;
 
     scan(&env, id);
 
@@ -307,21 +416,32 @@ fn t_pending_26_guard_is_off_by_default_so_a_plain_scan_registers_fresh_files() 
 }
 
 #[test]
-fn t_pending_27_exclusive_check_on_a_removable_volume_goes_through_the_guard_and_still_defers_a_held_file() {
+fn t_pending_27_exclusive_check_on_a_removable_volume_goes_through_the_guard_and_still_defers_a_held_file()
+ {
     // Arrange: 이동식 볼륨 폴더 — 막힐 수 있는 볼륨이라 열기 검사가 제한 시간 호출을 거친다 (게이트 ON 경로)
     let env = Env::new();
     let dir = env.vol.parent().unwrap().join("usb");
     fs::create_dir_all(dir.join("lib")).unwrap();
     fs::write(dir.join("lib").join("u.jpg"), [7u8; 90]).unwrap();
-    env.volumes.add("usb", mam_core::VolumeKind::Removable, &dir);
-    let id = env.ingest.add_folder(dir.join("lib").to_str().unwrap()).unwrap().folder_id;
+    env.volumes
+        .add("usb", mam_core::VolumeKind::Removable, &dir);
+    let id = env
+        .ingest
+        .add_folder(dir.join("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id;
     scan(&env, id);
     env.clock.advance(5_000);
     let held = dir.join("lib").join("w.jpg");
     fs::write(&held, [4u8; 80]).unwrap();
     let handle = OpenOptions::new().write(true).open(&held).unwrap();
-    env.ingest.queue_watch_change(id, &held, PendingKind::Path).unwrap();
-    let before = snapshot(&dir.join("lib")).into_iter().filter(|e| e.0 == "u.jpg").collect::<Vec<_>>();
+    env.ingest
+        .queue_watch_change(id, &held, PendingKind::Path)
+        .unwrap();
+    let before = snapshot(&dir.join("lib"))
+        .into_iter()
+        .filter(|e| e.0 == "u.jpg")
+        .collect::<Vec<_>>();
 
     // Act: 쓰기 핸들이 열린 동안 점검을 여러 번
     passes(&env, 8);
@@ -329,8 +449,16 @@ fn t_pending_27_exclusive_check_on_a_removable_volume_goes_through_the_guard_and
     // Assert: 반영하지 않고 유지, 검사 스레드는 남지 않는다 (제한 시간 안에 끝났다)
     assert_eq!(assets(&env), 1, "held-for-write file must not be applied");
     assert_eq!(rows(&env), 1);
-    let volume_id: i64 = env.read(|c| c.query_row("SELECT volume_id FROM managed_folders", [], |r| r.get(0)).unwrap());
-    assert!(common::env::wait_until(Duration::from_secs(10), || env.ingest.env().io.live_checks(volume_id) == 0));
+    let volume_id: i64 = env.read(|c| {
+        c.query_row("SELECT volume_id FROM managed_folders", [], |r| r.get(0))
+            .unwrap()
+    });
+    assert!(common::env::wait_until(Duration::from_secs(10), || env
+        .ingest
+        .env()
+        .io
+        .live_checks(volume_id)
+        == 0));
 
     // Act 2: 쓰기 핸들을 놓는다
     drop(handle);
@@ -339,7 +467,10 @@ fn t_pending_27_exclusive_check_on_a_removable_volume_goes_through_the_guard_and
     // Assert 2: 반영되고 원본은 그대로
     assert_eq!(assets(&env), 2);
     assert_eq!(rows(&env), 0);
-    let after = snapshot(&dir.join("lib")).into_iter().filter(|e| e.0 == "u.jpg").collect::<Vec<_>>();
+    let after = snapshot(&dir.join("lib"))
+        .into_iter()
+        .filter(|e| e.0 == "u.jpg")
+        .collect::<Vec<_>>();
     assert_eq!(before, after);
 }
 
@@ -350,7 +481,11 @@ fn t_pending_28_due_order_and_per_folder_count_queries_use_the_pending_indexes()
     let plan = |sql: &str, arg: i64| -> String {
         env.read(|c| {
             let mut s = c.prepare(&format!("EXPLAIN QUERY PLAN {sql}")).unwrap();
-            s.query_map([arg], |r| r.get::<_, String>(3)).unwrap().map(Result::unwrap).collect::<Vec<_>>().join(" | ")
+            s.query_map([arg], |r| r.get::<_, String>(3))
+                .unwrap()
+                .map(Result::unwrap)
+                .collect::<Vec<_>>()
+                .join(" | ")
         })
     };
 
@@ -364,16 +499,24 @@ fn t_pending_28_due_order_and_per_folder_count_queries_use_the_pending_indexes()
     // Assert: 전체 스캔·임시 정렬 없이 인덱스/기본키로 푼다
     assert!(due.contains("idx_watch_pending_due"), "{due}");
     assert!(!due.contains("TEMP B-TREE"), "{due}");
-    assert!(count.contains("SEARCH") && count.contains("folder_id=?"), "{count}");
+    assert!(
+        count.contains("SEARCH") && count.contains("folder_id=?"),
+        "{count}"
+    );
 }
 
 #[test]
-fn t_pending_34_shutdown_that_leaves_the_writer_undrained_keeps_the_marker_so_the_next_start_rescans() {
+fn t_pending_34_shutdown_that_leaves_the_writer_undrained_keeps_the_marker_so_the_next_start_rescans()
+ {
     // Arrange: 실제 스레드. DB 쓰기 스레드를 막아 기록기가 쓰기에서 멈추게 한다 (종료 기한을 넘기게)
     let env = Env::new();
     env.write("lib/a.jpg", 1);
     env.ingest.start().unwrap();
-    let id = env.ingest.add_folder(env.path("lib").to_str().unwrap()).unwrap().folder_id;
+    let id = env
+        .ingest
+        .add_folder(env.path("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id;
     assert!(common::env::wait_until(Duration::from_secs(30), || {
         assets(&env) == 1 && env.count("SELECT COUNT(*) FROM jobs") == 0
     }));
@@ -399,7 +542,11 @@ fn t_pending_34_shutdown_that_leaves_the_writer_undrained_keeps_the_marker_so_th
 
     // Assert: 떼어 낸 스레드가 있고 표식은 남는다
     assert!(abandoned >= 1, "the blocked writer is abandoned");
-    assert_eq!(marker_rows(&env), 1, "an undrained shutdown keeps the marker");
+    assert_eq!(
+        marker_rows(&env),
+        1,
+        "an undrained shutdown keeps the marker"
+    );
 
     // Act 2: 막힘을 풀고 다음 시작 — 실시간 폴더 재스캔 1회가 예약된다
     drop(release_tx);

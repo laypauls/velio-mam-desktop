@@ -51,7 +51,9 @@ fn timed<T>(iters: usize, mut f: impl FnMut(usize) -> T) -> Vec<f64> {
 
 fn main() {
     let dir = PathBuf::from(arg("dir").unwrap_or_else(|| "target/bench-play-ranges".into()));
-    let n: i64 = arg("assets").and_then(|s| s.parse().ok()).unwrap_or(1_000_000);
+    let n: i64 = arg("assets")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(1_000_000);
     let iters: usize = arg("iters").and_then(|s| s.parse().ok()).unwrap_or(300);
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
@@ -114,9 +116,20 @@ fn main() {
     )
     .unwrap();
     tx.commit().unwrap();
-    let ranged: i64 = conn.query_row("SELECT count(DISTINCT asset_id) FROM asset_play_ranges", [], |r| r.get(0)).unwrap();
-    let rows: i64 = conn.query_row("SELECT count(*) FROM asset_play_ranges", [], |r| r.get(0)).unwrap();
-    println!("generated in {:.1}s: assets={n}, collection=100000, ranged assets={ranged}, range rows={rows}", t.elapsed().as_secs_f64());
+    let ranged: i64 = conn
+        .query_row(
+            "SELECT count(DISTINCT asset_id) FROM asset_play_ranges",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    let rows: i64 = conn
+        .query_row("SELECT count(*) FROM asset_play_ranges", [], |r| r.get(0))
+        .unwrap();
+    println!(
+        "generated in {:.1}s: assets={n}, collection=100000, ranged assets={ranged}, range rows={rows}",
+        t.elapsed().as_secs_f64()
+    );
     drop(conn);
 
     let pool = Arc::new(DbPool::open(&db, 2).unwrap());
@@ -125,24 +138,66 @@ fn main() {
 
     // 1000구간 자산 하나 (비중첩: 500 ms 구간 + 400 ms 간격, 총 900 s < 길이 1000 s)
     let big_asset = 2;
-    let big: Vec<PlayRange> = (0..1000).map(|i| PlayRange { start_ms: i * 900, end_ms: i * 900 + 500 }).collect();
+    let big: Vec<PlayRange> = (0..1000)
+        .map(|i| PlayRange {
+            start_ms: i * 900,
+            end_ms: i * 900 + 500,
+        })
+        .collect();
     ud.play_ranges_set(big_asset, &big).unwrap();
 
     println!("\n| 항목 | 반복 | P50 / P95 / P99 (ms) | 예산 |\n|---|---|---|---|");
     // get: 구간 보유 자산(평균 3구간) 무작위, 1000구간 자산
-    let ids: Vec<i64> = (0..iters as i64).map(|i| 3 + 100 * ((i * 7919) % 10_000)).collect();
-    row("play_ranges_get (평균 3구간)", "P95 < 5", timed(iters, |i| ud.play_ranges_get(ids[i]).unwrap()));
-    row("play_ranges_get (1000구간)", "P95 < 5", timed(iters, |_| ud.play_ranges_get(big_asset).unwrap()));
+    let ids: Vec<i64> = (0..iters as i64)
+        .map(|i| 3 + 100 * ((i * 7919) % 10_000))
+        .collect();
+    row(
+        "play_ranges_get (평균 3구간)",
+        "P95 < 5",
+        timed(iters, |i| ud.play_ranges_get(ids[i]).unwrap()),
+    );
+    row(
+        "play_ranges_get (1000구간)",
+        "P95 < 5",
+        timed(iters, |_| ud.play_ranges_get(big_asset).unwrap()),
+    );
     // set: 3구간 교체, 1000구간 교체 (자산 3 은 구간 보유 자산이라 DELETE+INSERT 가 실제로 일어난다)
-    let small = [PlayRange { start_ms: 0, end_ms: 1000 }, PlayRange { start_ms: 5000, end_ms: 6000 }];
-    row("play_ranges_set (2구간)", "-", timed(iters, |i| ud.play_ranges_set(ids[i], &small).unwrap()));
-    row("play_ranges_set (1000구간)", "P95 < 20", timed(iters, |_| ud.play_ranges_set(big_asset, &big).unwrap()));
+    let small = [
+        PlayRange {
+            start_ms: 0,
+            end_ms: 1000,
+        },
+        PlayRange {
+            start_ms: 5000,
+            end_ms: 6000,
+        },
+    ];
+    row(
+        "play_ranges_set (2구간)",
+        "-",
+        timed(iters, |i| ud.play_ranges_set(ids[i], &small).unwrap()),
+    );
+    row(
+        "play_ranges_set (1000구간)",
+        "P95 < 20",
+        timed(iters, |_| ud.play_ranges_set(big_asset, &big).unwrap()),
+    );
     // summary: 컬렉션 10만 안에 구간 보유 자산 1만
     let first = ud.collection_play_range_summary(1).unwrap();
     println!("(summary rows = {})", first.len());
-    row("collection_play_range_summary (100k 컬렉션, 구간 자산 ~1만)", "P95 < 50", timed(iters.min(100), |_| ud.collection_play_range_summary(1).unwrap()));
+    row(
+        "collection_play_range_summary (100k 컬렉션, 구간 자산 ~1만)",
+        "P95 < 50",
+        timed(iters.min(100), |_| {
+            ud.collection_play_range_summary(1).unwrap()
+        }),
+    );
     // 기존 대기열 (변경 없음 확인용 기준선)
-    row("collection_play_queue (100k) [기존]", "P95 ~469 (기존 기록)", timed(iters.min(30), |_| ud.collection_play_queue(1).unwrap()));
+    row(
+        "collection_play_queue (100k) [기존]",
+        "P95 ~469 (기존 기록)",
+        timed(iters.min(30), |_| ud.collection_play_queue(1).unwrap()),
+    );
 
     drop(ud);
     drop(pool);

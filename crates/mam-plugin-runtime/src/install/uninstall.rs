@@ -29,7 +29,10 @@ impl PluginRuntime {
         let entry = self.take_entry(id);
         if entry.is_none() {
             let key = id.to_owned();
-            if self.db_read(move |c| Ok(get(c, INSTALLED, &key)?))?.is_none() {
+            if self
+                .db_read(move |c| Ok(get(c, INSTALLED, &key)?))?
+                .is_none()
+            {
                 return Err(InstallError::NotInstalled);
             }
         }
@@ -70,7 +73,12 @@ impl PluginRuntime {
         }
         // 7. 데이터
         if !keep_data {
-            let batch = self.knobs.read().unwrap_or_else(|p| p.into_inner()).delete_batch.unwrap_or(BATCH);
+            let batch = self
+                .knobs
+                .read()
+                .unwrap_or_else(|p| p.into_inner())
+                .delete_batch
+                .unwrap_or(BATCH);
             loop {
                 let key = id.to_owned();
                 let n = self.db_write(Priority::Low, move |c| {

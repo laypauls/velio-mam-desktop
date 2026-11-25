@@ -8,18 +8,25 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
+use crate::volume::strip_verbatim;
 use crate::watch::detector::{
-    ChangeDetector, DetectError, DetectorOptions, OptionField, OptionKind, ProbeResult, WatchHandle, WatchTarget, parse_options_checked,
+    ChangeDetector, DetectError, DetectorOptions, OptionField, OptionKind, ProbeResult,
+    WatchHandle, WatchTarget, parse_options_checked,
 };
 use crate::watch::options_ref::RefResolver;
 use crate::watch::remote::hub::{AttachGuard, RemoteHub};
 use crate::watch::remote::{SourceKind, map_reaches};
-use crate::volume::strip_verbatim;
 use crate::watch::sink::ChangeSink;
 
 pub const OPT_SOURCE: &str = "source";
 
-const FIELDS: &[OptionField] = &[OptionField { key: OPT_SOURCE, kind: OptionKind::Ref, min: 1, max: i64::MAX, default: 0 }];
+const FIELDS: &[OptionField] = &[OptionField {
+    key: OPT_SOURCE,
+    kind: OptionKind::Ref,
+    min: 1,
+    max: i64::MAX,
+    default: 0,
+}];
 
 /// 사유 키 (`watch.reason.<key>`)
 pub const REASON_NOT_READY: &str = "remote_not_ready";
@@ -72,13 +79,17 @@ impl ChangeDetector for DdpAudit {
         if self.hub.is_bound() {
             ProbeResult::Available
         } else {
-            ProbeResult::Unavailable { reason_key: REASON_NOT_READY }
+            ProbeResult::Unavailable {
+                reason_key: REASON_NOT_READY,
+            }
         }
     }
 
     fn probe_with(&self, target: &WatchTarget, opts: &DetectorOptions) -> ProbeResult {
         if !self.hub.is_bound() {
-            return ProbeResult::Unavailable { reason_key: REASON_NOT_READY };
+            return ProbeResult::Unavailable {
+                reason_key: REASON_NOT_READY,
+            };
         }
         match self.check(target, opts) {
             Ok(()) => ProbeResult::Available,
@@ -91,10 +102,16 @@ impl ChangeDetector for DdpAudit {
     }
 
     /// `source` 는 필수이고 `ddp_audit` 종류의 접속이어야 한다 (참조 존재는 주입된 해석기, 종류는 여기서).
-    fn parse_options_with(&self, raw: Option<&Value>, refs: &dyn RefResolver) -> Result<DetectorOptions, DetectError> {
+    fn parse_options_with(
+        &self,
+        raw: Option<&Value>,
+        refs: &dyn RefResolver,
+    ) -> Result<DetectorOptions, DetectError> {
         const FIELD: &str = "watchOptions";
         let opts = parse_options_checked(FIELDS, raw, refs)?;
-        let id = opts.get_i64(OPT_SOURCE).ok_or(DetectError::InvalidOptions { field: FIELD })?;
+        let id = opts
+            .get_i64(OPT_SOURCE)
+            .ok_or(DetectError::InvalidOptions { field: FIELD })?;
         // 허브가 아직 없으면(시험·초기화 순서) 종류를 확인할 수 없다 — 존재 확인은 위 해석기가 했다
         if self.hub.is_bound() && self.hub.kind_of(id) != Some(SourceKind::DdpAudit) {
             return Err(DetectError::UnknownReference { field: FIELD });
@@ -103,18 +120,35 @@ impl ChangeDetector for DdpAudit {
     }
 
     /// 경로 변환이 폴더 루트에 닿지 않으면 저장 전에 거부한다 — 붙어서 줄을 읽어도 그 폴더는 영영 깨어나지 않는 조용한 실패를 막는다.
-    fn validate_target(&self, target: &WatchTarget, opts: &DetectorOptions) -> Result<(), DetectError> {
+    fn validate_target(
+        &self,
+        target: &WatchTarget,
+        opts: &DetectorOptions,
+    ) -> Result<(), DetectError> {
         match self.check(target, opts) {
             Err(REASON_PATH_MAP) => Err(DetectError::InvalidOptions { field: "pathMap" }),
             _ => Ok(()),
         }
     }
 
-    fn start(&self, target: &WatchTarget, opts: &DetectorOptions, sink: ChangeSink) -> Result<Box<dyn WatchHandle>, DetectError> {
+    fn start(
+        &self,
+        target: &WatchTarget,
+        opts: &DetectorOptions,
+        sink: ChangeSink,
+    ) -> Result<Box<dyn WatchHandle>, DetectError> {
         let id = opts
             .get_i64(OPT_SOURCE)
-            .ok_or(DetectError::InvalidOptions { field: "watchOptions" })?;
-        let guard = self.hub.attach(id, SourceKind::DdpAudit, target.folder_id, &target.root, sink)?;
+            .ok_or(DetectError::InvalidOptions {
+                field: "watchOptions",
+            })?;
+        let guard = self.hub.attach(
+            id,
+            SourceKind::DdpAudit,
+            target.folder_id,
+            &target.root,
+            sink,
+        )?;
         Ok(Box::new(DdpHandle(guard)))
     }
 }

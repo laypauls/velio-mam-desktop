@@ -9,9 +9,12 @@ use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender, channel};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use windows::Win32::Foundation::{CloseHandle, DUPLICATE_SAME_ACCESS, DuplicateHandle, HANDLE, INVALID_HANDLE_VALUE};
+use windows::Win32::Foundation::{
+    CloseHandle, DUPLICATE_SAME_ACCESS, DuplicateHandle, HANDLE, INVALID_HANDLE_VALUE,
+};
 use windows::Win32::System::Memory::{
-    CreateFileMappingW, FILE_MAP_READ, MEMORY_MAPPED_VIEW_ADDRESS, MapViewOfFile, PAGE_READWRITE, UnmapViewOfFile,
+    CreateFileMappingW, FILE_MAP_READ, MEMORY_MAPPED_VIEW_ADDRESS, MapViewOfFile, PAGE_READWRITE,
+    UnmapViewOfFile,
 };
 use windows::Win32::System::Threading::GetCurrentProcess;
 use windows::core::PCWSTR;
@@ -19,7 +22,10 @@ use windows::core::PCWSTR;
 use super::proc::{RawProcessHandle, WorkerConn, WorkerProcess, WorkerSpawner};
 use super::surface::{BankAttach, FrameSurface, SurfaceError};
 use crate::PlayerError;
-use crate::protocol::{Command, FrameMsgOut, Message, PROTOCOL_VERSION, RenderPath, Request, decode_line, encode_line, stride_for};
+use crate::protocol::{
+    Command, FrameMsgOut, Message, PROTOCOL_VERSION, RenderPath, Request, decode_line, encode_line,
+    stride_for,
+};
 
 // ---------- 가짜 프레임 표면 ----------
 
@@ -58,7 +64,11 @@ impl MemSurface {
     }
 
     pub fn last_frame(&self) -> Option<FrameMsgOut> {
-        self.frames.lock().unwrap_or_else(|p| p.into_inner()).last().copied()
+        self.frames
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .last()
+            .copied()
     }
 
     /// 호스트 쪽 뷰에서 슬롯 전체 바이트를 읽는다 (워커가 쓴 픽셀 검증용)
@@ -71,7 +81,13 @@ impl MemSurface {
 }
 
 impl FrameSurface for MemSurface {
-    fn create_bank(&self, epoch: u64, w: u32, h: u32, worker_process: RawProcessHandle) -> Result<BankAttach, SurfaceError> {
+    fn create_bank(
+        &self,
+        epoch: u64,
+        w: u32,
+        h: u32,
+        worker_process: RawProcessHandle,
+    ) -> Result<BankAttach, SurfaceError> {
         if self.fail_create.load(Ordering::Relaxed) {
             return Err(SurfaceError::Failed("create_bank failed (test)".into()));
         }
@@ -82,28 +98,68 @@ impl FrameSurface for MemSurface {
         for _ in 0..3 {
             // SAFETY: 익명 페이지 파일 매핑 — 핸들·뷰는 Section 이 소유하고 retire 에서 해제한다
             unsafe {
-                let m = CreateFileMappingW(INVALID_HANDLE_VALUE, None, PAGE_READWRITE, (size >> 32) as u32, size as u32, PCWSTR::null())
-                    .map_err(|e| SurfaceError::Failed(e.to_string()))?;
+                let m = CreateFileMappingW(
+                    INVALID_HANDLE_VALUE,
+                    None,
+                    PAGE_READWRITE,
+                    (size >> 32) as u32,
+                    size as u32,
+                    PCWSTR::null(),
+                )
+                .map_err(|e| SurfaceError::Failed(e.to_string()))?;
                 let view = MapViewOfFile(m, FILE_MAP_READ, 0, 0, 0);
                 let mut dst = HANDLE::default();
                 if worker_process == 0 {
                     handles.push(m.0 as usize as u64); // 가짜 워커(같은 프로세스) — 값만 필요하다
                 } else {
-                    DuplicateHandle(GetCurrentProcess(), m, HANDLE(worker_process as *mut c_void), &mut dst, 0, false, DUPLICATE_SAME_ACCESS)
-                        .map_err(|e| SurfaceError::Failed(format!("DuplicateHandle: {e}")))?;
+                    DuplicateHandle(
+                        GetCurrentProcess(),
+                        m,
+                        HANDLE(worker_process as *mut c_void),
+                        &mut dst,
+                        0,
+                        false,
+                        DUPLICATE_SAME_ACCESS,
+                    )
+                    .map_err(|e| SurfaceError::Failed(format!("DuplicateHandle: {e}")))?;
                     handles.push(dst.0 as usize as u64);
                 }
-                sections.push(Section { host_handle: m, view, size: size as usize });
+                sections.push(Section {
+                    host_handle: m,
+                    view,
+                    size: size as usize,
+                });
             }
         }
-        self.banks.lock().unwrap_or_else(|p| p.into_inner()).insert(epoch, sections);
-        self.created.lock().unwrap_or_else(|p| p.into_inner()).push(epoch);
-        Ok(BankAttach { epoch, w, h, stride, size, handles })
+        self.banks
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .insert(epoch, sections);
+        self.created
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .push(epoch);
+        Ok(BankAttach {
+            epoch,
+            w,
+            h,
+            stride,
+            size,
+            handles,
+        })
     }
 
     fn retire_bank(&self, epoch: u64) {
-        self.retired.lock().unwrap_or_else(|p| p.into_inner()).push(epoch);
-        if let Some(secs) = self.banks.lock().unwrap_or_else(|p| p.into_inner()).remove(&epoch) {
+        self.retired
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .push(epoch);
+        if let Some(secs) = self
+            .banks
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .remove(&epoch)
+        {
             for s in secs {
                 // SAFETY: create_bank 가 만든 뷰·핸들
                 unsafe {
@@ -115,7 +171,10 @@ impl FrameSurface for MemSurface {
     }
 
     fn post_frame(&self, msg: &FrameMsgOut) {
-        self.frames.lock().unwrap_or_else(|p| p.into_inner()).push(*msg);
+        self.frames
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .push(*msg);
     }
 
     fn capabilities_ok(&self) -> bool {
@@ -129,7 +188,9 @@ pub struct ChanWriter(Sender<Vec<u8>>);
 
 impl Write for ChanWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.send(buf.to_vec()).map_err(|_| std::io::Error::from(std::io::ErrorKind::BrokenPipe))?;
+        self.0
+            .send(buf.to_vec())
+            .map_err(|_| std::io::Error::from(std::io::ErrorKind::BrokenPipe))?;
         Ok(buf.len())
     }
 
@@ -270,9 +331,16 @@ impl WorkerSpawner for FakeSpawner {
         let (script, d) = (Arc::clone(&self.script), Arc::clone(&dead));
         std::thread::spawn(move || serve(script, d, cmd_rx, evt_tx));
         Ok(WorkerConn {
-            process: Box::new(FakeProcess { dead, id: 10_000 + n }),
+            process: Box::new(FakeProcess {
+                dead,
+                id: 10_000 + n,
+            }),
             cmd: Box::new(ChanWriter(cmd_tx)),
-            evt: Box::new(ChanReader { rx: evt_rx, buf: Vec::new(), pos: 0 }),
+            evt: Box::new(ChanReader {
+                rx: evt_rx,
+                buf: Vec::new(),
+                pos: 0,
+            }),
         })
     }
 }
@@ -300,7 +368,12 @@ fn cmd_name(c: &Command) -> &'static str {
 }
 
 /// 가짜 워커 본체 — 실제 워커와 같은 줄 JSON 프로토콜을 말한다
-fn serve(script: Arc<FakeScript>, dead: Arc<AtomicBool>, rx: Receiver<Vec<u8>>, tx: Sender<Vec<u8>>) {
+fn serve(
+    script: Arc<FakeScript>,
+    dead: Arc<AtomicBool>,
+    rx: Receiver<Vec<u8>>,
+    tx: Sender<Vec<u8>>,
+) {
     let send = |m: &Message| {
         if !script.go_silent.load(Ordering::Relaxed)
             && let Ok(l) = encode_line(m)
@@ -309,17 +382,32 @@ fn serve(script: Arc<FakeScript>, dead: Arc<AtomicBool>, rx: Receiver<Vec<u8>>, 
         }
     };
     if script.fail_init.load(Ordering::Relaxed) {
-        send(&Message::Error { code: crate::protocol::WorkerErrorCode::Internal, msg: "init failed".into() });
+        send(&Message::Error {
+            code: crate::protocol::WorkerErrorCode::Internal,
+            msg: "init failed".into(),
+        });
         return;
     }
-    send(&Message::Ready { mpv_api: 0x2_0000, protocol: script.protocol.load(Ordering::Relaxed), render_path: RenderPath::R1 });
+    send(&Message::Ready {
+        mpv_api: 0x2_0000,
+        protocol: script.protocol.load(Ordering::Relaxed),
+        render_path: RenderPath::R1,
+    });
     let mut buf = Vec::<u8>::new();
     let (mut epoch, mut seq, mut time, mut paused) = (0u64, 0u64, 0i64, true);
     let mut size = (0u32, 0u32, 0u32);
     let frame = |epoch: u64, seq: &mut u64, size: (u32, u32, u32)| {
         if epoch != 0 {
             *seq += 1;
-            send(&Message::FrameReady { epoch, slot: (*seq % 3) as u32, seq: *seq, w: size.0, h: size.1, stride: size.2, render_done_ms: 1.0 });
+            send(&Message::FrameReady {
+                epoch,
+                slot: (*seq % 3) as u32,
+                seq: *seq,
+                w: size.0,
+                h: size.1,
+                stride: size.2,
+                render_done_ms: 1.0,
+            });
         }
     };
     let mut hb = std::time::Instant::now();
@@ -329,7 +417,12 @@ fn serve(script: Arc<FakeScript>, dead: Arc<AtomicBool>, rx: Receiver<Vec<u8>>, 
         }
         if hb.elapsed() >= Duration::from_millis(100) {
             hb = std::time::Instant::now();
-            send(&Message::Stats { rendered: seq, skipped: 0, ignored: 0, cache_hits: 0 });
+            send(&Message::Stats {
+                rendered: seq,
+                skipped: 0,
+                ignored: 0,
+                cache_hits: 0,
+            });
         }
         match rx.recv_timeout(Duration::from_millis(10)) {
             Ok(b) => buf.extend_from_slice(&b),
@@ -338,16 +431,41 @@ fn serve(script: Arc<FakeScript>, dead: Arc<AtomicBool>, rx: Receiver<Vec<u8>>, 
         }
         while let Some(i) = buf.iter().position(|&c| c == b'\n') {
             let line: Vec<u8> = buf.drain(..=i).collect();
-            let Ok(Request { id, command }) = decode_line::<Request>(&String::from_utf8_lossy(&line)) else { continue };
-            script.log.lock().unwrap_or_else(|p| p.into_inner()).push(command.clone());
-            let muted = script.mute_cmd.lock().unwrap_or_else(|p| p.into_inner()).as_deref() == Some(cmd_name(&command));
+            let Ok(Request { id, command }) =
+                decode_line::<Request>(&String::from_utf8_lossy(&line))
+            else {
+                continue;
+            };
+            script
+                .log
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .push(command.clone());
+            let muted = script
+                .mute_cmd
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .as_deref()
+                == Some(cmd_name(&command));
             let reply = |ok: bool| {
                 if id != 0 && !muted {
-                    send(&Message::Reply { id, ok, code: None, error: (!ok).then(|| "rejected".to_string()), data: None });
+                    send(&Message::Reply {
+                        id,
+                        ok,
+                        code: None,
+                        error: (!ok).then(|| "rejected".to_string()),
+                        data: None,
+                    });
                 }
             };
             match command {
-                Command::Attach { epoch: e, w, h, stride, .. } => {
+                Command::Attach {
+                    epoch: e,
+                    w,
+                    h,
+                    stride,
+                    ..
+                } => {
                     epoch = e;
                     size = (w, h, stride);
                     seq = 0;
@@ -356,7 +474,9 @@ fn serve(script: Arc<FakeScript>, dead: Arc<AtomicBool>, rx: Receiver<Vec<u8>>, 
                         frame(epoch, &mut seq, size);
                     }
                 }
-                Command::Open { paused: p, ranges, .. } => {
+                Command::Open {
+                    paused: p, ranges, ..
+                } => {
                     if script.die_on_open.load(Ordering::Relaxed) {
                         return;
                     }
@@ -367,7 +487,13 @@ fn serve(script: Arc<FakeScript>, dead: Arc<AtomicBool>, rx: Receiver<Vec<u8>>, 
                         continue;
                     }
                     let _ = ranges;
-                    send(&Message::FileLoaded { w: Some(1920), h: Some(1080), fps: Some(30.0), duration_ms: Some(script.duration_ms.load(Ordering::Relaxed) as i64), video_format: Some("h264".into()) });
+                    send(&Message::FileLoaded {
+                        w: Some(1920),
+                        h: Some(1080),
+                        fps: Some(30.0),
+                        duration_ms: Some(script.duration_ms.load(Ordering::Relaxed) as i64),
+                        video_format: Some("h264".into()),
+                    });
                     if script.die_after_load.load(Ordering::SeqCst) > 0 {
                         script.die_after_load.fetch_sub(1, Ordering::SeqCst);
                         return;
@@ -385,20 +511,35 @@ fn serve(script: Arc<FakeScript>, dead: Arc<AtomicBool>, rx: Receiver<Vec<u8>>, 
                 Command::Play => {
                     reply(true);
                     paused = false;
-                    send(&Message::Paused { paused, time_ms: time });
+                    send(&Message::Paused {
+                        paused,
+                        time_ms: time,
+                    });
                 }
                 Command::Pause => {
                     reply(true);
                     paused = true;
-                    send(&Message::Paused { paused, time_ms: time });
+                    send(&Message::Paused {
+                        paused,
+                        time_ms: time,
+                    });
                 }
                 Command::FrameStep | Command::FrameBackStep => {
                     reply(true);
                     paused = true;
-                    time = (time + if matches!(command, Command::FrameStep) { 33 } else { -33 }).max(0);
+                    time = (time
+                        + if matches!(command, Command::FrameStep) {
+                            33
+                        } else {
+                            -33
+                        })
+                    .max(0);
                     frame(epoch, &mut seq, size);
                     send(&Message::PlaybackRestart { time_ms: time });
-                    send(&Message::Paused { paused, time_ms: time });
+                    send(&Message::Paused {
+                        paused,
+                        time_ms: time,
+                    });
                 }
                 Command::Close => {
                     reply(true);

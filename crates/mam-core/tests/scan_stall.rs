@@ -16,7 +16,11 @@ const THREE_MIN: i64 = 180_000;
 /// 폴더 하나를 등록하고 스캔이 시작된 것처럼 진행 상태를 연다.
 fn scanning(env: &Env, rel: &str) -> i64 {
     env.write(&format!("{rel}/x.jpg"), 1);
-    let id = env.ingest.add_folder(env.path(rel).to_str().unwrap()).unwrap().folder_id;
+    let id = env
+        .ingest
+        .add_folder(env.path(rel).to_str().unwrap())
+        .unwrap()
+        .folder_id;
     env.ingest
         .env()
         .progress
@@ -25,7 +29,14 @@ fn scanning(env: &Env, rel: &str) -> i64 {
 }
 
 fn stall_of(env: &Env, id: i64) -> Option<mam_core::scan::ScanStall> {
-    env.ingest.list_folders().unwrap().into_iter().find(|f| f.folder_id == id).unwrap().scan_stall.clone()
+    env.ingest
+        .list_folders()
+        .unwrap()
+        .into_iter()
+        .find(|f| f.folder_id == id)
+        .unwrap()
+        .scan_stall
+        .clone()
 }
 
 #[test]
@@ -54,15 +65,26 @@ fn t_stall_02_moving_to_another_path_clears_the_stall_and_logs_one_recovery() {
     let env = Env::new();
     let id = scanning(&env, "lib");
     env.clock.advance(THREE_MIN);
-    assert!(matches!(env.ingest.check_stalls().as_slice(), [StallEvent::Stalled { folder_id, .. }] if *folder_id == id));
+    assert!(
+        matches!(env.ingest.check_stalls().as_slice(), [StallEvent::Stalled { folder_id, .. }] if *folder_id == id)
+    );
 
     // Act: 다른 경로로 넘어갔다
-    env.ingest.env().progress.hold(id, r"X:\lib\next", env.clock_now());
+    env.ingest
+        .env()
+        .progress
+        .hold(id, r"X:\lib\next", env.clock_now());
 
     // Assert
     assert_eq!(stall_of(&env, id), None);
-    assert_eq!(env.ingest.check_stalls(), vec![StallEvent::Recovered { folder_id: id }]);
-    assert!(env.ingest.check_stalls().is_empty(), "recovery is logged once");
+    assert_eq!(
+        env.ingest.check_stalls(),
+        vec![StallEvent::Recovered { folder_id: id }]
+    );
+    assert!(
+        env.ingest.check_stalls().is_empty(),
+        "recovery is logged once"
+    );
 }
 
 #[test]
@@ -94,7 +116,10 @@ fn t_stall_04_holding_the_same_path_again_does_not_restart_the_clock() {
     // Act: 같은 경로를 반복해서 기록한다 (파일 하나가 계속 막혀 있다)
     for _ in 0..3 {
         env.clock.advance(THREE_MIN / 3);
-        env.ingest.env().progress.hold(id, r"X:\lib", env.clock_now());
+        env.ingest
+            .env()
+            .progress
+            .hold(id, r"X:\lib", env.clock_now());
     }
 
     // Assert
@@ -114,7 +139,10 @@ fn t_stall_05_stall_is_logged_every_ten_minutes_with_an_injected_clock() {
     assert!(env.ingest.check_stalls().is_empty());
     env.clock.advance(1);
     let again = env.ingest.check_stalls();
-    assert!(matches!(again.as_slice(), [StallEvent::Stalled { folder_id, .. }] if *folder_id == id), "{again:?}");
+    assert!(
+        matches!(again.as_slice(), [StallEvent::Stalled { folder_id, .. }] if *folder_id == id),
+        "{again:?}"
+    );
 }
 
 #[test]
@@ -130,7 +158,10 @@ fn t_stall_06_finishing_the_scan_clears_the_stall() {
 
     // Assert
     assert_eq!(stall_of(&env, id), None);
-    assert_eq!(env.ingest.check_stalls(), vec![StallEvent::Recovered { folder_id: id }]);
+    assert_eq!(
+        env.ingest.check_stalls(),
+        vec![StallEvent::Recovered { folder_id: id }]
+    );
 }
 
 #[test]
@@ -155,12 +186,21 @@ fn t_stall_08_json_omits_the_key_when_healthy_and_uses_camel_case_when_stalled()
     let env = Env::new();
     let id = scanning(&env, "lib");
     let json = |env: &Env| {
-        let v = env.ingest.list_folders().unwrap().into_iter().find(|f| f.folder_id == id).unwrap();
+        let v = env
+            .ingest
+            .list_folders()
+            .unwrap()
+            .into_iter()
+            .find(|f| f.folder_id == id)
+            .unwrap();
         serde_json::to_value(v).unwrap()
     };
 
     // Act / Assert
-    assert!(json(&env).get("scanStall").is_none(), "optional field is absent while healthy");
+    assert!(
+        json(&env).get("scanStall").is_none(),
+        "optional field is absent while healthy"
+    );
     env.clock.advance(THREE_MIN);
     let v = json(&env);
     assert_eq!(v["scanStall"]["atPath"], r"X:\lib");

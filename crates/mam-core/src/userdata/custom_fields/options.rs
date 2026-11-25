@@ -43,7 +43,12 @@ fn require_option_field(c: &Connection, field_id: i64) -> Result<(), IngestError
     Ok(())
 }
 
-fn label_taken(c: &Connection, field_id: i64, key: &str, except: Option<i64>) -> Result<bool, IngestError> {
+fn label_taken(
+    c: &Connection,
+    field_id: i64,
+    key: &str,
+    except: Option<i64>,
+) -> Result<bool, IngestError> {
     let found: Option<i64> = c
         .query_row(
             "SELECT option_id FROM metadata_field_options WHERE field_id = ?1 AND label_key = ?2 AND option_id <> ?3",
@@ -64,7 +69,11 @@ fn load_option(c: &Connection, option_id: i64) -> Result<FieldOption, IngestErro
 
 impl UserData {
     /// 선택지를 맨 뒤에 추가한다. 같은 필드 안에서 이름(NFC + 소문자)이 겹치면 `AlreadyRegistered`.
-    pub fn add_metadata_option(&self, field_id: i64, label: &str) -> Result<FieldOption, IngestError> {
+    pub fn add_metadata_option(
+        &self,
+        field_id: i64,
+        label: &str,
+    ) -> Result<FieldOption, IngestError> {
         let label = clean_name(label)?;
         let key = name_key(&label);
         self.write(move |tx, _| {
@@ -86,7 +95,11 @@ impl UserData {
     }
 
     /// 선택지 이름을 바꾼다 — 재색인 없음.
-    pub fn rename_metadata_option(&self, option_id: i64, label: &str) -> Result<FieldOption, IngestError> {
+    pub fn rename_metadata_option(
+        &self,
+        option_id: i64,
+        label: &str,
+    ) -> Result<FieldOption, IngestError> {
         let label = clean_name(label)?;
         let key = name_key(&label);
         self.write(move |tx, _| {
@@ -103,7 +116,11 @@ impl UserData {
     }
 
     /// 선택지 순서를 바꾼다. `ordered` 는 그 필드의 모든 option_id 를 정확히 한 번씩 포함해야 한다. 재색인 없음.
-    pub fn reorder_metadata_options(&self, field_id: i64, ordered: &[i64]) -> Result<(), IngestError> {
+    pub fn reorder_metadata_options(
+        &self,
+        field_id: i64,
+        ordered: &[i64],
+    ) -> Result<(), IngestError> {
         let ordered = ordered.to_vec();
         self.write(move |tx, _| {
             require_option_field(tx, field_id)?;

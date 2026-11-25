@@ -49,7 +49,11 @@ impl WatchManager {
         Self::with_clock(tx, registry, Arc::new(mam_db::SystemClock))
     }
 
-    pub fn with_clock(tx: Sender<WatchMsg>, registry: Arc<DetectorRegistry>, clock: SharedClock) -> Self {
+    pub fn with_clock(
+        tx: Sender<WatchMsg>,
+        registry: Arc<DetectorRegistry>,
+        clock: SharedClock,
+    ) -> Self {
         Self {
             tx,
             registry,
@@ -72,7 +76,12 @@ impl WatchManager {
 
     /// 감시를 시작한다. 정착한 엔트리가 있으면 아무것도 하지 않는다(`started_now = false`).
     /// 아니면 옛 엔트리를 치우고 후보를 순서대로 시도한다 — 시작 실패는 다음 후보로 넘어가고 `scan_only` 는 항상 성공한다.
-    pub fn start(&self, target: &WatchTarget, mode: Option<&str>, raw_options: Option<&str>) -> StartOutcome {
+    pub fn start(
+        &self,
+        target: &WatchTarget,
+        mode: Option<&str>,
+        raw_options: Option<&str>,
+    ) -> StartOutcome {
         let old = {
             let mut map = self.map();
             if let Some(e) = map.get(&target.folder_id)
@@ -136,7 +145,10 @@ impl WatchManager {
             }
         }
         // scan_only 가 항상 성공하므로 도달하지 않는다 — 엔트리를 만들지 않아 supervisor 가 다시 시도한다
-        tracing::error!(folder_id = target.folder_id, "no change detector could start");
+        tracing::error!(
+            folder_id = target.folder_id,
+            "no change detector could start"
+        );
         StartOutcome {
             status: WatchStatus {
                 active: "scan_only",
@@ -173,9 +185,7 @@ impl WatchManager {
 
     /// 엔트리가 있고 시작 실패 폴백이 아니다 — false 면 supervisor 가 다시 시도한다.
     pub fn is_settled(&self, folder_id: i64) -> bool {
-        self.map()
-            .get(&folder_id)
-            .is_some_and(|e| !e.start_failed)
+        self.map().get(&folder_id).is_some_and(|e| !e.start_failed)
     }
 
     pub fn status(&self, folder_id: i64) -> Option<WatchStatus> {

@@ -25,9 +25,13 @@ impl RescanTrigger for ScheduleTrigger {
 
     fn parse(&self, raw: &Map<String, Value>) -> Result<Box<dyn TriggerSpec>, PolicyError> {
         if raw.keys().any(|k| k != "kind" && k != "days" && k != "at") {
-            return Err(PolicyError { field: "rescanPolicy.trigger" });
+            return Err(PolicyError {
+                field: "rescanPolicy.trigger",
+            });
         }
-        let bad_days = PolicyError { field: "rescanPolicy.trigger.days" };
+        let bad_days = PolicyError {
+            field: "rescanPolicy.trigger.days",
+        };
         let mut days: Vec<u8> = Vec::new();
         match raw.get("days") {
             None => return Err(bad_days), // days 는 필수 ([] = 매일)
@@ -51,7 +55,9 @@ impl RescanTrigger for ScheduleTrigger {
             .get("at")
             .and_then(Value::as_str)
             .and_then(HourMinute::parse)
-            .ok_or(PolicyError { field: "rescanPolicy.trigger.at" })?;
+            .ok_or(PolicyError {
+                field: "rescanPolicy.trigger.at",
+            })?;
         Ok(Box::new(ScheduleSpec { days, at }))
     }
 }

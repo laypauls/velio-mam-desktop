@@ -131,7 +131,8 @@ impl Ingest {
                     "SELECT volume_id, volume_key, kind, last_mount_point FROM volumes
                      WHERE volume_id IN (SELECT volume_id FROM managed_folders)",
                 )?;
-                let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?;
+                let rows =
+                    stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?;
                 Ok(rows.collect::<Result<_, _>>()?)
             })
             .unwrap_or_default();
@@ -156,7 +157,8 @@ impl Ingest {
         {
             return *v;
         }
-        let same_volume = |p: &std::path::Path| self.volumes.volume_of(p).is_ok_and(|v| v.key == key);
+        let same_volume =
+            |p: &std::path::Path| self.volumes.volume_of(p).is_ok_and(|v| v.key == key);
         let system = lock(&self.eject.system_root)
             .clone()
             .or_else(|| std::env::var_os("SystemRoot").map(std::path::PathBuf::from));
@@ -165,7 +167,10 @@ impl Ingest {
         let result = !internal
             && self.volumes.is_ejectable_device(mount).unwrap_or_else(|| {
                 if lock(&self.eject.warned).insert(volume_id) {
-                    tracing::warn!(volume_id, "cannot query the storage device; treating it as ejectable");
+                    tracing::warn!(
+                        volume_id,
+                        "cannot query the storage device; treating it as ejectable"
+                    );
                 }
                 true
             });
@@ -227,10 +232,9 @@ impl Ingest {
         }
         // 2) 오프라인 전환 (기존 오프라인 처리 재사용)
         let clock = Arc::clone(&self.env.clock);
-        if let Err(e) = self
-            .env
-            .write(Priority::High, move |c| Ok(set_volume_online(c, &*clock, volume_id, false)?))
-        {
+        if let Err(e) = self.env.write(Priority::High, move |c| {
+            Ok(set_volume_online(c, &*clock, volume_id, false)?)
+        }) {
             if !already {
                 self.release_held(volume_id);
             }
@@ -250,7 +254,12 @@ impl Ingest {
         self.jobs.cancel_running(&ids);
         if let Some(g) = &gate {
             let pids = g.cancel_under(&mount);
-            tracing::info!(volume_id, ?pids, jobs = ids.len(), "eject: cancelled running work on the volume");
+            tracing::info!(
+                volume_id,
+                ?pids,
+                jobs = ids.len(),
+                "eject: cancelled running work on the volume"
+            );
         }
         let hook = lock(&self.eject.hook).clone();
         if let Some(h) = hook {
@@ -268,7 +277,13 @@ impl Ingest {
         // 감시 핸들: `stop` 은 notify 스레드에 종료를 알릴 뿐이라 실제로 닫힐 때까지 기다린다
         let watches_done = self.watchers.wait_released(left(deadline));
         if !(jobs_done && sidecars_done && watches_done) {
-            tracing::warn!(volume_id, jobs_done, sidecars_done, watches_done, "eject: work did not release the volume in time");
+            tracing::warn!(
+                volume_id,
+                jobs_done,
+                sidecars_done,
+                watches_done,
+                "eject: work did not release the volume in time"
+            );
             return Err(IngestError::Busy);
         }
         let folder_ids = self
@@ -313,7 +328,12 @@ impl Ingest {
             } else {
                 // 남은 붙들린 볼륨의 폴더만 유지
                 let keep = h.volumes.keys().copied().collect::<HashSet<_>>();
-                let rows = self.env.pool.read(|c| Ok(load_all(c))).ok().and_then(Result::ok);
+                let rows = self
+                    .env
+                    .pool
+                    .read(|c| Ok(load_all(c)))
+                    .ok()
+                    .and_then(Result::ok);
                 if let Some(rows) = rows {
                     h.folders = rows
                         .into_iter()

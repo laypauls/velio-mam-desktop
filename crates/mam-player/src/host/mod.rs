@@ -10,13 +10,15 @@ mod ops;
 pub mod pipe;
 pub mod proc;
 pub mod restore;
-pub mod surface;
 mod supervisor;
+pub mod surface;
 #[cfg(any(test, feature = "test-support"))]
 pub mod testing;
 mod types;
 
-pub use events::{Emit, EventBridge, EventSink, EventState, PlayerErrorCode, PlayerEvent, RestartInfo};
+pub use events::{
+    Emit, EventBridge, EventSink, EventState, PlayerErrorCode, PlayerEvent, RestartInfo,
+};
 pub use proc::{ProcessSpawner, RawProcessHandle, WorkerConn, WorkerProcess, WorkerSpawner};
 pub use supervisor::PlayerHost;
 pub use surface::{BankAttach, FrameSurface, SurfaceError};

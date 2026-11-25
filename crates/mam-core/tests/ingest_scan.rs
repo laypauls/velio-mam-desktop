@@ -551,7 +551,11 @@ fn t_scan_06_removing_a_folder_deletes_its_linked_data_keeps_other_folders_and_o
         2
     );
     assert_eq!(env.count("SELECT COUNT(*) FROM asset_tags"), 0);
-    assert_eq!(env.count("SELECT COUNT(*) FROM tags WHERE name = 'keep'"), 1, "tag names stay");
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM tags WHERE name = 'keep'"),
+        1,
+        "tag names stay"
+    );
     assert_eq!(
         env.count("SELECT COUNT(*) FROM file_locations WHERE detached_at IS NOT NULL"),
         0,

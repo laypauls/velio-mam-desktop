@@ -26,7 +26,11 @@ fn hook(env: &Env, fail: bool) -> Arc<Mutex<u32>> {
     let c = Arc::clone(&calls);
     env.ingest.set_backup_hook(Arc::new(move || {
         *c.lock().unwrap() += 1;
-        if fail { Err("disk full".into()) } else { Ok(()) }
+        if fail {
+            Err("disk full".into())
+        } else {
+            Ok(())
+        }
     }));
     calls
 }
@@ -59,7 +63,10 @@ fn t_legacy_01_only_active_assets_without_an_active_location_outside_every_folde
     let deleted = detached_asset(&env, "gone/d.jpg", "deleted"); // 원본 삭제
     let superseded = detached_asset(&env, "gone/e.jpg", "superseded"); // 내용 변경
     let no_location = insert_assets(&env, "vol-a", "tmp", 1, "image")[0];
-    exec(&env, &format!("DELETE FROM file_locations WHERE asset_id = {no_location}"));
+    exec(
+        &env,
+        &format!("DELETE FROM file_locations WHERE asset_id = {no_location}"),
+    );
     let all = [target, moved_out, live, deleted, superseded, no_location];
     seed_linked(&env, &all);
     let before: Vec<i64> = all.iter().map(|id| total_linked(&env, &[*id])).collect();
@@ -70,17 +77,46 @@ fn t_legacy_01_only_active_assets_without_an_active_location_outside_every_folde
     let report = env.ingest.run_legacy_cleanup(&|| false).unwrap();
 
     // Assert
-    assert_eq!(report, LegacyCleanupReport { purged: 1, already_done: false, interrupted: false });
+    assert_eq!(
+        report,
+        LegacyCleanupReport {
+            purged: 1,
+            already_done: false,
+            interrupted: false
+        }
+    );
     assert_eq!(total_linked(&env, &[target]), 0);
     assert_eq!(status_counts(&env, &[target], "deleted"), 1);
-    assert_eq!(env.count(&format!("SELECT COUNT(*) FROM file_locations WHERE asset_id = {target}")), 0);
-    assert_eq!(env.count(&format!("SELECT COUNT(*) FROM search_outbox WHERE event_type = 'delete' AND asset_id = {target}")), 1);
+    assert_eq!(
+        env.count(&format!(
+            "SELECT COUNT(*) FROM file_locations WHERE asset_id = {target}"
+        )),
+        0
+    );
+    assert_eq!(
+        env.count(&format!(
+            "SELECT COUNT(*) FROM search_outbox WHERE event_type = 'delete' AND asset_id = {target}"
+        )),
+        1
+    );
     for (i, id) in all.iter().enumerate().skip(1) {
-        assert_eq!(total_linked(&env, &[*id]), before[i], "asset #{i} must be untouched");
+        assert_eq!(
+            total_linked(&env, &[*id]),
+            before[i],
+            "asset #{i} must be untouched"
+        );
     }
     assert_eq!(status_counts(&env, &[moved_out, live], "active"), 2);
-    assert_eq!(status_counts(&env, &[deleted], "deleted") + status_counts(&env, &[superseded], "superseded"), 2);
-    assert_eq!(*calls.lock().unwrap(), 1, "one backup before the first deletion");
+    assert_eq!(
+        status_counts(&env, &[deleted], "deleted")
+            + status_counts(&env, &[superseded], "superseded"),
+        2
+    );
+    assert_eq!(
+        *calls.lock().unwrap(),
+        1,
+        "one backup before the first deletion"
+    );
     assert!(done(&env));
     assert_eq!(snapshot(&env.vol), originals);
 }
@@ -92,12 +128,20 @@ fn t_legacy_02_candidates_that_are_kept_do_not_hide_later_targets_across_batches
     add(&env, "lib");
     let vid = volume_id(&env, "vol-a");
     let kept = insert_assets(&env, "vol-a", "lib", 501, "image");
-    exec(&env, &format!(
-        "UPDATE file_locations SET detached_at = 5 WHERE asset_id IN (SELECT asset_id FROM media_assets WHERE asset_id <= {})",
-        kept.last().unwrap()
-    ));
+    exec(
+        &env,
+        &format!(
+            "UPDATE file_locations SET detached_at = 5 WHERE asset_id IN (SELECT asset_id FROM media_assets WHERE asset_id <= {})",
+            kept.last().unwrap()
+        ),
+    );
     let targets = insert_assets(&env, "vol-a", "gone", 3, "image");
-    exec(&env, &format!("UPDATE file_locations SET detached_at = 5 WHERE volume_id = {vid} AND rel_path LIKE 'gone/%'"));
+    exec(
+        &env,
+        &format!(
+            "UPDATE file_locations SET detached_at = 5 WHERE volume_id = {vid} AND rel_path LIKE 'gone/%'"
+        ),
+    );
     seed_linked(&env, &targets);
     hook(&env, false);
 
@@ -156,7 +200,9 @@ fn t_legacy_05_interrupted_cleanup_has_no_flag_and_a_rerun_finishes_it() {
     // Arrange
     let env = Env::new();
     add(&env, "lib");
-    let targets: Vec<i64> = (0..3).map(|i| detached_asset(&env, &format!("gone/{i}.jpg"), "active")).collect();
+    let targets: Vec<i64> = (0..3)
+        .map(|i| detached_asset(&env, &format!("gone/{i}.jpg"), "active"))
+        .collect();
     seed_linked(&env, &targets);
     hook(&env, false);
 

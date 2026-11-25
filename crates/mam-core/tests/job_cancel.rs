@@ -6,16 +6,16 @@
 
 mod common;
 
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Sender, channel};
-use std::sync::Arc;
 use std::time::Duration;
 
 use common::env::Env;
 use mam_core::SharedClock;
 use mam_core::jobs::{
-    ExecutorRegistry, Job, JobContext, JobError, JobExecutor, JobKind, JobOutcome, JobQueue, JobRunner,
-    NewJob,
+    ExecutorRegistry, Job, JobContext, JobError, JobExecutor, JobKind, JobOutcome, JobQueue,
+    JobRunner, NewJob,
 };
 
 const WAIT: Duration = Duration::from_secs(20);
@@ -32,19 +32,33 @@ impl JobExecutor for Spin {
         while !ctx.should_stop() {
             std::thread::sleep(Duration::from_millis(2));
         }
-        self.saw_flag.store(ctx.shutdown_flag().load(Ordering::SeqCst), Ordering::SeqCst);
+        self.saw_flag
+            .store(ctx.shutdown_flag().load(Ordering::SeqCst), Ordering::SeqCst);
         // 한 번 양보한 뒤에는 다시 잡혀도 바로 끝낸다 (이 시험은 첫 실행만 본다)
         Ok(JobOutcome::Yielded)
     }
 }
 
-fn runner(env: &Env) -> (Arc<JobQueue>, JobRunner, std::sync::mpsc::Receiver<i64>, Arc<AtomicBool>) {
+fn runner(
+    env: &Env,
+) -> (
+    Arc<JobQueue>,
+    JobRunner,
+    std::sync::mpsc::Receiver<i64>,
+    Arc<AtomicBool>,
+) {
     let clock: SharedClock = env.clock.clone();
     let q = JobQueue::new(Arc::clone(&env.pool), clock);
     let (tx, rx) = channel();
     let saw = Arc::new(AtomicBool::new(false));
     let mut reg = ExecutorRegistry::new();
-    reg.register(JobKind::Thumb, Arc::new(Spin { entered: tx, saw_flag: Arc::clone(&saw) }));
+    reg.register(
+        JobKind::Thumb,
+        Arc::new(Spin {
+            entered: tx,
+            saw_flag: Arc::clone(&saw),
+        }),
+    );
     let r = JobRunner::start(Arc::clone(&q), reg).unwrap();
     (q, r, rx, saw)
 }
@@ -64,11 +78,22 @@ fn t_jobcancel_01_cancelling_a_running_job_makes_it_yield_back_to_pending_withou
 
     // Assert: 결과가 DB 에 반영된 뒤에 대기가 풀리고, 시도 횟수는 그대로이며 취소 신호는 `shutdown_flag` 로도 보인다
     assert!(done);
-    assert!(saw.load(Ordering::SeqCst), "cancel is visible through shutdown_flag()");
+    assert!(
+        saw.load(Ordering::SeqCst),
+        "cancel is visible through shutdown_flag()"
+    );
     let (attempts, failed): (i64, i64) = env.read(|c| {
         (
-            c.query_row("SELECT attempts FROM jobs WHERE job_id = ?1", [id], |r| r.get(0)).unwrap(),
-            c.query_row("SELECT COUNT(*) FROM jobs WHERE status = 'failed'", [], |r| r.get(0)).unwrap(),
+            c.query_row("SELECT attempts FROM jobs WHERE job_id = ?1", [id], |r| {
+                r.get(0)
+            })
+            .unwrap(),
+            c.query_row(
+                "SELECT COUNT(*) FROM jobs WHERE status = 'failed'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap(),
         )
     });
     assert_eq!((attempts, failed), (0, 0));
@@ -84,7 +109,10 @@ fn t_jobcancel_02_unknown_and_finished_job_ids_are_ignored() {
 
     // Act / Assert
     assert_eq!(q.cancel_running(&[12345]), 0);
-    assert!(q.wait_jobs_finished(&[12345], Duration::from_millis(10)), "nothing to wait for");
+    assert!(
+        q.wait_jobs_finished(&[12345], Duration::from_millis(10)),
+        "nothing to wait for"
+    );
     assert!(q.running_jobs().is_empty());
     r.stop();
 }
@@ -112,7 +140,10 @@ fn t_jobcancel_03_wait_times_out_while_the_job_ignores_the_cancel_and_other_jobs
     let r = JobRunner::start(Arc::clone(&q), reg).unwrap();
     q.enqueue(NewJob::for_asset(JobKind::Thumb, 1)).unwrap();
     q.enqueue(NewJob::for_asset(JobKind::Thumb, 2)).unwrap();
-    let (a, b) = (rx.recv_timeout(WAIT).unwrap(), rx.recv_timeout(WAIT).unwrap());
+    let (a, b) = (
+        rx.recv_timeout(WAIT).unwrap(),
+        rx.recv_timeout(WAIT).unwrap(),
+    );
 
     // Act
     q.cancel_running(&[a]);

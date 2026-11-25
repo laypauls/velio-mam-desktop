@@ -62,7 +62,10 @@ fn t_ranges_14_upgrade_from_v12_adds_table_and_keeps_existing_rows() {
     let report = migrate(&mut db.conn, &db.backup_dir, &FixedClock(T0 + 1)).unwrap();
 
     // Assert
-    assert_eq!(report.applied, vec![13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]);
+    assert_eq!(
+        report.applied,
+        vec![13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
+    );
     assert!(report.backup.is_some_and(|b| b.is_file()));
     let assets: i64 = db
         .conn

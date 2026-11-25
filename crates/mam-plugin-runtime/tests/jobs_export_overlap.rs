@@ -20,10 +20,15 @@ fn gate_on() -> (Env, Vec<i64>) {
     env.install(exporter());
     env.add_managed_root(&env.lib);
     let assets = vec![env.add_asset("image", "photo.jpg")];
-    env.invoker.script(vec![json!({"out": {"text": "control"}})]);
+    env.invoker
+        .script(vec![json!({"out": {"text": "control"}})]);
     let free = env.out_dir().join("control.csv");
-    env.export(EXPORTER, "exp.step", &assets, &free).expect("a free folder is accepted with the gate on");
-    assert_eq!((fs::read(&free).unwrap(), env.invoker.call_count()), (b"control".to_vec(), 1));
+    env.export(EXPORTER, "exp.step", &assets, &free)
+        .expect("a free folder is accepted with the gate on");
+    assert_eq!(
+        (fs::read(&free).unwrap(), env.invoker.call_count()),
+        (b"control".to_vec(), 1)
+    );
     (env, assets)
 }
 
@@ -33,19 +38,26 @@ fn assert_rejected(env: &Env, assets: &[i64], dests: &[(&str, PathBuf)], expect:
     let calls = env.invoker.call_count();
     for (label, dest) in dests {
         let existed = dest.exists();
-        let err = env.export(EXPORTER, "exp.step", assets, dest).expect_err(label);
+        let err = env
+            .export(EXPORTER, "exp.step", assets, dest)
+            .expect_err(label);
         match err {
             ExportError::InvalidInput(m) => assert!(m.contains(expect), "{label}: {m}"),
             other => panic!("{label}: expected invalid_input, got {other:?}"),
         }
         assert_eq!(dest.exists(), existed, "{label}: no file created");
     }
-    assert_eq!(env.invoker.call_count(), calls, "the provider is never invoked for a rejected destination");
+    assert_eq!(
+        env.invoker.call_count(),
+        calls,
+        "the provider is never invoked for a rejected destination"
+    );
     assert_eq!(lib_state(&env.lib), before, "original media untouched");
 }
 
 #[test]
-fn t_pjob_23_destination_inside_or_equal_to_a_managed_folder_is_rejected_before_the_provider_runs() {
+fn t_pjob_23_destination_inside_or_equal_to_a_managed_folder_is_rejected_before_the_provider_runs()
+{
     // Arrange: 관리 폴더 하위 폴더, 그리고 "관리 폴더 루트가 파일 경로"인 변형(루트와 같은 경로가 모양 검사를 통과)
     let (env, assets) = gate_on();
     fs::create_dir(env.lib.join("sub")).unwrap();
@@ -57,8 +69,22 @@ fn t_pjob_23_destination_inside_or_equal_to_a_managed_folder_is_rejected_before_
     env.add_managed_root(&equal_dir);
 
     // Act / Assert
-    assert_rejected(&env, &assets, &[("in root", env.lib.join("out.csv")), ("in subfolder", env.lib.join("sub").join("out.csv")), ("equal to a root (file)", weird)], "managed folder");
-    assert_rejected(&env, &assets, &[("equal to a root (dir)", equal_dir)], "directory");
+    assert_rejected(
+        &env,
+        &assets,
+        &[
+            ("in root", env.lib.join("out.csv")),
+            ("in subfolder", env.lib.join("sub").join("out.csv")),
+            ("equal to a root (file)", weird),
+        ],
+        "managed folder",
+    );
+    assert_rejected(
+        &env,
+        &assets,
+        &[("equal to a root (dir)", equal_dir)],
+        "directory",
+    );
 }
 
 #[test]
@@ -68,7 +94,11 @@ fn t_pjob_23_destination_inside_mamdata_or_the_backup_folder_is_rejected() {
     fs::create_dir_all(env.data.join("cache")).unwrap();
 
     // Act / Assert
-    let dests = [("MAMData", env.data.join("out.csv")), ("MAMData subfolder", env.data.join("cache").join("out.csv")), ("backups", env.backups.join("out.csv"))];
+    let dests = [
+        ("MAMData", env.data.join("out.csv")),
+        ("MAMData subfolder", env.data.join("cache").join("out.csv")),
+        ("backups", env.backups.join("out.csv")),
+    ];
     assert_rejected(&env, &assets, &dests, "app data folder");
 }
 
@@ -77,14 +107,25 @@ fn t_pjob_23_destination_through_a_directory_junction_into_the_library_or_mamdat
     // Arrange: 허용 폴더 안의 정션이 관리 폴더·MAMData 를 가리킨다
     let (env, assets) = gate_on();
     let (to_lib, to_data) = (env.out_dir().join("to_lib"), env.out_dir().join("to_data"));
-    let (Some(_j1), Some(_j2)) = (junction(&to_lib, &env.lib), junction(&to_data, &env.data)) else {
+    let (Some(_j1), Some(_j2)) = (junction(&to_lib, &env.lib), junction(&to_data, &env.data))
+    else {
         eprintln!("SKIPPED: `cmd /c mklink /J` could not create a junction in the temp dir");
         return;
     };
 
     // Act / Assert
-    assert_rejected(&env, &assets, &[("junction to library", to_lib.join("out.csv"))], "managed folder");
-    assert_rejected(&env, &assets, &[("junction to MAMData", to_data.join("out.csv"))], "app data folder");
+    assert_rejected(
+        &env,
+        &assets,
+        &[("junction to library", to_lib.join("out.csv"))],
+        "managed folder",
+    );
+    assert_rejected(
+        &env,
+        &assets,
+        &[("junction to MAMData", to_data.join("out.csv"))],
+        "app data folder",
+    );
     assert!(env.lib.join("photo.jpg").is_file() && !env.lib.join("out.csv").exists());
 }
 
@@ -96,9 +137,17 @@ fn t_pjob_23_destination_spelled_with_different_case_is_rejected() {
     let lower = |p: &Path| PathBuf::from(p.to_string_lossy().to_lowercase());
 
     // Act / Assert
-    let dests = [("upper case", upper(&env.lib).join("OUT.CSV")), ("lower case", lower(&env.lib).join("out.csv"))];
+    let dests = [
+        ("upper case", upper(&env.lib).join("OUT.CSV")),
+        ("lower case", lower(&env.lib).join("out.csv")),
+    ];
     assert_rejected(&env, &assets, &dests, "managed folder");
-    assert_rejected(&env, &assets, &[("MAMData upper case", upper(&env.data).join("out.csv"))], "app data folder");
+    assert_rejected(
+        &env,
+        &assets,
+        &[("MAMData upper case", upper(&env.data).join("out.csv"))],
+        "app data folder",
+    );
 }
 
 #[test]
@@ -111,13 +160,24 @@ fn t_pjob_23_destination_spelled_with_the_8_3_short_name_is_rejected() {
     };
     let variant = short != env.lib;
     if !variant {
-        eprintln!("NOTE: this volume has no 8.3 name for the library folder; asserting the plain path (no short-name variant exists here)");
+        eprintln!(
+            "NOTE: this volume has no 8.3 name for the library folder; asserting the plain path (no short-name variant exists here)"
+        );
     }
 
     // Act / Assert
-    assert_rejected(&env, &assets, &[("8.3 name", short.join("out.csv"))], "managed folder");
+    assert_rejected(
+        &env,
+        &assets,
+        &[("8.3 name", short.join("out.csv"))],
+        "managed folder",
+    );
     if variant {
-        assert_ne!(short.to_string_lossy().to_lowercase(), env.lib.to_string_lossy().to_lowercase(), "a real short-name spelling was tested");
+        assert_ne!(
+            short.to_string_lossy().to_lowercase(),
+            env.lib.to_string_lossy().to_lowercase(),
+            "a real short-name spelling was tested"
+        );
     }
 }
 
@@ -129,7 +189,12 @@ fn lib_state(root: &Path) -> Vec<(String, FileState)> {
         .unwrap()
         .map(|e| {
             let p = e.unwrap().path();
-            let data = p.is_file().then(|| (fs::read(&p).unwrap(), fs::metadata(&p).unwrap().modified().unwrap()));
+            let data = p.is_file().then(|| {
+                (
+                    fs::read(&p).unwrap(),
+                    fs::metadata(&p).unwrap().modified().unwrap(),
+                )
+            });
             (p.file_name().unwrap().to_string_lossy().into_owned(), data)
         })
         .collect();

@@ -4,11 +4,11 @@
 use rusqlite::Connection;
 use tempfile::TempDir;
 
+use crate::secret::Secret;
+use crate::secret::SecretBox;
 use crate::watch::remote::fake::FakeSecretBox;
 use crate::watch::remote::store::{self, NewSource, StoreError};
 use crate::watch::remote::{Auth, DEFAULT_LOG_DIR, Mapping, SourceKind};
-use crate::secret::Secret;
-use crate::secret::SecretBox;
 
 const FP: &str = "SHA256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
@@ -30,7 +30,10 @@ fn input(name: &str) -> NewSource {
         log_dir: None,
         db_path: None,
         poll_sec: 3,
-        path_map: vec![Mapping { from: "/".into(), to: r"F:\UHD".into() }],
+        path_map: vec![Mapping {
+            from: "/".into(),
+            to: r"F:\UHD".into(),
+        }],
     }
 }
 
@@ -47,7 +50,17 @@ fn t_remote_store_01_create_list_view_load_roundtrip_and_the_secret_is_decrypted
     let (_d, conn) = db();
     let id = make(&conn, "ddp-1");
     let v = store::view(&conn, id).unwrap();
-    assert_eq!((v.name.as_str(), v.kind, v.auth_kind, v.has_secret, v.port, v.poll_sec), ("ddp-1", "ddp_audit", "password", true, 22, 3));
+    assert_eq!(
+        (
+            v.name.as_str(),
+            v.kind,
+            v.auth_kind,
+            v.has_secret,
+            v.port,
+            v.poll_sec
+        ),
+        ("ddp-1", "ddp_audit", "password", true, 22, 3)
+    );
     assert_eq!(v.host_key.as_deref(), Some(FP));
     assert_eq!(store::list(&conn).unwrap(), vec![v]);
     let src = store::load(&conn, id, &FakeSecretBox).unwrap();
@@ -87,8 +100,15 @@ fn t_remote_store_02_inputs_that_break_the_rules_are_rejected_by_field_name_only
     bad(&|i| i.kind = SourceKind::SesQueue, "dbPath");
     bad(&|i| i.db_path = Some("/srv/ses/events.db".into()), "dbPath");
     // 비밀
-    for secret in [pw(""), pw(&"x".repeat(store::MAX_PASSWORD_LEN + 1)), Auth::Key(Secret::new("k".repeat(store::MAX_KEY_LEN + 1)))] {
-        assert!(matches!(store::create(&conn, &input("y"), &secret, &FakeSecretBox, 1), Err(StoreError::Invalid("auth"))));
+    for secret in [
+        pw(""),
+        pw(&"x".repeat(store::MAX_PASSWORD_LEN + 1)),
+        Auth::Key(Secret::new("k".repeat(store::MAX_KEY_LEN + 1))),
+    ] {
+        assert!(matches!(
+            store::create(&conn, &input("y"), &secret, &FakeSecretBox, 1),
+            Err(StoreError::Invalid("auth"))
+        ));
     }
     assert!(store::list(&conn).unwrap().is_empty(), "nothing was stored");
 }
@@ -96,17 +116,31 @@ fn t_remote_store_02_inputs_that_break_the_rules_are_rejected_by_field_name_only
 #[test]
 fn t_remote_store_03_fingerprint_format_is_exactly_sha256_plus_43_base64_chars() {
     assert!(store::valid_fingerprint(FP));
-    assert!(store::valid_fingerprint("SHA256:AbCdEfGhIjKlMnOpQrStUvWxYz0123456789+/abcde"));
-    for bad in ["", "SHA256:", "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "SHA256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "SHA256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa=", "SHA256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa "] {
+    assert!(store::valid_fingerprint(
+        "SHA256:AbCdEfGhIjKlMnOpQrStUvWxYz0123456789+/abcde"
+    ));
+    for bad in [
+        "",
+        "SHA256:",
+        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "SHA256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "SHA256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa=",
+        "SHA256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ",
+    ] {
         assert!(!store::valid_fingerprint(bad), "{bad:?}");
     }
 }
 
 #[test]
-fn t_remote_store_04_a_source_used_by_a_folder_cannot_be_deleted_and_an_unused_one_takes_its_cursor_along() {
+fn t_remote_store_04_a_source_used_by_a_folder_cannot_be_deleted_and_an_unused_one_takes_its_cursor_along()
+ {
     let (_d, conn) = db();
     let id = make(&conn, "ddp-1");
-    conn.execute("INSERT INTO volumes (kind, volume_key, last_seen_at) VALUES ('fixed', 'v', 1)", []).unwrap();
+    conn.execute(
+        "INSERT INTO volumes (kind, volume_key, last_seen_at) VALUES ('fixed', 'v', 1)",
+        [],
+    )
+    .unwrap();
     conn.execute(
         "INSERT INTO managed_folders (volume_id, rel_root, path_key, display_path, watch_mode, watch_options, created_at)
          VALUES (1, 'lib', 'lib', 'F:\\lib', 'ddp_audit', ?1, 1)",
@@ -117,11 +151,15 @@ fn t_remote_store_04_a_source_used_by_a_folder_cannot_be_deleted_and_an_unused_o
     assert!(matches!(store::delete(&conn, id), Err(StoreError::InUse)));
     assert_eq!(store::referencing_folders(&conn, id).unwrap().len(), 1);
     // 깨진 JSON 행이 다른 접속의 조회를 망치지 않는다
-    conn.execute("UPDATE managed_folders SET watch_options = '{not json'", []).unwrap();
+    conn.execute("UPDATE managed_folders SET watch_options = '{not json'", [])
+        .unwrap();
     assert!(store::referencing_folders(&conn, id).unwrap().is_empty());
     store::delete(&conn, id).unwrap();
     assert_eq!(store::load_cursor(&conn, id), None, "ON DELETE CASCADE");
-    assert!(matches!(store::delete(&conn, id), Err(StoreError::NotFound)));
+    assert!(matches!(
+        store::delete(&conn, id),
+        Err(StoreError::NotFound)
+    ));
 }
 
 #[test]
@@ -132,18 +170,39 @@ fn t_remote_store_05_update_without_a_secret_keeps_the_stored_one_and_with_one_r
     n.port = 2222;
     store::update(&conn, id, &n, None, &FakeSecretBox, 2_000).unwrap();
     let s = store::load(&conn, id, &FakeSecretBox).unwrap();
-    assert_eq!((s.name.as_str(), s.port, s.auth.secret().expose()), ("renamed", 2222, "hunter2"));
-    store::update(&conn, id, &n, Some(&Auth::Key(Secret::new("PEM".into()))), &FakeSecretBox, 3_000).unwrap();
+    assert_eq!(
+        (s.name.as_str(), s.port, s.auth.secret().expose()),
+        ("renamed", 2222, "hunter2")
+    );
+    store::update(
+        &conn,
+        id,
+        &n,
+        Some(&Auth::Key(Secret::new("PEM".into()))),
+        &FakeSecretBox,
+        3_000,
+    )
+    .unwrap();
     let s = store::load(&conn, id, &FakeSecretBox).unwrap();
     assert!(matches!(s.auth, Auth::Key(_)) && s.auth.secret().expose() == "PEM");
     assert_eq!(store::view(&conn, id).unwrap().updated_at, 3_000);
-    assert!(matches!(store::update(&conn, 999, &n, None, &FakeSecretBox, 1), Err(StoreError::NotFound)));
+    assert!(matches!(
+        store::update(&conn, 999, &n, None, &FakeSecretBox, 1),
+        Err(StoreError::NotFound)
+    ));
 }
 
 #[test]
 fn t_remote_store_06_secrets_are_absent_from_the_database_file_views_serde_debug_and_errors() {
     let (dir, conn) = db();
-    let id = store::create(&conn, &input("ddp-1"), &pw("S3cr3t-p@ss"), &FakeSecretBox, 1).unwrap();
+    let id = store::create(
+        &conn,
+        &input("ddp-1"),
+        &pw("S3cr3t-p@ss"),
+        &FakeSecretBox,
+        1,
+    )
+    .unwrap();
     // 행: 평문이 어느 컬럼에도 없다
     let dump: String = conn
         .query_row("SELECT kind||name||host||user||auth_kind||hex(auth_blob)||coalesce(host_key,'')||path_map_json FROM remote_sources", [], |r| r.get(0))
@@ -151,15 +210,29 @@ fn t_remote_store_06_secrets_are_absent_from_the_database_file_views_serde_debug
     assert!(!dump.contains("S3cr3t"));
     conn.execute("PRAGMA wal_checkpoint(TRUNCATE)", []).ok();
     let raw = std::fs::read(dir.path().join("mam.sqlite")).unwrap();
-    assert!(!raw.windows(11).any(|w| w == b"S3cr3t-p@ss"), "not in the database file");
+    assert!(
+        !raw.windows(11).any(|w| w == b"S3cr3t-p@ss"),
+        "not in the database file"
+    );
     // 읽기 모델 / serde / Debug
     let v = store::view(&conn, id).unwrap();
     let json = serde_json::to_string(&v).unwrap();
-    assert!(!json.contains("S3cr3t") && json.contains("\"hasSecret\":true") && !json.contains("authBlob"));
+    assert!(
+        !json.contains("S3cr3t")
+            && json.contains("\"hasSecret\":true")
+            && !json.contains("authBlob")
+    );
     let src = store::load(&conn, id, &FakeSecretBox).unwrap();
     assert!(!format!("{src:?}").contains("S3cr3t"));
     // 오류 문구 — 이름 중복·잘못된 입력에도 비밀이 없다
-    let e1 = store::create(&conn, &input("ddp-1"), &pw("S3cr3t-p@ss"), &FakeSecretBox, 1).unwrap_err();
+    let e1 = store::create(
+        &conn,
+        &input("ddp-1"),
+        &pw("S3cr3t-p@ss"),
+        &FakeSecretBox,
+        1,
+    )
+    .unwrap_err();
     let mut bad = input("z");
     bad.port = 0;
     let e2 = store::create(&conn, &bad, &pw("S3cr3t-p@ss"), &FakeSecretBox, 1).unwrap_err();
@@ -176,25 +249,37 @@ fn t_remote_store_07_cursor_is_upserted_per_source_and_a_missing_source_violates
     store::save_cursor(&conn, id, "one", 1).unwrap();
     store::save_cursor(&conn, id, "two", 2).unwrap();
     assert_eq!(store::load_cursor(&conn, id).as_deref(), Some("two"));
-    let n: i64 = conn.query_row("SELECT COUNT(*) FROM watch_cursors", [], |r| r.get(0)).unwrap();
+    let n: i64 = conn
+        .query_row("SELECT COUNT(*) FROM watch_cursors", [], |r| r.get(0))
+        .unwrap();
     assert_eq!(n, 1);
-    assert!(store::save_cursor(&conn, 4242, "x", 1).is_err(), "FK: no such source");
+    assert!(
+        store::save_cursor(&conn, 4242, "x", 1).is_err(),
+        "FK: no such source"
+    );
 }
 
 #[test]
 fn t_remote_store_08_names_are_unique_case_sensitive_by_sqlite_and_trimmed() {
     let (_d, conn) = db();
     make(&conn, "ddp-1");
-    assert!(matches!(store::create(&conn, &input(" ddp-1 "), &pw("p"), &FakeSecretBox, 1), Err(StoreError::NameTaken)));
+    assert!(matches!(
+        store::create(&conn, &input(" ddp-1 "), &pw("p"), &FakeSecretBox, 1),
+        Err(StoreError::NameTaken)
+    ));
     let id2 = make(&conn, "ddp-2");
-    assert!(matches!(store::update(&conn, id2, &input("ddp-1"), None, &FakeSecretBox, 1), Err(StoreError::NameTaken)));
+    assert!(matches!(
+        store::update(&conn, id2, &input("ddp-1"), None, &FakeSecretBox, 1),
+        Err(StoreError::NameTaken)
+    ));
 }
 
 #[test]
 fn t_remote_store_09_a_corrupted_secret_blob_is_an_error_not_a_panic_and_nothing_leaks() {
     let (_d, conn) = db();
     let id = make(&conn, "ddp-1");
-    conn.execute("UPDATE remote_sources SET auth_blob = x'00ff'", []).unwrap();
+    conn.execute("UPDATE remote_sources SET auth_blob = x'00ff'", [])
+        .unwrap();
     let e = store::load(&conn, id, &FakeSecretBox).unwrap_err();
     assert!(matches!(e, StoreError::Secret(_)));
     // 목록·요약은 복호하지 않으므로 계속 동작한다
@@ -207,9 +292,19 @@ fn t_remote_store_10_the_schema_rejects_values_the_app_should_never_write() {
     let (_d, conn) = db();
     let bad = |sql: &str| conn.execute(sql, []).is_err();
     let base = "INSERT INTO remote_sources (kind, name, host, port, user, auth_kind, auth_blob, poll_sec, path_map_json, created_at, updated_at)";
-    assert!(bad(&format!("{base} VALUES ('ftp', 'a', 'h', 22, 'u', 'password', x'01', 3, '[]', 1, 1)")));
-    assert!(bad(&format!("{base} VALUES ('ddp_audit', 'a', 'h', 0, 'u', 'password', x'01', 3, '[]', 1, 1)")));
-    assert!(bad(&format!("{base} VALUES ('ddp_audit', 'a', 'h', 22, 'u', 'token', x'01', 3, '[]', 1, 1)")));
-    assert!(bad(&format!("{base} VALUES ('ddp_audit', 'a', 'h', 22, 'u', 'password', x'01', 0, '[]', 1, 1)")));
-    assert!(!bad(&format!("{base} VALUES ('ses_queue', 'ok', 'h', 22, 'u', 'key', x'01', 3, '[]', 1, 1)")));
+    assert!(bad(&format!(
+        "{base} VALUES ('ftp', 'a', 'h', 22, 'u', 'password', x'01', 3, '[]', 1, 1)"
+    )));
+    assert!(bad(&format!(
+        "{base} VALUES ('ddp_audit', 'a', 'h', 0, 'u', 'password', x'01', 3, '[]', 1, 1)"
+    )));
+    assert!(bad(&format!(
+        "{base} VALUES ('ddp_audit', 'a', 'h', 22, 'u', 'token', x'01', 3, '[]', 1, 1)"
+    )));
+    assert!(bad(&format!(
+        "{base} VALUES ('ddp_audit', 'a', 'h', 22, 'u', 'password', x'01', 0, '[]', 1, 1)"
+    )));
+    assert!(!bad(&format!(
+        "{base} VALUES ('ses_queue', 'ok', 'h', 22, 'u', 'key', x'01', 3, '[]', 1, 1)"
+    )));
 }

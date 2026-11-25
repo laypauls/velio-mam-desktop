@@ -44,7 +44,10 @@ fn t_scene_11_request_counts_queued_and_skipped_and_registers_user_priority_jobs
     }
     let r = scene_cuts::get(&db.conn, 1).unwrap().unwrap();
     assert_eq!(r.state, SceneState::Pending);
-    assert!(scene_cuts::get(&db.conn, 2).unwrap().is_none(), "건너뛴 자산은 행도 만들지 않는다");
+    assert!(
+        scene_cuts::get(&db.conn, 2).unwrap().is_none(),
+        "건너뛴 자산은 행도 만들지 않는다"
+    );
     // 빈 목록
     let none = request_tx(&db.conn, &[], &opts(), USER, NOW).unwrap();
     assert_eq!((none.queued, none.skipped), (0, 0));
@@ -58,7 +61,11 @@ fn t_scene_11_redetect_requeues_done_and_unsupported_and_records_the_requested_s
     replace_auto_tx(&db.conn, 1, &[3000], "medium", None, NOW).unwrap();
     add_video(&db.conn, 2, None, None);
     set_outcome_tx(&db.conn, 2, SceneState::Unsupported, None, NOW).unwrap();
-    let redo = RequestOptions { redetect: true, restore_suppressed: false, sensitivity: Some(SceneSensitivity::High) };
+    let redo = RequestOptions {
+        redetect: true,
+        restore_suppressed: false,
+        sensitivity: Some(SceneSensitivity::High),
+    };
 
     // Act
     let out = request_tx(&db.conn, &[1, 2], &redo, USER, NOW + 1).unwrap();
@@ -85,7 +92,10 @@ fn t_scene_11_request_on_a_user_only_row_still_extracts() {
 
     // Assert
     assert_eq!((out.queued, out.skipped), (1, 0));
-    assert_eq!(scene_cuts::get(&db.conn, 1).unwrap().unwrap().user, vec![5000]);
+    assert_eq!(
+        scene_cuts::get(&db.conn, 1).unwrap().unwrap().user,
+        vec![5000]
+    );
 }
 
 #[test]
@@ -118,7 +128,10 @@ fn t_scene_11_running_and_failed_jobs_are_handled_without_duplicates_or_unique_v
         .execute("UPDATE jobs SET status = 'running' WHERE asset_id = 1", [])
         .unwrap();
     db.conn
-        .execute("UPDATE jobs SET status = 'failed', attempts = 5, last_error = 'x' WHERE asset_id = 2", [])
+        .execute(
+            "UPDATE jobs SET status = 'failed', attempts = 5, last_error = 'x' WHERE asset_id = 2",
+            [],
+        )
         .unwrap();
 
     // Act
@@ -129,7 +142,10 @@ fn t_scene_11_running_and_failed_jobs_are_handled_without_duplicates_or_unique_v
     assert_eq!(scene_jobs(&db.conn, 2), vec![(USER, "pending".to_owned())]);
 
     // Act: 재검출 요청은 실행 중이어도 다음 작업을 올린다
-    let redo = RequestOptions { redetect: true, ..opts() };
+    let redo = RequestOptions {
+        redetect: true,
+        ..opts()
+    };
     request_tx(&db.conn, &[1], &redo, USER, NOW + 2).unwrap();
     assert_eq!(
         scene_jobs(&db.conn, 1),
@@ -173,13 +189,24 @@ fn t_scene_12_backfill_registers_only_active_videos_without_a_row_in_batches() {
     // Assert: 1000 + 1000 + 498 + 마지막 빈 배치, 합계 = count, 우선순위 60·pending, 이후 count 0
     assert_eq!(batches, vec![1000, 1000, 498, 0]);
     assert_eq!(batches.iter().map(|b| i64::from(*b)).sum::<i64>(), expected);
-    assert_eq!(count(&db.conn, "SELECT COUNT(*) FROM jobs WHERE kind = 'scene'"), expected);
     assert_eq!(
-        count(&db.conn, &format!("SELECT COUNT(*) FROM jobs WHERE kind = 'scene' AND priority = {BG} AND status = 'pending'")),
+        count(&db.conn, "SELECT COUNT(*) FROM jobs WHERE kind = 'scene'"),
         expected
     );
     assert_eq!(
-        count(&db.conn, "SELECT COUNT(*) FROM asset_scene_cuts WHERE state = 'pending'"),
+        count(
+            &db.conn,
+            &format!(
+                "SELECT COUNT(*) FROM jobs WHERE kind = 'scene' AND priority = {BG} AND status = 'pending'"
+            )
+        ),
+        expected
+    );
+    assert_eq!(
+        count(
+            &db.conn,
+            "SELECT COUNT(*) FROM asset_scene_cuts WHERE state = 'pending'"
+        ),
         expected
     );
     assert_eq!(backfill_count(&db.conn).unwrap(), 0);
@@ -249,7 +276,11 @@ fn t_scene_12_requeue_pending_only_registers_active_assets_without_a_live_job() 
     // Assert
     assert_eq!((n, again), (1, 0));
     assert_eq!(scene_jobs(&db.conn, 1), vec![(BG, "pending".to_owned())]);
-    assert_eq!(scene_jobs(&db.conn, 2), vec![(USER, "pending".to_owned())], "기존 작업 우선순위 유지");
+    assert_eq!(
+        scene_jobs(&db.conn, 2),
+        vec![(USER, "pending".to_owned())],
+        "기존 작업 우선순위 유지"
+    );
     assert_eq!(scene_jobs(&db.conn, 3).len(), 1);
     assert!(scene_jobs(&db.conn, 4).is_empty());
     assert!(scene_jobs(&db.conn, 5).is_empty());
@@ -272,5 +303,8 @@ fn t_scene_12_enqueue_auto_creates_a_pending_row_and_job_only_once() {
     assert_eq!((first, second, done_already), (true, false, false));
     assert_eq!(scene_jobs(&db.conn, 1), vec![(BG, "pending".to_owned())]);
     assert!(scene_jobs(&db.conn, 2).is_empty());
-    assert_eq!(scene_cuts::get(&db.conn, 2).unwrap().unwrap().auto, vec![3000]);
+    assert_eq!(
+        scene_cuts::get(&db.conn, 2).unwrap().unwrap().auto,
+        vec![3000]
+    );
 }

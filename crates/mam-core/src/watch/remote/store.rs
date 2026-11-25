@@ -75,21 +75,46 @@ fn no_control(s: &str) -> bool {
 
 /// `SHA256:` + 43자 base64(무패딩) — OpenSSH 지문 형식
 pub fn valid_fingerprint(s: &str) -> bool {
-    s.strip_prefix("SHA256:")
-        .is_some_and(|b| b.len() == 43 && b.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'+' || c == b'/'))
+    s.strip_prefix("SHA256:").is_some_and(|b| {
+        b.len() == 43
+            && b.bytes()
+                .all(|c| c.is_ascii_alphanumeric() || c == b'+' || c == b'/')
+    })
 }
 
 /// 입력 검증 — 저장·접속 시험 공용.
 pub fn validate(i: &NewSource) -> Result<(), StoreError> {
-    let ok = |c: bool, f: &'static str| if c { Ok(()) } else { Err(StoreError::Invalid(f)) };
-    ok((1..=100).contains(&i.name.trim().chars().count()) && no_control(&i.name), "name")?;
-    ok(!i.host.is_empty() && i.host.len() <= 253 && !i.host.chars().any(|c| c.is_whitespace() || c.is_control()), "host")?;
-    ok(i.port != 0, "port")?;
-    ok((1..=128).contains(&i.user.len()) && no_control(&i.user), "user")?;
-    ok((1..=3600).contains(&i.poll_sec), "pollSec")?;
-    ok(i.host_key.as_deref().is_none_or(valid_fingerprint), "hostKey")?;
+    let ok = |c: bool, f: &'static str| {
+        if c {
+            Ok(())
+        } else {
+            Err(StoreError::Invalid(f))
+        }
+    };
     ok(
-        i.log_dir.as_deref().is_none_or(|d| d.starts_with('/') && d.len() <= 512 && no_control(d)),
+        (1..=100).contains(&i.name.trim().chars().count()) && no_control(&i.name),
+        "name",
+    )?;
+    ok(
+        !i.host.is_empty()
+            && i.host.len() <= 253
+            && !i.host.chars().any(|c| c.is_whitespace() || c.is_control()),
+        "host",
+    )?;
+    ok(i.port != 0, "port")?;
+    ok(
+        (1..=128).contains(&i.user.len()) && no_control(&i.user),
+        "user",
+    )?;
+    ok((1..=3600).contains(&i.poll_sec), "pollSec")?;
+    ok(
+        i.host_key.as_deref().is_none_or(valid_fingerprint),
+        "hostKey",
+    )?;
+    ok(
+        i.log_dir
+            .as_deref()
+            .is_none_or(|d| d.starts_with('/') && d.len() <= 512 && no_control(d)),
         "logDir",
     )?;
     // 종류마다 쓰는 필드가 다르다 — `ddp_audit` = 로그 폴더(선택), `ses_queue` = 이벤트 DB 경로(필수, 셸에 실리므로 엄격히 검증)
@@ -102,7 +127,12 @@ pub fn validate(i: &NewSource) -> Result<(), StoreError> {
     }
     ok(
         (1..=MAX_RULES).contains(&i.path_map.len())
-            && i.path_map.iter().all(|r| r.from.len() <= 512 && no_control(&r.from) && r.to.len() <= 512 && is_absolute(&r.to)),
+            && i.path_map.iter().all(|r| {
+                r.from.len() <= 512
+                    && no_control(&r.from)
+                    && r.to.len() <= 512
+                    && is_absolute(&r.to)
+            }),
         "pathMap",
     )
 }
@@ -120,7 +150,11 @@ pub fn validate_auth(a: &Auth) -> Result<(), StoreError> {
 
 fn map_unique(e: rusqlite::Error) -> StoreError {
     match &e {
-        rusqlite::Error::SqliteFailure(f, _) if f.code == rusqlite::ErrorCode::ConstraintViolation => StoreError::NameTaken,
+        rusqlite::Error::SqliteFailure(f, _)
+            if f.code == rusqlite::ErrorCode::ConstraintViolation =>
+        {
+            StoreError::NameTaken
+        }
         _ => StoreError::Db(e),
     }
 }
@@ -129,7 +163,13 @@ fn rules_json(rules: &[Mapping]) -> String {
     serde_json::to_string(rules).unwrap_or_else(|_| "[]".into())
 }
 
-pub fn create(conn: &Connection, i: &NewSource, auth: &Auth, secrets: &dyn SecretBox, now: i64) -> Result<i64, StoreError> {
+pub fn create(
+    conn: &Connection,
+    i: &NewSource,
+    auth: &Auth,
+    secrets: &dyn SecretBox,
+    now: i64,
+) -> Result<i64, StoreError> {
     validate(i)?;
     validate_auth(auth)?;
     let blob = secrets.seal(auth.secret().expose().as_bytes())?;
@@ -143,7 +183,14 @@ pub fn create(conn: &Connection, i: &NewSource, auth: &Auth, secrets: &dyn Secre
 }
 
 /// 수정. `auth` 가 `None` 이면 저장된 비밀을 그대로 둔다.
-pub fn update(conn: &Connection, id: i64, i: &NewSource, auth: Option<&Auth>, secrets: &dyn SecretBox, now: i64) -> Result<(), StoreError> {
+pub fn update(
+    conn: &Connection,
+    id: i64,
+    i: &NewSource,
+    auth: Option<&Auth>,
+    secrets: &dyn SecretBox,
+    now: i64,
+) -> Result<(), StoreError> {
     validate(i)?;
     // 종류는 바꿀 수 없다 (쓰는 필드·수집기가 다르다)
     match kind_of(conn, id) {
@@ -164,7 +211,10 @@ pub fn update(conn: &Connection, id: i64, i: &NewSource, auth: Option<&Auth>, se
     if let Some(a) = auth {
         validate_auth(a)?;
         let blob = secrets.seal(a.secret().expose().as_bytes())?;
-        conn.execute("UPDATE remote_sources SET auth_kind = ?2, auth_blob = ?3 WHERE source_id = ?1", params![id, a.kind_str(), blob])?;
+        conn.execute(
+            "UPDATE remote_sources SET auth_kind = ?2, auth_blob = ?3 WHERE source_id = ?1",
+            params![id, a.kind_str(), blob],
+        )?;
     }
     Ok(())
 }
@@ -176,7 +226,9 @@ pub fn referencing_folders(conn: &Connection, id: i64) -> Result<Vec<i64>, Store
           WHERE watch_mode IN ('ddp_audit', 'fanotify_feed')
             AND CASE WHEN json_valid(watch_options) THEN json_extract(watch_options, '$.source') END = ?1",
     )?;
-    let ids = st.query_map([id], |r| r.get(0))?.collect::<Result<Vec<i64>, _>>()?;
+    let ids = st
+        .query_map([id], |r| r.get(0))?
+        .collect::<Result<Vec<i64>, _>>()?;
     Ok(ids)
 }
 
@@ -211,7 +263,11 @@ fn read_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Row> {
             host: r.get(3)?,
             port: r.get(4)?,
             user: r.get(5)?,
-            auth_kind: if auth_kind == "key" { "key" } else { "password" },
+            auth_kind: if auth_kind == "key" {
+                "key"
+            } else {
+                "password"
+            },
             has_secret: !blob.is_empty(),
             host_key: r.get(8)?,
             log_dir: r.get(9)?,
@@ -226,15 +282,21 @@ fn read_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Row> {
 }
 
 pub fn list(conn: &Connection) -> Result<Vec<SourceView>, StoreError> {
-    let mut st = conn.prepare(&format!("SELECT {COLS} FROM remote_sources ORDER BY name COLLATE NOCASE"))?;
+    let mut st = conn.prepare(&format!(
+        "SELECT {COLS} FROM remote_sources ORDER BY name COLLATE NOCASE"
+    ))?;
     let rows = st.query_map([], read_row)?.collect::<Result<Vec<_>, _>>()?;
     Ok(rows.into_iter().map(|r| r.view).collect())
 }
 
 fn row(conn: &Connection, id: i64) -> Result<Row, StoreError> {
-    conn.query_row(&format!("SELECT {COLS} FROM remote_sources WHERE source_id = ?1"), [id], read_row)
-        .optional()?
-        .ok_or(StoreError::NotFound)
+    conn.query_row(
+        &format!("SELECT {COLS} FROM remote_sources WHERE source_id = ?1"),
+        [id],
+        read_row,
+    )
+    .optional()?
+    .ok_or(StoreError::NotFound)
 }
 
 pub fn view(conn: &Connection, id: i64) -> Result<SourceView, StoreError> {
@@ -243,15 +305,27 @@ pub fn view(conn: &Connection, id: i64) -> Result<SourceView, StoreError> {
 
 /// 종류만 (감지기 `probe` 용 — 복호하지 않는다)
 pub fn kind_of(conn: &Connection, id: i64) -> Option<SourceKind> {
-    let k: Option<String> = conn.query_row("SELECT kind FROM remote_sources WHERE source_id = ?1", [id], |r| r.get(0)).optional().ok()?;
+    let k: Option<String> = conn
+        .query_row(
+            "SELECT kind FROM remote_sources WHERE source_id = ?1",
+            [id],
+            |r| r.get(0),
+        )
+        .optional()
+        .ok()?;
     SourceKind::parse(&k?)
 }
 
 /// 복호한 접속 설정 (접속할 때만 만든다).
-pub fn load(conn: &Connection, id: i64, secrets: &dyn SecretBox) -> Result<RemoteSource, StoreError> {
+pub fn load(
+    conn: &Connection,
+    id: i64,
+    secrets: &dyn SecretBox,
+) -> Result<RemoteSource, StoreError> {
     let Row { view: v, auth_blob } = row(conn, id)?;
     let plain = secrets.open(&auth_blob)?;
-    let secret = Secret::new(String::from_utf8(plain.to_vec()).map_err(|_| StoreError::Invalid("auth"))?);
+    let secret =
+        Secret::new(String::from_utf8(plain.to_vec()).map_err(|_| StoreError::Invalid("auth"))?);
     Ok(RemoteSource {
         source_id: v.source_id,
         kind: SourceKind::parse(v.kind).unwrap_or(SourceKind::DdpAudit),
@@ -259,7 +333,11 @@ pub fn load(conn: &Connection, id: i64, secrets: &dyn SecretBox) -> Result<Remot
         host: v.host,
         port: v.port,
         user: v.user,
-        auth: if v.auth_kind == "key" { Auth::Key(secret) } else { Auth::Password(secret) },
+        auth: if v.auth_kind == "key" {
+            Auth::Key(secret)
+        } else {
+            Auth::Password(secret)
+        },
         host_key: v.host_key,
         log_dir: v.log_dir,
         db_path: v.db_path,
@@ -269,7 +347,14 @@ pub fn load(conn: &Connection, id: i64, secrets: &dyn SecretBox) -> Result<Remot
 }
 
 pub fn load_cursor(conn: &Connection, id: i64) -> Option<String> {
-    conn.query_row("SELECT cursor FROM watch_cursors WHERE source_id = ?1", [id], |r| r.get(0)).optional().ok().flatten()
+    conn.query_row(
+        "SELECT cursor FROM watch_cursors WHERE source_id = ?1",
+        [id],
+        |r| r.get(0),
+    )
+    .optional()
+    .ok()
+    .flatten()
 }
 
 /// 커서 저장 — **호출자의 트랜잭션 안에서** 대기열 UPSERT 와 함께 부른다.

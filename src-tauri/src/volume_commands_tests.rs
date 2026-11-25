@@ -84,7 +84,10 @@ fn t_ipc_vol_01_pending_event_and_list_use_the_contract_shape() {
         "mountPoint": "E:\\", "totalBytes": null
     }]});
     assert_eq!(ev[0].1, expected);
-    assert_eq!(serde_json::to_value(ingest.pending_volumes()).unwrap(), expected["volumes"]);
+    assert_eq!(
+        serde_json::to_value(ingest.pending_volumes()).unwrap(),
+        expected["volumes"]
+    );
 }
 
 #[test]
@@ -105,7 +108,10 @@ fn t_ipc_vol_02_dismiss_remember_then_list_and_unignore_round_trip() {
     keys.sort();
     assert_eq!(keys, ["ignoredAt", "label", "lastMountPoint", "volumeKey"]);
     assert!(obj["ignoredAt"].is_i64());
-    assert_eq!(cap.0.lock().unwrap().last().unwrap().1, serde_json::json!({"volumes": []}));
+    assert_eq!(
+        cap.0.lock().unwrap().last().unwrap().1,
+        serde_json::json!({"volumes": []})
+    );
 
     // 다시 묻기: 연결돼 있으므로 바로 대기 목록으로
     ingest.unignore_volume("usb").unwrap();

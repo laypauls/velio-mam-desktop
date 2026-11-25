@@ -23,35 +23,74 @@ pub struct DbCommitter {
 
 impl DbCommitter {
     pub fn new(pool: Arc<DbPool>, clock: SharedClock, due_ms: i64, cap: usize) -> Self {
-        Self { pool, clock, due_ms, cap }
+        Self {
+            pool,
+            clock,
+            due_ms,
+            cap,
+        }
     }
 }
 
 impl BatchCommitter for DbCommitter {
-    fn commit_feed(&self, source_id: i64, items: &[FeedItem], cursor: &str, origin: &'static str) -> Result<CommitOutcome, CommitError> {
+    fn commit_feed(
+        &self,
+        source_id: i64,
+        items: &[FeedItem],
+        cursor: &str,
+        origin: &'static str,
+    ) -> Result<CommitOutcome, CommitError> {
         let incoming: Vec<Incoming> = items
             .iter()
-            .filter_map(|i| Incoming::new(i.folder_id, &i.path, if i.subtree { PendingKind::Subtree } else { PendingKind::Path }, origin))
+            .filter_map(|i| {
+                Incoming::new(
+                    i.folder_id,
+                    &i.path,
+                    if i.subtree {
+                        PendingKind::Subtree
+                    } else {
+                        PendingKind::Path
+                    },
+                    origin,
+                )
+            })
             .collect();
-        let (now, due, cap) = (self.clock.now_ms(), self.clock.now_ms() + self.due_ms, self.cap);
+        let (now, due, cap) = (
+            self.clock.now_ms(),
+            self.clock.now_ms() + self.due_ms,
+            self.cap,
+        );
         // 청크마다 별도 트랜잭션 — 커서는 **마지막 청크의 같은 트랜잭션**에서만 올린다 (중간 실패 시 커서 불변)
         let report = store::upsert_chunked(&incoming, store::MAX_ROWS_PER_TX, |part, last| {
             let part = part.to_vec();
             let cursor = last.then(|| cursor.to_string());
             self.pool
                 .write(Priority::Low, move |c| {
-                    Ok(store::upsert_batch_with(c, &part, now, due, cap, |tx| match &cursor {
-                        Some(cur) => remote_store::save_cursor(tx, source_id, cur, now),
-                        None => Ok(()),
-                    }))
+                    Ok(store::upsert_batch_with(
+                        c,
+                        &part,
+                        now,
+                        due,
+                        cap,
+                        |tx| match &cursor {
+                            Some(cur) => remote_store::save_cursor(tx, source_id, cur, now),
+                            None => Ok(()),
+                        },
+                    ))
                 })
                 .map_err(crate::scan::IngestError::from)?
         })
         .map_err(|e| CommitError(e.to_string()))?;
-        Ok(CommitOutcome { overflowed: report.overflowed, dropped: report.dropped })
+        Ok(CommitOutcome {
+            overflowed: report.overflowed,
+            dropped: report.dropped,
+        })
     }
 
     fn load_cursor(&self, source_id: i64) -> Option<String> {
-        self.pool.read(|c| Ok(remote_store::load_cursor(c, source_id))).ok().flatten()
+        self.pool
+            .read(|c| Ok(remote_store::load_cursor(c, source_id)))
+            .ok()
+            .flatten()
     }
 }

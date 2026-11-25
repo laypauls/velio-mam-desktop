@@ -85,7 +85,10 @@ fn t_scene_01_v15_upgrade_from_v14_adds_table_check_and_partial_index() {
     let report = migrate(&mut db.conn, &db.backup_dir, &FixedClock(T0 + 1)).unwrap();
 
     // Assert: 업그레이드 + 백업 + 기존 행 보존 + 재실행 no-op
-    assert_eq!(report.applied, vec![15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]);
+    assert_eq!(
+        report.applied,
+        vec![15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
+    );
     assert!(report.backup.is_some_and(|b| b.is_file()));
     assert_eq!(count(&db.conn, "SELECT COUNT(*) FROM media_assets"), 1);
     let strict: bool = db
@@ -125,13 +128,22 @@ fn t_scene_01_constraints_reject_bad_rows() {
     let put = |sql: &str| db.conn.execute(sql, []);
 
     // Act / Assert: state CHECK, detector_version CHECK, FK, PK, NOT NULL
-    assert!(put("INSERT INTO asset_scene_cuts (asset_id, state, updated_at) VALUES (1, 'bogus', 0)").is_err());
+    assert!(
+        put("INSERT INTO asset_scene_cuts (asset_id, state, updated_at) VALUES (1, 'bogus', 0)")
+            .is_err()
+    );
     assert!(put("INSERT INTO asset_scene_cuts (asset_id, state, detector_version, updated_at) VALUES (1, 'done', 0, 0)").is_err());
-    assert!(put("INSERT INTO asset_scene_cuts (asset_id, state, updated_at) VALUES (99, 'done', 0)").is_err());
+    assert!(
+        put("INSERT INTO asset_scene_cuts (asset_id, state, updated_at) VALUES (99, 'done', 0)")
+            .is_err()
+    );
     assert!(put("INSERT INTO asset_scene_cuts (asset_id, state) VALUES (1, 'done')").is_err());
     // 값이 늘어날 수 있는 열은 CHECK 가 없다 (W9)
     assert!(put("INSERT INTO asset_scene_cuts (asset_id, state, sensitivity, error, updated_at) VALUES (1, 'failed', 'future', 'future_code', 0)").is_ok());
-    assert!(put("INSERT INTO asset_scene_cuts (asset_id, state, updated_at) VALUES (1, 'done', 0)").is_err());
+    assert!(
+        put("INSERT INTO asset_scene_cuts (asset_id, state, updated_at) VALUES (1, 'done', 0)")
+            .is_err()
+    );
 }
 
 fn migrated() -> TestDb {
@@ -190,7 +202,10 @@ fn t_scene_02_v16_preserves_every_job_row_column_and_index() {
     let report = migrate(&mut db.conn, &db.backup_dir, &FixedClock(T0 + 1)).unwrap();
 
     // Assert: 값·열 정의·인덱스 동일, FK ON·위반 0
-    assert_eq!(report.applied, vec![15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]);
+    assert_eq!(
+        report.applied,
+        vec![15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
+    );
     assert_eq!(jobs_dump(&db.conn), before_rows);
     assert_eq!(jobs_columns(&db.conn), before_cols);
     assert_eq!(jobs_indexes(&db.conn), before_idx);
@@ -199,14 +214,20 @@ fn t_scene_02_v16_preserves_every_job_row_column_and_index() {
         .query_row("PRAGMA foreign_keys", [], |r| r.get(0))
         .unwrap();
     assert_eq!(fk, 1);
-    assert_eq!(count(&db.conn, "SELECT COUNT(*) FROM pragma_foreign_key_check"), 0);
+    assert_eq!(
+        count(&db.conn, "SELECT COUNT(*) FROM pragma_foreign_key_check"),
+        0
+    );
     // 폴더 삭제 CASCADE 유지 (scan 작업이 사라진다)
     let scan_before = count(&db.conn, "SELECT COUNT(*) FROM jobs WHERE folder_id = 1");
     assert!(scan_before > 0);
     db.conn
         .execute("DELETE FROM managed_folders WHERE folder_id = 1", [])
         .unwrap();
-    assert_eq!(count(&db.conn, "SELECT COUNT(*) FROM jobs WHERE folder_id = 1"), 0);
+    assert_eq!(
+        count(&db.conn, "SELECT COUNT(*) FROM jobs WHERE folder_id = 1"),
+        0
+    );
 }
 
 #[test]
@@ -279,7 +300,10 @@ fn t_scene_03_deleting_an_asset_cascades_its_scene_row_and_table_count_is_34() {
     // Assert
     assert_eq!(count(&db.conn, "SELECT COUNT(*) FROM asset_scene_cuts"), 1);
     assert_eq!(
-        count(&db.conn, "SELECT COUNT(*) FROM asset_scene_cuts WHERE asset_id = 2"),
+        count(
+            &db.conn,
+            "SELECT COUNT(*) FROM asset_scene_cuts WHERE asset_id = 2"
+        ),
         1
     );
     let tables = common::user_tables(&db.conn)

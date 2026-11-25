@@ -30,7 +30,12 @@ fn t_media_gate_01_blocked_prefix_is_refused_without_spawning() {
 
     // Act
     let err = runner(&gate)
-        .run(Tool::Ffmpeg, Path::new("Z:/no/such/ffmpeg-binary"), &args, &opts())
+        .run(
+            Tool::Ffmpeg,
+            Path::new("Z:/no/such/ffmpeg-binary"),
+            &args,
+            &opts(),
+        )
         .unwrap_err();
 
     // Assert
@@ -47,7 +52,8 @@ fn t_media_gate_02_cancel_under_kills_the_running_child_by_pid_and_releases_wait
     let args: Vec<OsString> = ["-n", "30", "127.0.0.1"].map(OsString::from).to_vec();
     let prefix = "127.0.0.1";
     let started = Instant::now();
-    let worker = std::thread::spawn(move || r.run(Tool::Ffprobe, Path::new("ping"), &args, &opts()));
+    let worker =
+        std::thread::spawn(move || r.run(Tool::Ffprobe, Path::new("ping"), &args, &opts()));
 
     // Act: 프로세스가 뜰 때까지 기다렸다가 종료 요청
     let mut pids = Vec::new();
@@ -60,10 +66,19 @@ fn t_media_gate_02_cancel_under_kills_the_running_child_by_pid_and_releases_wait
     let result = worker.join().unwrap();
 
     // Assert
-    assert!(!pids.is_empty() && pids[0] != 0, "child PID reported: {pids:?}");
+    assert!(
+        !pids.is_empty() && pids[0] != 0,
+        "child PID reported: {pids:?}"
+    );
     assert!(released, "waiter released after the child was killed");
-    assert!(matches!(result, Err(MediaError::Cancelled { .. })), "{result:?}");
-    assert!(started.elapsed() < Duration::from_secs(10), "did not wait for ping to finish");
+    assert!(
+        matches!(result, Err(MediaError::Cancelled { .. })),
+        "{result:?}"
+    );
+    assert!(
+        started.elapsed() < Duration::from_secs(10),
+        "did not wait for ping to finish"
+    );
 }
 
 #[cfg(windows)]

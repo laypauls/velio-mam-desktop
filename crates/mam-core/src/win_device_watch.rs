@@ -16,8 +16,8 @@ use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DBT_DEVICEARRIVAL, DBT_DEVICEREMOVECOMPLETE, DBT_DEVTYP_VOLUME,
     DEV_BROADCAST_HDR, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW, MSG,
-    PostMessageW, PostQuitMessage, RegisterClassW, TranslateMessage,
-    WM_CLOSE, WM_DESTROY, WM_DEVICECHANGE, WNDCLASSW, WS_OVERLAPPED,
+    PostMessageW, PostQuitMessage, RegisterClassW, TranslateMessage, WM_CLOSE, WM_DESTROY,
+    WM_DEVICECHANGE, WNDCLASSW, WS_OVERLAPPED,
 };
 
 use crate::device_watch::{DeviceNotify, DeviceWatcher};
@@ -55,7 +55,12 @@ fn is_volume_change(wparam: WPARAM, lparam: LPARAM) -> bool {
         && hdr.dbch_devicetype == DBT_DEVTYP_VOLUME
 }
 
-unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+unsafe extern "system" fn wnd_proc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
     match msg {
         WM_DEVICECHANGE => {
             if is_volume_change(wparam, lparam) {

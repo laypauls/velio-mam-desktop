@@ -19,16 +19,31 @@ pub struct TracingSink;
 impl LogSink for TracingSink {
     fn emit(&self, plugin_id: &str, level: LogLevel, message: &str) {
         match level {
-            LogLevel::Debug => tracing::debug!(target: "mam::plugin", plugin_id = plugin_id, message = message),
-            LogLevel::Info => tracing::info!(target: "mam::plugin", plugin_id = plugin_id, message = message),
-            LogLevel::Warn | LogLevel::Error => tracing::warn!(target: "mam::plugin", plugin_id = plugin_id, message = message),
+            LogLevel::Debug => {
+                tracing::debug!(target: "mam::plugin", plugin_id = plugin_id, message = message)
+            }
+            LogLevel::Info => {
+                tracing::info!(target: "mam::plugin", plugin_id = plugin_id, message = message)
+            }
+            LogLevel::Warn | LogLevel::Error => {
+                tracing::warn!(target: "mam::plugin", plugin_id = plugin_id, message = message)
+            }
         }
     }
 }
 
 /// 줄 바꿈·제어 문자(U+2028·2029 포함) -> 공백, 비밀 마스킹, 4 KiB 자르기
 pub fn sanitize(raw: &str) -> String {
-    let flat: String = raw.chars().map(|c| if c.is_control() || c == '\u{2028}' || c == '\u{2029}' { ' ' } else { c }).collect();
+    let flat: String = raw
+        .chars()
+        .map(|c| {
+            if c.is_control() || c == '\u{2028}' || c == '\u{2029}' {
+                ' '
+            } else {
+                c
+            }
+        })
+        .collect();
     let mut out = redact(&flat);
     if out.len() > MAX_LOG_BYTES {
         let mut end = MAX_LOG_BYTES;
@@ -61,7 +76,9 @@ fn secret_at(b: &[u8], i: usize) -> Option<(usize, usize)> {
     // sk-... / AIza... (단어 경계에서 시작, 최소 길이)
     for (prefix, min) in [("sk-", 8usize), ("AIza", 16)] {
         if !word_before(b, i) && b[i..].starts_with(prefix.as_bytes()) {
-            let end = run(b, i + prefix.len(), |c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-');
+            let end = run(b, i + prefix.len(), |c| {
+                c.is_ascii_alphanumeric() || c == b'_' || c == b'-'
+            });
             if end - (i + prefix.len()) >= min {
                 return Some((i, end));
             }
@@ -80,7 +97,9 @@ fn secret_at(b: &[u8], i: usize) -> Option<(usize, usize)> {
         if !starts_ci(b, i, name) {
             continue;
         }
-        let mut j = run(b, i + name.len(), |c| c.is_ascii_alphanumeric() || c == b'_');
+        let mut j = run(b, i + name.len(), |c| {
+            c.is_ascii_alphanumeric() || c == b'_'
+        });
         if matches!(b.get(j), Some(b'"' | b'\'')) {
             j += 1;
         }
@@ -95,7 +114,12 @@ fn secret_at(b: &[u8], i: usize) -> Option<(usize, usize)> {
                 (s, s + b[s..].iter().take_while(|c| *c != q).count())
             }
             _ if starts_ci(b, j, "bearer ") => (j, run(b, run(b, j + 6, |c| c == b' '), is_tok)), // `token: Bearer <tok>` 는 스킴 뒤 토큰까지
-            _ => (j, run(b, j, |c| !matches!(c, b' ' | b',' | b';' | b'&' | b'"' | b'\'' | b'}' | b')'))),
+            _ => (
+                j,
+                run(b, j, |c| {
+                    !matches!(c, b' ' | b',' | b';' | b'&' | b'"' | b'\'' | b'}' | b')')
+                }),
+            ),
         };
         if end > start {
             return Some((start, end));
@@ -145,12 +169,20 @@ pub enum Admit {
 
 impl LogLimiter {
     pub fn new(per_sec: u32, burst: u32) -> Self {
-        Self { per_sec: f64::from(per_sec), burst: f64::from(burst), buckets: Mutex::new(HashMap::new()) }
+        Self {
+            per_sec: f64::from(per_sec),
+            burst: f64::from(burst),
+            buckets: Mutex::new(HashMap::new()),
+        }
     }
 
     pub fn admit(&self, plugin: &str, now: Instant) -> Admit {
         let mut map = self.buckets.lock().unwrap_or_else(|p| p.into_inner());
-        let b = map.entry(plugin.to_owned()).or_insert(Bucket { tokens: self.burst, last: now, dropped: 0 });
+        let b = map.entry(plugin.to_owned()).or_insert(Bucket {
+            tokens: self.burst,
+            last: now,
+            dropped: 0,
+        });
         let elapsed = now.saturating_duration_since(b.last);
         b.tokens = (b.tokens + elapsed.as_secs_f64() * self.per_sec).min(self.burst);
         b.last = now.max(b.last);

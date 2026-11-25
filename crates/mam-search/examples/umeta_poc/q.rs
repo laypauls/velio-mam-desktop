@@ -56,7 +56,12 @@ pub fn build_schema() -> (Schema, Fx) {
 }
 
 /// D2 형식: keyword=소문자 문자열, number=f64(+ 비교용 정렬 가능 i64 `n{id}`), 나머지 i64.
-pub fn make_doc(fx: &Fx, asset_id: u64, vals: &[(u32, Val)], with_sortable: bool) -> TantivyDocument {
+pub fn make_doc(
+    fx: &Fx,
+    asset_id: u64,
+    vals: &[(u32, Val)],
+    with_sortable: bool,
+) -> TantivyDocument {
     let mut d = TantivyDocument::default();
     d.add_u64(fx.asset_id, asset_id);
     d.add_text(fx.media_type, data::media_type(asset_id));
@@ -150,7 +155,12 @@ pub fn any_of(terms: Vec<Term>, f: Field) -> Box<dyn Query> {
     Box::new(BooleanQuery::new(
         terms
             .into_iter()
-            .map(|t| (Occur::Should, Box::new(TermQuery::new(t, IndexRecordOption::Basic)) as Box<dyn Query>))
+            .map(|t| {
+                (
+                    Occur::Should,
+                    Box::new(TermQuery::new(t, IndexRecordOption::Basic)) as Box<dyn Query>,
+                )
+            })
             .collect(),
     ))
 }
@@ -158,7 +168,12 @@ pub fn all_of(terms: Vec<Term>) -> Box<dyn Query> {
     Box::new(BooleanQuery::new(
         terms
             .into_iter()
-            .map(|t| (Occur::Must, Box::new(TermQuery::new(t, IndexRecordOption::Basic)) as Box<dyn Query>))
+            .map(|t| {
+                (
+                    Occur::Must,
+                    Box::new(TermQuery::new(t, IndexRecordOption::Basic)) as Box<dyn Query>,
+                )
+            })
             .collect(),
     ))
 }
@@ -261,10 +276,7 @@ impl P {
 pub fn build_query(fx: &Fx, preds: &[P], text_tokens: &[String]) -> Box<dyn Query> {
     let mut clauses: Vec<(Occur, Box<dyn Query>)> = preds.iter().map(|p| p.clause(fx)).collect();
     for t in text_tokens {
-        clauses.push((
-            Occur::Must,
-            term_q(Term::from_field_text(fx.umeta_text, t)),
-        ));
+        clauses.push((Occur::Must, term_q(Term::from_field_text(fx.umeta_text, t))));
     }
     if !clauses.iter().any(|(o, _)| *o == Occur::Must) {
         clauses.push((Occur::Must, Box::new(AllQuery)));

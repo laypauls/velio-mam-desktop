@@ -6,7 +6,9 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use mam_plugin_runtime::{PluginCommandResult, PluginContributions, PluginInfo, PluginPreview, PluginRuntime};
+use mam_plugin_runtime::{
+    PluginCommandResult, PluginContributions, PluginInfo, PluginPreview, PluginRuntime,
+};
 use tauri::State;
 
 use crate::error::{CommandError, ErrorCode};
@@ -17,7 +19,9 @@ type Settings<'a> = State<'a, Arc<Storage>>;
 
 /// 표시 언어 코드 — 설정을 읽지 못하면 `en`
 fn language(storage: &Storage) -> String {
-    storage.get_settings().map_or_else(|_| "en".to_owned(), |v| v.settings.language)
+    storage
+        .get_settings()
+        .map_or_else(|_| "en".to_owned(), |v| v.settings.language)
 }
 
 /// 사용자가 고른 폴더 경로 문자열 -> `PathBuf`. 비었거나 NUL 이 있으면 `invalid_input`
@@ -40,14 +44,21 @@ where
 }
 
 #[tauri::command]
-pub async fn plugin_list(runtime: Runtime<'_>, storage: Settings<'_>) -> Result<Vec<PluginInfo>, CommandError> {
+pub async fn plugin_list(
+    runtime: Runtime<'_>,
+    storage: Settings<'_>,
+) -> Result<Vec<PluginInfo>, CommandError> {
     let (rt, st) = (Arc::clone(&runtime), Arc::clone(&storage));
     blocking(move || Ok(rt.list(&language(&st)))).await
 }
 
 /// 설치 전 미리보기 — 폴더는 읽기만 한다
 #[tauri::command]
-pub async fn plugin_inspect_dir(runtime: Runtime<'_>, storage: Settings<'_>, dir: String) -> Result<PluginPreview, CommandError> {
+pub async fn plugin_inspect_dir(
+    runtime: Runtime<'_>,
+    storage: Settings<'_>,
+    dir: String,
+) -> Result<PluginPreview, CommandError> {
     let dir = dir_arg(dir)?;
     let (rt, st) = (Arc::clone(&runtime), Arc::clone(&storage));
     blocking(move || Ok(rt.inspect_dir(&dir, &language(&st))?)).await
@@ -65,11 +76,25 @@ pub async fn plugin_install(
 ) -> Result<PluginInfo, CommandError> {
     let dir = dir_arg(dir)?;
     let (rt, st) = (Arc::clone(&runtime), Arc::clone(&storage));
-    blocking(move || Ok(rt.install(&dir, &expected_id, &expected_version, granted_permissions, &language(&st))?)).await
+    blocking(move || {
+        Ok(rt.install(
+            &dir,
+            &expected_id,
+            &expected_version,
+            granted_permissions,
+            &language(&st),
+        )?)
+    })
+    .await
 }
 
 #[tauri::command]
-pub async fn plugin_set_enabled(runtime: Runtime<'_>, storage: Settings<'_>, plugin_id: String, enabled: bool) -> Result<PluginInfo, CommandError> {
+pub async fn plugin_set_enabled(
+    runtime: Runtime<'_>,
+    storage: Settings<'_>,
+    plugin_id: String,
+    enabled: bool,
+) -> Result<PluginInfo, CommandError> {
     let (rt, st) = (Arc::clone(&runtime), Arc::clone(&storage));
     blocking(move || Ok(rt.set_enabled(&plugin_id, enabled, &language(&st))?)).await
 }
@@ -87,7 +112,11 @@ pub async fn plugin_grant_permissions(
 
 /// 제거. `keep_data=false` 면 그 플러그인의 KV·작업 행도 지운다(배치) — 원본 미디어는 건드리지 않는다
 #[tauri::command]
-pub async fn plugin_uninstall(runtime: Runtime<'_>, plugin_id: String, keep_data: bool) -> Result<(), CommandError> {
+pub async fn plugin_uninstall(
+    runtime: Runtime<'_>,
+    plugin_id: String,
+    keep_data: bool,
+) -> Result<(), CommandError> {
     let rt = Arc::clone(&runtime);
     blocking(move || Ok(rt.uninstall(&plugin_id, keep_data)?)).await
 }
@@ -106,7 +135,10 @@ pub async fn plugin_run_command(
 
 /// 활성 플러그인의 메뉴 항목·내보내기 provider (번역된 title, `when` 은 원문)
 #[tauri::command]
-pub async fn plugin_contributions(runtime: Runtime<'_>, storage: Settings<'_>) -> Result<PluginContributions, CommandError> {
+pub async fn plugin_contributions(
+    runtime: Runtime<'_>,
+    storage: Settings<'_>,
+) -> Result<PluginContributions, CommandError> {
     let (rt, st) = (Arc::clone(&runtime), Arc::clone(&storage));
     blocking(move || Ok(rt.contributions(&language(&st)))).await
 }
@@ -118,9 +150,18 @@ mod tests {
 
     #[test]
     fn t_ipc_plugin_00_dir_arg_rejects_empty_and_nul_paths() {
-        assert_eq!(dir_arg(String::new()).unwrap_err().code(), ErrorCode::InvalidInput);
-        assert_eq!(dir_arg("C:\\x\0y".into()).unwrap_err().code(), ErrorCode::InvalidInput);
-        assert_eq!(dir_arg("C:\\plugins\\demo".into()).unwrap(), PathBuf::from("C:\\plugins\\demo"));
+        assert_eq!(
+            dir_arg(String::new()).unwrap_err().code(),
+            ErrorCode::InvalidInput
+        );
+        assert_eq!(
+            dir_arg("C:\\x\0y".into()).unwrap_err().code(),
+            ErrorCode::InvalidInput
+        );
+        assert_eq!(
+            dir_arg("C:\\plugins\\demo".into()).unwrap(),
+            PathBuf::from("C:\\plugins\\demo")
+        );
     }
 }
 

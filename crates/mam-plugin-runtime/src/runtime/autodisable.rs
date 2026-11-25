@@ -13,18 +13,32 @@ use crate::install::store::put_row;
 
 impl PluginRuntime {
     /// 호출 오류 -> `RunError`. 차단기가 열렸으면 자동 비활성화한다 (`Disabled` 오류는 `RunError::Disabled`)
-    pub(crate) fn after_invoke_error(&self, entry: &Entry, host: &Arc<PluginHost>, e: InvokeError) -> RunError {
+    pub(crate) fn after_invoke_error(
+        &self,
+        entry: &Entry,
+        host: &Arc<PluginHost>,
+        e: InvokeError,
+    ) -> RunError {
         let already = e == InvokeError::Disabled;
         if already || (e.is_fault() && host.state() == HostState::Disabled) {
             self.auto_disable(&entry.id, host);
         }
-        if already { RunError::Disabled } else { RunError::Invoke(e) }
+        if already {
+            RunError::Disabled
+        } else {
+            RunError::Invoke(e)
+        }
     }
 
     fn auto_disable(&self, id: &str, host: &Arc<PluginHost>) {
         let _guard = self.lifecycle.lock().unwrap_or_else(|p| p.into_inner());
         // 그 사이 제거·교체됐거나 이미 꺼졌으면 할 일이 없다
-        let Some(cur) = self.entry(id).filter(|c| c.enabled && c.host.as_ref().is_some_and(|h| Arc::ptr_eq(h, host))) else { return };
+        let Some(cur) = self
+            .entry(id)
+            .filter(|c| c.enabled && c.host.as_ref().is_some_and(|h| Arc::ptr_eq(h, host)))
+        else {
+            return;
+        };
         let key = id.to_owned();
         let persisted = self.db_write(Priority::Low, move |c| {
             if get(c, INSTALLED, &key)?.is_none() {
@@ -37,15 +51,23 @@ impl PluginRuntime {
         match persisted {
             Ok(false) => return,
             Ok(true) => {
-                self.put_entry(Entry { enabled: false, ..(*cur).clone() });
+                self.put_entry(Entry {
+                    enabled: false,
+                    ..(*cur).clone()
+                });
                 self.refresh_grants(&pid);
             }
             Err(e) => {
                 // 저장하지 못해도 이번 실행에서는 닫는다 (실패 시 닫힘) — 다음 부팅은 DB 값을 따른다
                 tracing::error!(plugin = id, error = %e, "failed to persist auto-disable; closing in memory");
-                self.put_entry(Entry { enabled: false, ..(*cur).clone() });
+                self.put_entry(Entry {
+                    enabled: false,
+                    ..(*cur).clone()
+                });
                 if let Some(pkg) = cur.pkg.as_ref() {
-                    self.gateway.grants().register(&pid, &pkg.manifest.permissions);
+                    self.gateway
+                        .grants()
+                        .register(&pid, &pkg.manifest.permissions);
                 }
             }
         }

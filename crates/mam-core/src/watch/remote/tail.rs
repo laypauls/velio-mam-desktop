@@ -150,7 +150,11 @@ pub(super) mod cmd {
 
     /// 파일의 `off` 바이트 뒤 (`tail -c +N` 은 N 번째 바이트 **부터** 라 1 을 더한다).
     pub fn tail_from(dir: &str, name: &str, off: u64) -> String {
-        format!("tail -c +{} {}", off + 1, sh_quote(&format!("{dir}/{name}")))
+        format!(
+            "tail -c +{} {}",
+            off + 1,
+            sh_quote(&format!("{dir}/{name}"))
+        )
     }
 }
 
@@ -158,11 +162,15 @@ pub(super) mod cmd {
 fn valid_log_name(n: &str) -> bool {
     n.len() <= 64
         && n.starts_with("audit-log.")
-        && n.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
+        && n.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
 }
 
 /// `audit-log.*` 이름 → 크기. 비어 있으면 `NoAuditFiles`, 폴더가 없으면 `NoLogDir`. 접속 시험도 같은 함수를 쓴다.
-pub fn list_sizes(run: &mut dyn RemoteRunner, dir: &str) -> Result<BTreeMap<String, u64>, RunError> {
+pub fn list_sizes(
+    run: &mut dyn RemoteRunner,
+    dir: &str,
+) -> Result<BTreeMap<String, u64>, RunError> {
     let out = run.run(&cmd::list_sizes(dir))?; // 종료 코드 9(폴더 없음)는 실행기가 `NoLogDir` 로 바꿔 준다
     let sizes: BTreeMap<String, u64> = String::from_utf8_lossy(&out)
         .lines()

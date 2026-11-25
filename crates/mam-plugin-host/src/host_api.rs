@@ -37,7 +37,10 @@ pub struct HostError {
 
 impl HostError {
     pub fn new(code: &str, message: &str) -> Self {
-        Self { code: code.to_owned(), message: message.to_owned() }
+        Self {
+            code: code.to_owned(),
+            message: message.to_owned(),
+        }
     }
 }
 
@@ -67,11 +70,21 @@ impl InvokeScope {
         if assets.len() > MAX_SCOPE_ASSETS {
             return Err(ScopeTooLarge);
         }
-        Ok(Self { assets: assets.into(), deadline: Instant::now(), derived_bytes: AtomicU64::new(0), new_tags: AtomicU32::new(0) })
+        Ok(Self {
+            assets: assets.into(),
+            deadline: Instant::now(),
+            derived_bytes: AtomicU64::new(0),
+            new_tags: AtomicU32::new(0),
+        })
     }
 
     pub fn empty() -> Self {
-        Self { assets: Arc::from(Vec::new()), deadline: Instant::now(), derived_bytes: AtomicU64::new(0), new_tags: AtomicU32::new(0) }
+        Self {
+            assets: Arc::from(Vec::new()),
+            deadline: Instant::now(),
+            derived_bytes: AtomicU64::new(0),
+            new_tags: AtomicU32::new(0),
+        }
     }
 
     pub fn with_deadline(mut self, deadline: Instant) -> Self {

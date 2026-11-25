@@ -40,7 +40,10 @@ fn kst(_: i64) -> i32 {
 }
 
 fn pairs(s: &SectionIndex) -> Vec<(String, u64)> {
-    s.sections.iter().map(|x| (x.key.clone(), x.count)).collect()
+    s.sections
+        .iter()
+        .map(|x| (x.key.clone(), x.count))
+        .collect()
 }
 
 /// 정렬 순서대로 모든 항목의 id (한 페이지 200건 이내인 데이터셋용)
@@ -62,14 +65,28 @@ fn runs(keys: impl IntoIterator<Item = String>) -> Vec<(String, u64)> {
 
 fn month_of(secs: i64, offset: i32) -> String {
     let tz = FixedOffset::east_opt(offset).unwrap();
-    tz.timestamp_opt(secs, 0).unwrap().format("%Y-%m").to_string()
+    tz.timestamp_opt(secs, 0)
+        .unwrap()
+        .format("%Y-%m")
+        .to_string()
 }
 
 #[test]
 fn t_sect_10_month_sections_follow_sort_order_with_nulls_last() {
     // Arrange: 2023-12, 2024-01(여럿), 2024-03 (2월 비어 있음), 날짜 없음 2건
-    let t = |y, m, d| chrono::Utc.with_ymd_and_hms(y, m, d, 12, 0, 0).unwrap().timestamp();
-    let times = [t(2023, 12, 31), t(2024, 1, 2), t(2024, 1, 15), t(2024, 1, 30), t(2024, 3, 1)];
+    let t = |y, m, d| {
+        chrono::Utc
+            .with_ymd_and_hms(y, m, d, 12, 0, 0)
+            .unwrap()
+            .timestamp()
+    };
+    let times = [
+        t(2023, 12, 31),
+        t(2024, 1, 2),
+        t(2024, 1, 15),
+        t(2024, 1, 30),
+        t(2024, 3, 1),
+    ];
     let mut docs: Vec<AssetDoc> = times
         .iter()
         .enumerate()
@@ -95,7 +112,10 @@ fn t_sect_10_month_sections_follow_sort_order_with_nulls_last() {
         if desc {
             expect.reverse();
         }
-        let mut expect: Vec<(String, u64)> = expect.into_iter().map(|(k, c)| (k.to_string(), c)).collect();
+        let mut expect: Vec<(String, u64)> = expect
+            .into_iter()
+            .map(|(k, c)| (k.to_string(), c))
+            .collect();
         expect.push(("none".into(), 2));
         assert_eq!(pairs(&s), expect, "desc={desc}");
         assert_eq!(s.kind, SectionKind::Month);
@@ -110,14 +130,21 @@ fn t_sect_10_month_sections_follow_sort_order_with_nulls_last() {
             Some(v) => month_of(v, 0),
             None => "none".into(),
         }));
-        assert_eq!(pairs(&s), sequence, "desc={desc}: sections == runs of the real order");
+        assert_eq!(
+            pairs(&s),
+            sequence,
+            "desc={desc}: sections == runs of the real order"
+        );
     }
 }
 
 #[test]
 fn t_sect_11_month_boundaries_use_the_injected_utc_offset() {
     // Arrange: KST 2024-02-01 00:00 = 2024-01-31T15:00Z (2월 첫 순간) 과 1초 전
-    let feb_first_kst = chrono::Utc.with_ymd_and_hms(2024, 1, 31, 15, 0, 0).unwrap().timestamp();
+    let feb_first_kst = chrono::Utc
+        .with_ymd_and_hms(2024, 1, 31, 15, 0, 0)
+        .unwrap()
+        .timestamp();
     let mut a = doc(1, "a.jpg");
     a.captured_at = Some(feb_first_kst);
     let mut b = doc(2, "b.jpg");
@@ -134,14 +161,25 @@ fn t_sect_11_month_boundaries_use_the_injected_utc_offset() {
     let in_utc = h.section_index(&r, &utc).unwrap();
 
     // Assert: 같은 3건이 시간대에 따라 다르게 나뉜다
-    assert_eq!(pairs(&in_kst), [("2024-01".to_string(), 1), ("2024-02".to_string(), 2)]);
-    assert_eq!(pairs(&in_utc), [("2024-01".to_string(), 2), ("2024-02".to_string(), 1)]);
+    assert_eq!(
+        pairs(&in_kst),
+        [("2024-01".to_string(), 1), ("2024-02".to_string(), 2)]
+    );
+    assert_eq!(
+        pairs(&in_utc),
+        [("2024-01".to_string(), 2), ("2024-02".to_string(), 1)]
+    );
 }
 
 #[test]
 fn t_sect_11b_modified_at_is_milliseconds_and_has_no_null_bucket_in_practice() {
     // Arrange: 수정일은 ms 단위다
-    let ms = |y, m, d| chrono::Utc.with_ymd_and_hms(y, m, d, 1, 0, 0).unwrap().timestamp_millis();
+    let ms = |y, m, d| {
+        chrono::Utc
+            .with_ymd_and_hms(y, m, d, 1, 0, 0)
+            .unwrap()
+            .timestamp_millis()
+    };
     let docs: Vec<AssetDoc> = [ms(2022, 5, 1), ms(2022, 5, 31), ms(2022, 6, 1)]
         .iter()
         .enumerate()
@@ -156,22 +194,33 @@ fn t_sect_11b_modified_at_is_milliseconds_and_has_no_null_bucket_in_practice() {
     let h = SearchHandle::for_index(&idx);
 
     // Act
-    let s = h.section_index(&creq(SortField::ModifiedAt, true), &utc).unwrap();
+    let s = h
+        .section_index(&creq(SortField::ModifiedAt, true), &utc)
+        .unwrap();
 
     // Assert
-    assert_eq!(pairs(&s), [("2022-06".to_string(), 1), ("2022-05".to_string(), 2)]);
+    assert_eq!(
+        pairs(&s),
+        [("2022-06".to_string(), 1), ("2022-05".to_string(), 2)]
+    );
 }
 
 /// 테스트 쪽 독립 분류: 정렬 키(NFC + 소문자)의 첫 글자로 구간을 정한다.
 fn expected_bucket(name: &str) -> &'static str {
     const CHO: [&str; 19] = [
-        "ㄱ", "ㄱ", "ㄴ", "ㄷ", "ㄷ", "ㄹ", "ㅁ", "ㅂ", "ㅂ", "ㅅ", "ㅅ", "ㅇ", "ㅈ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ",
+        "ㄱ", "ㄱ", "ㄴ", "ㄷ", "ㄷ", "ㄹ", "ㅁ", "ㅂ", "ㅂ", "ㅅ", "ㅅ", "ㅇ", "ㅈ", "ㅈ", "ㅊ",
+        "ㅋ", "ㅌ", "ㅍ", "ㅎ",
     ];
     let key: String = name.nfc().collect::<String>().to_lowercase();
-    let Some(c) = key.chars().next() else { return "sym" };
+    let Some(c) = key.chars().next() else {
+        return "sym";
+    };
     match c as u32 {
         0..=0x60 => "sym",
-        0x61..=0x7a => ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"][(c as u32 - 0x61) as usize],
+        0x61..=0x7a => [
+            "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q",
+            "r", "s", "t", "u", "v", "w", "x", "y", "z",
+        ][(c as u32 - 0x61) as usize],
         0x7b..=0xabff => "etc",
         cp @ 0xac00..=0xd7a3 => CHO[((cp - 0xac00) / 588) as usize],
         _ => "etc_end",
@@ -190,14 +239,51 @@ fn name_docs(names: &[&str]) -> Vec<AssetDoc> {
 fn t_sect_12_name_sections_cover_latin_symbols_accents_kana_and_hangul_in_sort_order() {
     // Arrange
     let names = [
-        "Apple.jpg", "apricot.jpg", "banana.jpg", "_under.jpg", "1photo.jpg", "#hash.jpg", "-dash.jpg",
-        "zebra.jpg", "Z-last.jpg", "{brace.jpg", "~tilde.jpg",
-        "Éclair.jpg", "ümlaut.jpg", "ÉCLAIR2.jpg", "e\u{301}clair3.jpg", // NFC 후 é(U+00E9) → etc
-        "カタカナ.jpg", "日本語.jpg", "ㄱ낱자.jpg", "ㅎ낱자.jpg", // 가나·한자·호환 자모 낱자 → etc
-        "가방.jpg", "까치.jpg", "깋.jpg", "나비.jpg", "다람쥐.jpg", "따뜻.jpg", "라면.jpg", "마을.jpg", "바다.jpg", "빵.jpg",
-        "사자.jpg", "싸움.jpg", "아기.jpg", "자전거.jpg", "짜장.jpg", "차.jpg", "카메라.jpg", "타조.jpg", "파도.jpg", "하늘.jpg", "힣.jpg",
+        "Apple.jpg",
+        "apricot.jpg",
+        "banana.jpg",
+        "_under.jpg",
+        "1photo.jpg",
+        "#hash.jpg",
+        "-dash.jpg",
+        "zebra.jpg",
+        "Z-last.jpg",
+        "{brace.jpg",
+        "~tilde.jpg",
+        "Éclair.jpg",
+        "ümlaut.jpg",
+        "ÉCLAIR2.jpg",
+        "e\u{301}clair3.jpg", // NFC 후 é(U+00E9) → etc
+        "カタカナ.jpg",
+        "日本語.jpg",
+        "ㄱ낱자.jpg",
+        "ㅎ낱자.jpg", // 가나·한자·호환 자모 낱자 → etc
+        "가방.jpg",
+        "까치.jpg",
+        "깋.jpg",
+        "나비.jpg",
+        "다람쥐.jpg",
+        "따뜻.jpg",
+        "라면.jpg",
+        "마을.jpg",
+        "바다.jpg",
+        "빵.jpg",
+        "사자.jpg",
+        "싸움.jpg",
+        "아기.jpg",
+        "자전거.jpg",
+        "짜장.jpg",
+        "차.jpg",
+        "카메라.jpg",
+        "타조.jpg",
+        "파도.jpg",
+        "하늘.jpg",
+        "힣.jpg",
         "\u{1100}\u{1161}\u{11a8}.jpg", // 조합형 가 → NFC 로 ㄱ
-        "ퟀ.jpg", "ﬁle.jpg", "😀.jpg", "\u{ff21}fullwidth.jpg", // 힣 뒤 → etc_end
+        "ퟀ.jpg",
+        "ﬁle.jpg",
+        "😀.jpg",
+        "\u{ff21}fullwidth.jpg", // 힣 뒤 → etc_end
     ];
     let docs = name_docs(&names);
     let dir = tempdir().unwrap();
@@ -214,9 +300,18 @@ fn t_sect_12_name_sections_cover_latin_symbols_accents_kana_and_hangul_in_sort_o
         assert_eq!(s.kind, SectionKind::Initial);
         assert_eq!(s.total, names.len() as u64);
         assert_eq!(s.sections.iter().map(|x| x.count).sum::<u64>(), s.total);
-        let by_id: std::collections::HashMap<u64, &AssetDoc> = docs.iter().map(|d| (d.asset_id, d)).collect();
-        let sequence = runs(real_order.iter().map(|id| expected_bucket(&by_id[id].file_name).to_string()));
-        assert_eq!(pairs(&s), sequence, "desc={desc}: sections == runs of the real order");
+        let by_id: std::collections::HashMap<u64, &AssetDoc> =
+            docs.iter().map(|d| (d.asset_id, d)).collect();
+        let sequence = runs(
+            real_order
+                .iter()
+                .map(|id| expected_bucket(&by_id[id].file_name).to_string()),
+        );
+        assert_eq!(
+            pairs(&s),
+            sequence,
+            "desc={desc}: sections == runs of the real order"
+        );
         // 구간 키는 한 번씩만 나온다 (정렬이 구간 안에서 연속이라는 뜻)
         let mut keys: Vec<_> = s.sections.iter().map(|x| x.key.clone()).collect();
         keys.sort();
@@ -225,29 +320,61 @@ fn t_sect_12_name_sections_cover_latin_symbols_accents_kana_and_hangul_in_sort_o
     }
 
     // 몇 가지 구체적 기대값 (오름차순)
-    let s = h.section_index(&creq(SortField::Name, false), &utc).unwrap();
-    let get = |k: &str| s.sections.iter().find(|x| x.key == k).map_or(0, |x| x.count);
-    assert_eq!((get("sym"), get("a"), get("z"), get("etc"), get("etc_end")), (4, 2, 2, 10, 4));
+    let s = h
+        .section_index(&creq(SortField::Name, false), &utc)
+        .unwrap();
+    let get = |k: &str| {
+        s.sections
+            .iter()
+            .find(|x| x.key == k)
+            .map_or(0, |x| x.count)
+    };
+    assert_eq!(
+        (get("sym"), get("a"), get("z"), get("etc"), get("etc_end")),
+        (4, 2, 2, 10, 4)
+    );
 }
 
 #[test]
 fn t_sect_13_name_edge_rules() {
     // Arrange: 구간 경계 값 그대로
-    let names = ["`tick.jpg", "a.jpg", "z.jpg", "z\u{10ffff}.jpg", "\u{ab00}.jpg", "가.jpg", "깋.jpg", "깍.jpg", "힣.jpg", "\u{d7a4}.jpg", ".hidden.jpg"];
+    let names = [
+        "`tick.jpg",
+        "a.jpg",
+        "z.jpg",
+        "z\u{10ffff}.jpg",
+        "\u{ab00}.jpg",
+        "가.jpg",
+        "깋.jpg",
+        "깍.jpg",
+        "힣.jpg",
+        "\u{d7a4}.jpg",
+        ".hidden.jpg",
+    ];
     let docs = name_docs(&names);
     let dir = tempdir().unwrap();
     let idx = indexed(&dir, &docs);
     let h = SearchHandle::for_index(&idx);
 
     // Act
-    let s = h.section_index(&creq(SortField::Name, false), &utc).unwrap();
+    let s = h
+        .section_index(&creq(SortField::Name, false), &utc)
+        .unwrap();
 
     // Assert: ` 와 . 는 a 앞(sym), U+AB00 은 가(U+AC00) 앞(etc), 가·깍(까 구간 안)은 ㄱ, 힣 은 ㅎ, U+D7A4 는 etc_end
     let got = pairs(&s);
-    let expect: Vec<(String, u64)> = [("sym", 2), ("a", 1), ("z", 2), ("etc", 1), ("ㄱ", 3), ("ㅎ", 1), ("etc_end", 1)]
-        .iter()
-        .map(|(k, c)| (k.to_string(), *c))
-        .collect();
+    let expect: Vec<(String, u64)> = [
+        ("sym", 2),
+        ("a", 1),
+        ("z", 2),
+        ("etc", 1),
+        ("ㄱ", 3),
+        ("ㅎ", 1),
+        ("etc_end", 1),
+    ]
+    .iter()
+    .map(|(k, c)| (k.to_string(), *c))
+    .collect();
     assert_eq!(got, expect);
     // 경계 표는 오름차순이며 라벨이 중복되지 않는다
     let bounds = name_initial_bounds();
@@ -262,7 +389,10 @@ fn t_sect_14_sections_respect_filters_query_and_direction() {
     // Arrange: 영상은 3의 배수. 이름 "n{i%17}-photo{i}", 촬영일 월 분산
     let docs: Vec<AssetDoc> = (1..=60)
         .map(|i| {
-            let mut d = doc(i, &format!("{}-photo{i}.jpg", ["a", "b", "c"][(i % 3) as usize]));
+            let mut d = doc(
+                i,
+                &format!("{}-photo{i}.jpg", ["a", "b", "c"][(i % 3) as usize]),
+            );
             d.captured_at = Some(1_700_000_000 + (i as i64 % 4) * 31 * 86_400);
             if i % 3 == 0 {
                 d.media_type = MediaType::Video;
@@ -319,7 +449,9 @@ fn t_sect_15_sorts_without_sections_return_one_bucket_and_empty_results_return_n
         assert_eq!((s.total, s.sections.len()), (0, 0), "{field:?}");
     }
     // 촬영일이 하나도 없는 인덱스: 전부 none
-    let s = h.section_index(&creq(SortField::CapturedAt, false), &utc).unwrap();
+    let s = h
+        .section_index(&creq(SortField::CapturedAt, false), &utc)
+        .unwrap();
     assert_eq!(pairs(&s), [("none".to_string(), 12)]);
 }
 
@@ -334,12 +466,22 @@ fn t_sect_16_title_sort_buckets_by_title_then_file_name() {
     let h = SearchHandle::for_index(&idx);
 
     // Act
-    let by_title = h.section_index(&creq(SortField::Title, false), &utc).unwrap();
-    let by_name = h.section_index(&creq(SortField::Name, false), &utc).unwrap();
+    let by_title = h
+        .section_index(&creq(SortField::Title, false), &utc)
+        .unwrap();
+    let by_name = h
+        .section_index(&creq(SortField::Name, false), &utc)
+        .unwrap();
 
     // Assert
-    assert_eq!(pairs(&by_title), [("b".to_string(), 1), ("z".to_string(), 1)]);
-    assert_eq!(pairs(&by_name), [("a".to_string(), 1), ("b".to_string(), 1)]);
+    assert_eq!(
+        pairs(&by_title),
+        [("b".to_string(), 1), ("z".to_string(), 1)]
+    );
+    assert_eq!(
+        pairs(&by_name),
+        [("a".to_string(), 1), ("b".to_string(), 1)]
+    );
 }
 
 #[test]

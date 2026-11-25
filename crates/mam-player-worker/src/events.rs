@@ -29,7 +29,12 @@ pub fn spawn(inner: Arc<Inner>, log: bool) -> JoinHandle<()> {
                 EV_SHUTDOWN => break,
                 EV_LOG_MESSAGE if log && !ev.data.is_null() => {
                     let l = unsafe { &*(ev.data as *const EventLog) };
-                    eprintln!("[mpv {}] {}: {}", unsafe { lossy(l.level) }, unsafe { lossy(l.prefix) }, unsafe { lossy(l.text) }.trim_end());
+                    eprintln!(
+                        "[mpv {}] {}: {}",
+                        unsafe { lossy(l.level) },
+                        unsafe { lossy(l.prefix) },
+                        unsafe { lossy(l.text) }.trim_end()
+                    );
                 }
                 EV_FILE_LOADED => on_file_loaded(&inner),
                 EV_PLAYBACK_RESTART => on_restart(&inner),
@@ -45,9 +50,15 @@ pub fn spawn(inner: Arc<Inner>, log: bool) -> JoinHandle<()> {
                         continue; // 속성을 쓸 수 없는 상태 (FORMAT_NONE)
                     }
                     match (ev.reply_userdata, p.format) {
-                        (OBS_PAUSE, FORMAT_FLAG) => on_pause(&inner, unsafe { *(p.data as *const i32) } != 0),
-                        (OBS_EOF, FORMAT_FLAG) => on_eof(&inner, unsafe { *(p.data as *const i32) } != 0),
-                        (OBS_CACHE_PAUSE, FORMAT_FLAG) => inner.send(Message::Buffering { on: unsafe { *(p.data as *const i32) } != 0 }),
+                        (OBS_PAUSE, FORMAT_FLAG) => {
+                            on_pause(&inner, unsafe { *(p.data as *const i32) } != 0)
+                        }
+                        (OBS_EOF, FORMAT_FLAG) => {
+                            on_eof(&inner, unsafe { *(p.data as *const i32) } != 0)
+                        }
+                        (OBS_CACHE_PAUSE, FORMAT_FLAG) => inner.send(Message::Buffering {
+                            on: unsafe { *(p.data as *const i32) } != 0,
+                        }),
                         (OBS_TIME, FORMAT_DOUBLE) => {
                             let pos = unsafe { *(p.data as *const f64) };
                             if !on_step_time(&inner, pos) {
@@ -75,7 +86,12 @@ pub fn spawn(inner: Arc<Inner>, log: bool) -> JoinHandle<()> {
                     rendered: sh.rendered.load(Ordering::Relaxed),
                     skipped: sh.skipped.load(Ordering::Relaxed),
                     ignored: sh.ignored.load(Ordering::Relaxed),
-                    cache_hits: sh.cache.lock().unwrap_or_else(|p| p.into_inner()).as_ref().map_or(0, |c| c.hits()),
+                    cache_hits: sh
+                        .cache
+                        .lock()
+                        .unwrap_or_else(|p| p.into_inner())
+                        .as_ref()
+                        .map_or(0, |c| c.hits()),
                 });
             }
         }
@@ -85,8 +101,12 @@ pub fn spawn(inner: Arc<Inner>, log: bool) -> JoinHandle<()> {
 fn on_file_loaded(i: &Inner) {
     let m = &i.mpv;
     let (w, h) = (m.get_int("width"), m.get_int("height"));
-    let fps = m.get_double("container-fps").filter(|f| f.is_finite() && *f > 0.0);
-    let dur = m.get_double("duration").filter(|d| d.is_finite() && *d >= 0.0);
+    let fps = m
+        .get_double("container-fps")
+        .filter(|f| f.is_finite() && *f > 0.0);
+    let dur = m
+        .get_double("duration")
+        .filter(|d| d.is_finite() && *d >= 0.0);
     let fmt = m.get_string("video-format");
     let mut s = i.lock();
     s.loaded = true;
@@ -112,10 +132,20 @@ fn on_file_loaded(i: &Inner) {
             let _ = m.command(&["seek", &format!("{target_s}"), "absolute+exact"]);
         }
         _ => {
-            let duration_ms = if s.edl.is_some() { s.source_duration_ms } else { dur.map(ms_from_secs) };
+            let duration_ms = if s.edl.is_some() {
+                s.source_duration_ms
+            } else {
+                dur.map(ms_from_secs)
+            };
             let video_format = s.video_format.clone();
             drop(s);
-            i.send(Message::FileLoaded { w, h, fps, duration_ms, video_format });
+            i.send(Message::FileLoaded {
+                w,
+                h,
+                fps,
+                duration_ms,
+                video_format,
+            });
             i.configure_cache();
         }
     }
@@ -125,11 +155,14 @@ fn on_restart(i: &Inner) {
     // 열기 단계에서는 이번 로드의 FILE_LOADED 뒤에 온 재시작만 본다
     {
         let s = i.lock();
-        if (s.opening || matches!(s.pending, Some(Pending::Probe | Pending::EdlLoad))) && !s.loaded {
+        if (s.opening || matches!(s.pending, Some(Pending::Probe | Pending::EdlLoad))) && !s.loaded
+        {
             return;
         }
     }
-    let Some(pos) = i.mpv.get_double("time-pos") else { return };
+    let Some(pos) = i.mpv.get_double("time-pos") else {
+        return;
+    };
     let mut s = i.lock();
     match s.pending.clone() {
         Some(Pending::Probe) => {
@@ -152,7 +185,9 @@ fn on_restart(i: &Inner) {
             }
             complete_open(i, s, pos)
         }
-        Some(Pending::Reload { target_s, seeked, .. }) => {
+        Some(Pending::Reload {
+            target_s, seeked, ..
+        }) => {
             if seeked && (pos - target_s).abs() <= NEAR_S {
                 complete_reload(i, s, pos);
             }
@@ -168,7 +203,10 @@ fn on_restart(i: &Inner) {
                 let near_end = s.duration_s.is_some_and(|d| ms as f64 / 1000.0 >= d - 0.5);
                 if !near_end {
                     drop(s);
-                    if i.mpv.command(&["seek", &format!("{target}"), "absolute+exact"]).is_ok() {
+                    if i.mpv
+                        .command(&["seek", &format!("{target}"), "absolute+exact"])
+                        .is_ok()
+                    {
                         return; // 도착 재시작에서 열기를 끝낸다
                     }
                     s = i.lock();
@@ -183,13 +221,20 @@ fn on_restart(i: &Inner) {
             let stepped = s.step.take().is_some();
             drop(s);
             // 캐시로 이미 응답한 뒤 mpv 가 따라잡은 프레임 이동 — 이미 알렸다
-            if i.shared.suppress.fetch_update(Ordering::AcqRel, Ordering::Acquire, |v| v.checked_sub(1)).is_ok() {
+            if i.shared
+                .suppress
+                .fetch_update(Ordering::AcqRel, Ordering::Acquire, |v| v.checked_sub(1))
+                .is_ok()
+            {
                 i.drain_steps();
                 return;
             }
             i.send(Message::PlaybackRestart { time_ms: ms });
             if stepped {
-                i.send(Message::Paused { paused: true, time_ms: ms });
+                i.send(Message::Paused {
+                    paused: true,
+                    time_ms: ms,
+                });
             }
         }
     }
@@ -219,7 +264,10 @@ fn complete_open(i: &Inner, mut s: std::sync::MutexGuard<'_, super::session::Ses
         let _ = i.mpv.set_prop("pause", "no");
     }
     i.send(Message::PlaybackRestart { time_ms: ms });
-    i.send(Message::Paused { paused: !autoplay, time_ms: ms });
+    i.send(Message::Paused {
+        paused: !autoplay,
+        time_ms: ms,
+    });
     if let Some(t) = deferred_seek {
         let _ = i.seek(t);
     }
@@ -227,7 +275,13 @@ fn complete_open(i: &Inner, mut s: std::sync::MutexGuard<'_, super::session::Ses
 
 /// 구간 재열기 마무리 — 목표 위치에 도달했다. 재생 중이었다면 이어서 재생한다
 fn complete_reload(i: &Inner, mut s: std::sync::MutexGuard<'_, super::session::Session>, pos: f64) {
-    let resume = matches!(s.pending, Some(Pending::Reload { resume_play: true, .. }));
+    let resume = matches!(
+        s.pending,
+        Some(Pending::Reload {
+            resume_play: true,
+            ..
+        })
+    );
     s.pending = None;
     let ms = s.source_ms(pos, false);
     s.shown_ms = ms;
@@ -244,7 +298,10 @@ fn complete_reload(i: &Inner, mut s: std::sync::MutexGuard<'_, super::session::S
         let _ = i.mpv.set_prop("pause", "no");
     }
     i.send(Message::PlaybackRestart { time_ms: ms });
-    i.send(Message::Paused { paused: !resume, time_ms: ms });
+    i.send(Message::Paused {
+        paused: !resume,
+        time_ms: ms,
+    });
 }
 
 fn fail_open(i: &Inner, code: WorkerErrorCode, msg: String) {
@@ -264,9 +321,16 @@ fn on_read_error(i: &Inner) {
         s.opening || s.pending.is_some()
     };
     if was_opening {
-        fail_open(i, WorkerErrorCode::OpenFailed, "cannot open the media".into());
+        fail_open(
+            i,
+            WorkerErrorCode::OpenFailed,
+            "cannot open the media".into(),
+        );
     } else {
-        i.send(Message::Error { code: WorkerErrorCode::OpenFailed, msg: "cannot read the media".into() });
+        i.send(Message::Error {
+            code: WorkerErrorCode::OpenFailed,
+            msg: "cannot read the media".into(),
+        });
     }
 }
 
@@ -279,14 +343,21 @@ fn on_pause(i: &Inner, paused: bool) {
     s.paused = paused;
     let ms = s.shown_ms;
     drop(s);
-    i.send(Message::Paused { paused, time_ms: ms });
+    i.send(Message::Paused {
+        paused,
+        time_ms: ms,
+    });
 }
 
 /// 프레임 이동 중 `time-pos` 가 바뀌었다 — 새 프레임이 화면에 올라온 것이다 (앞으로 이동은 `PLAYBACK_RESTART` 가 없고 시각 변화만 있다).
 /// 완료를 즉시 알린다 (100ms 시각 제한을 거치지 않는다)
 fn on_step_time(i: &Inner, pos: f64) -> bool {
     let mut s = i.lock();
-    if s.step.is_none() || s.pending.is_some() || s.opening || i.shared.suppress.load(Ordering::Acquire) > 0 {
+    if s.step.is_none()
+        || s.pending.is_some()
+        || s.opening
+        || i.shared.suppress.load(Ordering::Acquire) > 0
+    {
         return false;
     }
     s.step = None;
@@ -295,7 +366,10 @@ fn on_step_time(i: &Inner, pos: f64) -> bool {
     s.shown_ms = ms;
     drop(s);
     i.send(Message::PlaybackRestart { time_ms: ms });
-    i.send(Message::Paused { paused: true, time_ms: ms });
+    i.send(Message::Paused {
+        paused: true,
+        time_ms: ms,
+    });
     true
 }
 
@@ -350,10 +424,15 @@ fn tick(i: &Inner) {
         drop(s);
         // 첫/마지막 프레임에서의 이동은 mpv 가 아무것도 하지 않는다 — 그래도 완료를 알린다 (UI 가 시각을 갱신한다)
         i.send(Message::PlaybackRestart { time_ms: ms });
-        i.send(Message::Paused { paused: true, time_ms: ms });
+        i.send(Message::Paused {
+            paused: true,
+            time_ms: ms,
+        });
         return;
     }
-    if let Some(Pending::Reload { deadline, target_s, .. }) = s.pending
+    if let Some(Pending::Reload {
+        deadline, target_s, ..
+    }) = s.pending
         && Instant::now() >= deadline
     {
         complete_reload(i, s, target_s);

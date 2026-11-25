@@ -46,6 +46,12 @@ pub enum PlayerError {
 impl PlayerError {
     /// 재생 엔진 자체를 쓸 수 없다 — 호출자는 "내장 플레이어 없음" 으로 보고 외부 앱 열기로 폴백한다
     pub fn is_engine_unavailable(&self) -> bool {
-        matches!(self, Self::WorkerNotFound(_) | Self::SpawnFailed(_) | Self::ProtocolMismatch { .. } | Self::SurfaceUnavailable(_))
+        matches!(
+            self,
+            Self::WorkerNotFound(_)
+                | Self::SpawnFailed(_)
+                | Self::ProtocolMismatch { .. }
+                | Self::SurfaceUnavailable(_)
+        )
     }
 }

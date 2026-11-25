@@ -91,15 +91,42 @@ pub fn kinds(seed: u64) -> Vec<KindDef> {
                 let _ = $i;
                 variants.push($body);
             }
-            out.push(KindDef { name: $name, variants });
+            out.push(KindDef {
+                name: $name,
+                variants,
+            });
         }};
     }
     // 1. 타입별 단일 조건
-    kind!("kw_exact f1(300종)", |_i| (vec![P::Kw(1, kw_value(r.skewed(300)))], vec![]));
-    kind!("kw_exact f5(10만종)", |_i| (vec![P::Kw(5, kw_value(r.skewed(100_000)))], vec![]));
-    kind!("kw_any(5) f2", |_i| (vec![P::KwAny(2, (0..5).map(|_| kw_value(r.skewed(5000))).collect())], vec![]));
-    kind!("kw_any(50) f2 Bool", |_i| (vec![P::KwAny(2, (0..50).map(|_| kw_value(r.skewed(5000))).collect())], vec![]));
-    kind!("kw_any(50) f2 TermSet", |_i| (vec![P::KwAnySet(2, (0..50).map(|_| kw_value(r.skewed(5000))).collect())], vec![]));
+    kind!("kw_exact f1(300종)", |_i| (
+        vec![P::Kw(1, kw_value(r.skewed(300)))],
+        vec![]
+    ));
+    kind!("kw_exact f5(10만종)", |_i| (
+        vec![P::Kw(5, kw_value(r.skewed(100_000)))],
+        vec![]
+    ));
+    kind!("kw_any(5) f2", |_i| (
+        vec![P::KwAny(
+            2,
+            (0..5).map(|_| kw_value(r.skewed(5000))).collect()
+        )],
+        vec![]
+    ));
+    kind!("kw_any(50) f2 Bool", |_i| (
+        vec![P::KwAny(
+            2,
+            (0..50).map(|_| kw_value(r.skewed(5000))).collect()
+        )],
+        vec![]
+    ));
+    kind!("kw_any(50) f2 TermSet", |_i| (
+        vec![P::KwAnySet(
+            2,
+            (0..50).map(|_| kw_value(r.skewed(5000))).collect()
+        )],
+        vec![]
+    ));
     kind!("num_range f6 ~5%", |_i| {
         let a = r.unit() * 950.0;
         (vec![P::Num(6, a, a + 50.0)], vec![])
@@ -120,38 +147,119 @@ pub fn kinds(seed: u64) -> Vec<KindDef> {
     kind!("date f10 1년", |_i| (vec![year(r, 10)], vec![]));
     kind!("date f10 5년", |_i| (vec![years5(r, 10)], vec![]));
     kind!("boolean f14=1", |_i| (vec![P::Bool(14, 1)], vec![]));
-    kind!("enum_any(2) f16", |_i| (vec![P::EnumAny(16, opts(16, &two(r, 4)))], vec![]));
-    kind!("enum_any(5) f18", |_i| (vec![P::EnumAny(18, opts(18, &picks(r, 50, 5)))], vec![]));
-    kind!("multi_any(2) f19", |_i| (vec![P::MultiAny(19, opts(19, &two(r, 8)))], vec![]));
-    kind!("multi_all(2) f19", |_i| (vec![P::MultiAll(19, opts(19, &two(r, 8)))], vec![]));
-    kind!("multi_all(3) f20", |_i| (vec![P::MultiAll(20, opts(20, &picks(r, 30, 3)))], vec![]));
+    kind!("enum_any(2) f16", |_i| (
+        vec![P::EnumAny(16, opts(16, &two(r, 4)))],
+        vec![]
+    ));
+    kind!("enum_any(5) f18", |_i| (
+        vec![P::EnumAny(18, opts(18, &picks(r, 50, 5)))],
+        vec![]
+    ));
+    kind!("multi_any(2) f19", |_i| (
+        vec![P::MultiAny(19, opts(19, &two(r, 8)))],
+        vec![]
+    ));
+    kind!("multi_all(2) f19", |_i| (
+        vec![P::MultiAll(19, opts(19, &two(r, 8)))],
+        vec![]
+    ));
+    kind!("multi_all(3) f20", |_i| (
+        vec![P::MultiAll(20, opts(20, &picks(r, 30, 3)))],
+        vec![]
+    ));
     // 2. 값 없음
     kind!("missing f3 단독", |_i| (vec![P::Missing(3)], vec![]));
     kind!("missing f9 단독", |_i| (vec![P::Missing(9)], vec![]));
-    kind!("missing f3 + video + date f10 1년", |_i| (vec![P::Missing(3), media_v(r), year(r, 10)], vec![]));
-    kind!("missing f9 + enum_any(2) f16 + bool f14=1", |_i| (vec![P::Missing(9), P::EnumAny(16, opts(16, &two(r, 4))), P::Bool(14, 1)], vec![]));
-    kind!("missing f3 + missing f13 + media", |_i| (vec![P::Missing(3), P::Missing(13), media(r)], vec![]));
+    kind!("missing f3 + video + date f10 1년", |_i| (
+        vec![P::Missing(3), media_v(r), year(r, 10)],
+        vec![]
+    ));
+    kind!("missing f9 + enum_any(2) f16 + bool f14=1", |_i| (
+        vec![
+            P::Missing(9),
+            P::EnumAny(16, opts(16, &two(r, 4))),
+            P::Bool(14, 1)
+        ],
+        vec![]
+    ));
+    kind!("missing f3 + missing f13 + media", |_i| (
+        vec![P::Missing(3), P::Missing(13), media(r)],
+        vec![]
+    ));
     // 3. 복합
-    kind!("고정만: media + captured 5년 + rating>=1 (기준선)", |_i| (vec![media(r), cap(r, 5), P::RatingMin(1)], vec![]));
-    kind!("복합3: video + date f10 1년 + enum f16", |_i| (vec![media_v(r), year(r, 10), P::EnumAny(16, opts(16, &two(r, 4)))], vec![]));
+    kind!(
+        "고정만: media + captured 5년 + rating>=1 (기준선)",
+        |_i| (vec![media(r), cap(r, 5), P::RatingMin(1)], vec![])
+    );
+    kind!("복합3: video + date f10 1년 + enum f16", |_i| (
+        vec![
+            media_v(r),
+            year(r, 10),
+            P::EnumAny(16, opts(16, &two(r, 4)))
+        ],
+        vec![]
+    ));
     kind!("복합4: +captured 2년 + num f6 50%", |_i| {
         let a = r.unit() * 500.0;
-        (vec![media_v(r), year(r, 10), P::EnumAny(16, opts(16, &two(r, 4))), cap(r, 2), P::Num(6, a, a + 500.0)], vec![])
+        (
+            vec![
+                media_v(r),
+                year(r, 10),
+                P::EnumAny(16, opts(16, &two(r, 4))),
+                cap(r, 2),
+                P::Num(6, a, a + 500.0),
+            ],
+            vec![],
+        )
     });
-    kind!("복합5 선택적: kw f1 + num f6 + date f11 5년 + enum f17 + bool f14", |_i| {
-        let a = r.unit() * 500.0;
-        (vec![P::Kw(1, kw_value(r.skewed(300))), P::Num(6, a, a + 500.0), years5(r, 11), P::EnumAny(17, opts(17, &picks(r, 12, 4))), P::Bool(14, 0)], vec![])
-    });
-    kind!("복합6 광범위: media + captured 5년 + date f10 5년 + num f8 50% + multi_any f19 + rating>=1", |_i| {
-        let a = r.unit() * 500_000.0;
-        (vec![media(r), cap(r, 5), years5(r, 10), P::Num(8, a, a + 500_000.0), P::MultiAny(19, opts(19, &two(r, 8))), P::RatingMin(1)], vec![])
-    });
+    kind!(
+        "복합5 선택적: kw f1 + num f6 + date f11 5년 + enum f17 + bool f14",
+        |_i| {
+            let a = r.unit() * 500.0;
+            (
+                vec![
+                    P::Kw(1, kw_value(r.skewed(300))),
+                    P::Num(6, a, a + 500.0),
+                    years5(r, 11),
+                    P::EnumAny(17, opts(17, &picks(r, 12, 4))),
+                    P::Bool(14, 0),
+                ],
+                vec![],
+            )
+        }
+    );
+    kind!(
+        "복합6 광범위: media + captured 5년 + date f10 5년 + num f8 50% + multi_any f19 + rating>=1",
+        |_i| {
+            let a = r.unit() * 500_000.0;
+            (
+                vec![
+                    media(r),
+                    cap(r, 5),
+                    years5(r, 10),
+                    P::Num(8, a, a + 500_000.0),
+                    P::MultiAny(19, opts(19, &two(r, 8))),
+                    P::RatingMin(1),
+                ],
+                vec![],
+            )
+        }
+    );
     // 4. umeta_text (BM25)
     kind!("text 단일어 (umeta_text)", |_i| (vec![], words(r, 1)));
     kind!("text 2단어 AND", |_i| (vec![], words(r, 2)));
-    kind!("text + enum f16 + date f10 1년", |_i| (vec![P::EnumAny(16, opts(16, &two(r, 4))), year(r, 10)], words(r, 1)));
-    kind!("text + video + kw f1 일치", |_i| (vec![media_v(r), P::Kw(1, kw_value(r.skewed(300)))], words(r, 1)));
-    kind!("text + missing f3 + media", |_i| (vec![P::Missing(3), media(r)], words(r, 1)));
+    kind!("text + enum f16 + date f10 1년", |_i| (
+        vec![P::EnumAny(16, opts(16, &two(r, 4))), year(r, 10)],
+        words(r, 1)
+    ));
+    kind!("text + video + kw f1 일치", |_i| (
+        vec![media_v(r), P::Kw(1, kw_value(r.skewed(300)))],
+        words(r, 1)
+    ));
+    kind!("text + missing f3 + media", |_i| (
+        vec![P::Missing(3), media(r)],
+        words(r, 1)
+    ));
     out
 }
 
@@ -172,19 +280,31 @@ fn time<T>(f: impl FnOnce() -> T) -> (T, Duration) {
 }
 
 fn run_kind(s: &Searcher, fx: &Fx, k: &KindDef, reps: usize, cap_secs: u64) -> Row {
-    let qs: Vec<Box<dyn Query>> = k.variants.iter().map(|(p, t)| build_query(fx, p, t)).collect();
+    let qs: Vec<Box<dyn Query>> = k
+        .variants
+        .iter()
+        .map(|(p, t)| build_query(fx, p, t))
+        .collect();
     let text = !k.variants[0].1.is_empty();
     let (c0, cold) = time(|| s.search(&*qs[0], &Count).unwrap());
     let _ = c0;
     // 웜업 1회 + 개수 기록
-    let counts: Vec<u64> = qs.iter().map(|q| s.search(&**q, &Count).unwrap() as u64).collect();
+    let counts: Vec<u64> = qs
+        .iter()
+        .map(|q| s.search(&**q, &Count).unwrap() as u64)
+        .collect();
     let top = |q: &dyn Query| {
         if text {
-            s.search(q, &TopDocs::with_limit(50).order_by_score()).map(|v| v.len()).unwrap()
-        } else {
-            s.search(q, &TopDocs::with_limit(50).order_by_fast_field::<i64>("captured_at", Order::Desc))
+            s.search(q, &TopDocs::with_limit(50).order_by_score())
                 .map(|v| v.len())
                 .unwrap()
+        } else {
+            s.search(
+                q,
+                &TopDocs::with_limit(50).order_by_fast_field::<i64>("captured_at", Order::Desc),
+            )
+            .map(|v| v.len())
+            .unwrap()
         }
     };
     for q in &qs {
@@ -233,7 +353,10 @@ impl Collector for AssetIdCollector {
     type Fruit = Vec<u64>;
     type Child = AssetIdSegment;
     fn for_segment(&self, _o: u32, seg: &SegmentReader) -> tantivy::Result<AssetIdSegment> {
-        Ok(AssetIdSegment { column: seg.fast_fields().u64("asset_id")?, ids: Vec::new() })
+        Ok(AssetIdSegment {
+            column: seg.fast_fields().u64("asset_id")?,
+            ids: Vec::new(),
+        })
     }
     fn requires_scoring(&self) -> bool {
         false
@@ -259,7 +382,11 @@ fn open(dir: &Path) -> (Index, Fx) {
     let t = Instant::now();
     let index = Index::open_in_dir(dir).unwrap();
     mam_search::analyzer::register(&index);
-    println!("index open: {:.1} ms, segments={}", t.elapsed().as_secs_f64() * 1000.0, index.searchable_segment_metas().unwrap().len());
+    println!(
+        "index open: {:.1} ms, segments={}",
+        t.elapsed().as_secs_f64() * 1000.0,
+        index.searchable_segment_metas().unwrap().len()
+    );
     let (_, fx) = build_schema();
     (index, fx)
 }
@@ -270,21 +397,38 @@ fn f(ms: f64) -> String {
 
 pub fn run(dir: &Path, n: u64, reps: usize, verify: bool, update: usize) {
     let (index, fx) = open(dir);
-    let reader = index.reader_builder().reload_policy(ReloadPolicy::Manual).try_into().unwrap();
+    let reader = index
+        .reader_builder()
+        .reload_policy(ReloadPolicy::Manual)
+        .try_into()
+        .unwrap();
     let searcher = reader.searcher();
-    println!("docs={} segments={}", searcher.num_docs(), searcher.segment_readers().len());
+    println!(
+        "docs={} segments={}",
+        searcher.num_docs(),
+        searcher.segment_readers().len()
+    );
     let ks = kinds(7);
     let mut rows = Vec::new();
-    println!("\n| 질의 종류 | 평균 hit | 첫 실행(ms) | Count P50/P95/P99 (ms) | Top50 P50/P95/P99 (ms) | n |");
+    println!(
+        "\n| 질의 종류 | 평균 hit | 첫 실행(ms) | Count P50/P95/P99 (ms) | Top50 P50/P95/P99 (ms) | n |"
+    );
     println!("|---|---|---|---|---|---|");
     for k in &ks {
         let row = run_kind(&searcher, &fx, k, reps, 30);
         println!(
             "| {} | {:.0} | {} | {} / {} / {} | {} / {} / {} | {}{} |",
-            row.name, row.hits_mean, f(row.cold_ms),
-            f(row.count.p50_ms), f(row.count.p95_ms), f(row.count.p99_ms),
-            f(row.top.p50_ms), f(row.top.p95_ms), f(row.top.p99_ms),
-            row.count.n, if row.capped { " (시간 상한)" } else { "" }
+            row.name,
+            row.hits_mean,
+            f(row.cold_ms),
+            f(row.count.p50_ms),
+            f(row.count.p95_ms),
+            f(row.count.p99_ms),
+            f(row.top.p50_ms),
+            f(row.top.p95_ms),
+            f(row.top.p99_ms),
+            row.count.n,
+            if row.capped { " (시간 상한)" } else { "" }
         );
         rows.push(row);
     }
@@ -319,11 +463,18 @@ pub fn run(dir: &Path, n: u64, reps: usize, verify: bool, update: usize) {
                 bad += 1;
                 e.1 += 1;
                 if e.1 <= 2 {
-                    println!("MISMATCH {} variant {vi}: tantivy={got} expected={} preds={:?}", ks[*ki].name, exp[slot], ks[*ki].variants[*vi].0);
+                    println!(
+                        "MISMATCH {} variant {vi}: tantivy={got} expected={} preds={:?}",
+                        ks[*ki].name, exp[slot], ks[*ki].variants[*vi].0
+                    );
                 }
             }
         }
-        println!("\n정답 검증({:.0}s): {} 변형 중 불일치 {bad}", t.elapsed().as_secs_f64(), flat.len());
+        println!(
+            "\n정답 검증({:.0}s): {} 변형 중 불일치 {bad}",
+            t.elapsed().as_secs_f64(),
+            flat.len()
+        );
         for (name, (tot, b)) in per_kind {
             println!("  {name}: {tot} 변형, 불일치 {b}");
         }
@@ -337,12 +488,31 @@ pub fn run(dir: &Path, n: u64, reps: usize, verify: bool, update: usize) {
         ("media=image (~50%)", vec![P::Media("image")]),
         ("date f10 5년 (~42%)", vec![P::Date(10, 20150101, 20191231)]),
         ("missing f3 (~20%)", vec![P::Missing(3)]),
-        ("enum f16 any2 (~60%)", vec![P::EnumAny(16, opts(16, &[0, 1]))]),
-        ("복합: image + cap 5년 + date f10 5년 + num f8 50% + multi f19", {
-            let a = r.unit() * 500_000.0;
-            vec![P::Media("image"), P::Captured(T0, T0 + 5 * 365 * DAY), P::Date(10, 20150101, 20191231), P::Num(8, a, a + 500_000.0), P::MultiAny(19, opts(19, &[0, 1]))]
-        }),
-        ("고정만: image + cap 5년 + rating>=1", vec![P::Media("image"), P::Captured(T0, T0 + 5 * 365 * DAY), P::RatingMin(1)]),
+        (
+            "enum f16 any2 (~60%)",
+            vec![P::EnumAny(16, opts(16, &[0, 1]))],
+        ),
+        (
+            "복합: image + cap 5년 + date f10 5년 + num f8 50% + multi f19",
+            {
+                let a = r.unit() * 500_000.0;
+                vec![
+                    P::Media("image"),
+                    P::Captured(T0, T0 + 5 * 365 * DAY),
+                    P::Date(10, 20150101, 20191231),
+                    P::Num(8, a, a + 500_000.0),
+                    P::MultiAny(19, opts(19, &[0, 1])),
+                ]
+            },
+        ),
+        (
+            "고정만: image + cap 5년 + rating>=1",
+            vec![
+                P::Media("image"),
+                P::Captured(T0, T0 + 5 * 365 * DAY),
+                P::RatingMin(1),
+            ],
+        ),
     ];
     for (name, preds) in broad {
         let q = build_query(&fx, &preds, &[]);
@@ -354,7 +524,12 @@ pub fn run(dir: &Path, n: u64, reps: usize, verify: bool, update: usize) {
             ts.push(d);
         }
         let s = summarize(&ts[1..]); // 첫 회 제외
-        println!("| {name} | {len} | {} | {} | {} |", f(s.p50_ms), f(s.p95_ms), f(s.max_ms));
+        println!(
+            "| {name} | {len} | {} | {} | {} |",
+            f(s.p50_ms),
+            f(s.p95_ms),
+            f(s.max_ms)
+        );
     }
 
     // 갱신 반영: 임의 `update` 건 삭제 + 재추가, commit, reader reload
@@ -368,14 +543,18 @@ pub fn run(dir: &Path, n: u64, reps: usize, verify: bool, update: usize) {
         let (_, d_add) = time(|| {
             for id in &ids {
                 w.delete_term(Term::from_field_u64(fx.asset_id, *id));
-                w.add_document(make_doc(&fx, *id, &gen_values(*id, &sp, 1), false)).unwrap();
+                w.add_document(make_doc(&fx, *id, &gen_values(*id, &sp, 1), false))
+                    .unwrap();
             }
         });
         let (_, d_commit) = time(|| w.commit().unwrap());
         let (_, d_reload) = time(|| reader.reload().unwrap());
         println!(
             "\n갱신 {} 건(delete+add): 투입 {:.0} ms, commit {:.0} ms, reader.reload {:.0} ms, segments={}",
-            ids.len(), d_add.as_secs_f64() * 1000.0, d_commit.as_secs_f64() * 1000.0, d_reload.as_secs_f64() * 1000.0,
+            ids.len(),
+            d_add.as_secs_f64() * 1000.0,
+            d_commit.as_secs_f64() * 1000.0,
+            d_reload.as_secs_f64() * 1000.0,
             reader.searcher().segment_readers().len()
         );
         drop(w);
@@ -383,10 +562,23 @@ pub fn run(dir: &Path, n: u64, reps: usize, verify: bool, update: usize) {
         println!("\n갱신 후 재측정 (삭제 표시 + 추가 세그먼트 존재)");
         println!("| 질의 종류 | Count P50/P95/P99 | Top50 P50/P95/P99 |");
         println!("|---|---|---|");
-        for name in ["복합4: +captured 2년 + num f6 50%", "복합6 광범위: media + captured 5년 + date f10 5년 + num f8 50% + multi_any f19 + rating>=1", "missing f3 + video + date f10 1년"] {
+        for name in [
+            "복합4: +captured 2년 + num f6 50%",
+            "복합6 광범위: media + captured 5년 + date f10 5년 + num f8 50% + multi_any f19 + rating>=1",
+            "missing f3 + video + date f10 1년",
+        ] {
             let k = ks.iter().find(|k| k.name == name).unwrap();
             let row = run_kind(&s2, &fx, k, 5, 20);
-            println!("| {} | {} / {} / {} | {} / {} / {} |", row.name, f(row.count.p50_ms), f(row.count.p95_ms), f(row.count.p99_ms), f(row.top.p50_ms), f(row.top.p95_ms), f(row.top.p99_ms));
+            println!(
+                "| {} | {} / {} / {} | {} / {} / {} |",
+                row.name,
+                f(row.count.p50_ms),
+                f(row.count.p95_ms),
+                f(row.count.p99_ms),
+                f(row.top.p50_ms),
+                f(row.top.p95_ms),
+                f(row.top.p99_ms)
+            );
         }
     }
     println!("\npeak RSS: {:.0} MB", mb(peak_rss_bytes()));

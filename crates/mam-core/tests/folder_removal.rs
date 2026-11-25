@@ -57,13 +57,22 @@ fn backup_hook(env: &Env, fail: bool) -> Arc<Mutex<u32>> {
     let c = Arc::clone(&calls);
     env.ingest.set_backup_hook(Arc::new(move || {
         *c.lock().unwrap() += 1;
-        if fail { Err("disk full".to_string()) } else { Ok(()) }
+        if fail {
+            Err("disk full".to_string())
+        } else {
+            Ok(())
+        }
     }));
     calls
 }
 
 fn folder_ids(env: &Env) -> Vec<i64> {
-    env.ingest.list_folders().unwrap().iter().map(|f| f.folder_id).collect()
+    env.ingest
+        .list_folders()
+        .unwrap()
+        .iter()
+        .map(|f| f.folder_id)
+        .collect()
 }
 
 fn touch_cache(root: &std::path::Path, id: i64) -> Vec<std::path::PathBuf> {
@@ -81,7 +90,8 @@ fn touch_cache(root: &std::path::Path, id: i64) -> Vec<std::path::PathBuf> {
 }
 
 #[test]
-fn t_rmv_01_removal_deletes_every_linked_table_keeps_names_and_history_and_never_touches_originals() {
+fn t_rmv_01_removal_deletes_every_linked_table_keeps_names_and_history_and_never_touches_originals()
+{
     // Arrange
     let env = Env::new();
     env.write("lib/a.jpg", 1);
@@ -97,8 +107,14 @@ fn t_rmv_01_removal_deletes_every_linked_table_keeps_names_and_history_and_never
     let kept_before = total_linked(&env, &kept);
     let cache = env.data.join("cache");
     env.ingest.set_cache_root(cache.clone());
-    let gone_files: Vec<_> = gone.iter().flat_map(|id| touch_cache(&cache, *id)).collect();
-    let kept_files: Vec<_> = kept.iter().flat_map(|id| touch_cache(&cache, *id)).collect();
+    let gone_files: Vec<_> = gone
+        .iter()
+        .flat_map(|id| touch_cache(&cache, *id))
+        .collect();
+    let kept_files: Vec<_> = kept
+        .iter()
+        .flat_map(|id| touch_cache(&cache, *id))
+        .collect();
     let log = events(&env);
     let backups = backup_hook(&env, false);
     let originals = snapshot(&env.vol);
@@ -107,16 +123,33 @@ fn t_rmv_01_removal_deletes_every_linked_table_keeps_names_and_history_and_never
     env.ingest.remove_folder(lib).unwrap();
     // 반환 직후: 목록·검색(숨김 id)에서 이미 빠져 있다
     assert_eq!(folder_ids(&env), vec![other]);
-    assert!(env.read(|c| mam_core::scan::hidden_folder_ids(c).unwrap()).contains(&(lib as u64)));
+    assert!(
+        env.read(|c| mam_core::scan::hidden_folder_ids(c).unwrap())
+            .contains(&(lib as u64))
+    );
     env.ingest.wait_removals();
 
     // Assert: 연결 테이블마다 0행
     for (table, n) in linked_rows(&env, &gone) {
         assert_eq!(n, 0, "{table} still has rows of removed assets");
     }
-    assert_eq!(status_counts(&env, &gone, "deleted"), 2, "asset rows stay as deleted");
-    assert_eq!(global_plugin_kv_rows(&env), 1, "plugin global KV (asset_id NULL) is not asset-linked");
-    assert_eq!(env.count(&format!("SELECT COUNT(*) FROM file_locations WHERE asset_id IN ({})", ids_sql(&gone))), 0);
+    assert_eq!(
+        status_counts(&env, &gone, "deleted"),
+        2,
+        "asset rows stay as deleted"
+    );
+    assert_eq!(
+        global_plugin_kv_rows(&env),
+        1,
+        "plugin global KV (asset_id NULL) is not asset-linked"
+    );
+    assert_eq!(
+        env.count(&format!(
+            "SELECT COUNT(*) FROM file_locations WHERE asset_id IN ({})",
+            ids_sql(&gone)
+        )),
+        0
+    );
     assert_eq!(env.count("SELECT COUNT(*) FROM managed_folders"), 1);
     // revision 증가 + delete 이벤트 한 건씩 (같은 트랜잭션 — 이벤트 revision 이 자산 revision 과 같다)
     for id in &gone {
@@ -132,20 +165,45 @@ fn t_rmv_01_removal_deletes_every_linked_table_keeps_names_and_history_and_never
         assert_eq!((rev, ev_rev, n), (2, 2, 1));
     }
     // 지우지 않는 것: 태그 이름·컬렉션·AI 사용량 이력, 다른 폴더의 자산과 연결 데이터
-    assert_eq!(env.count("SELECT COUNT(*) FROM tags WHERE name_key = 'seed-tag'"), 1);
-    assert_eq!(env.count("SELECT COUNT(*) FROM collections WHERE name_key = 'seed-collection'"), 1);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM tags WHERE name_key = 'seed-tag'"),
+        1
+    );
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM collections WHERE name_key = 'seed-collection'"),
+        1
+    );
     assert_eq!(env.count("SELECT COUNT(*) FROM ai_usage"), 3);
     assert_eq!(total_linked(&env, &kept), kept_before);
     assert_eq!(status_counts(&env, &kept, "active"), 1);
-    assert_eq!(env.count(&format!("SELECT COUNT(*) FROM search_outbox WHERE event_type = 'delete' AND asset_id IN ({})", ids_sql(&kept))), 0);
+    assert_eq!(
+        env.count(&format!(
+            "SELECT COUNT(*) FROM search_outbox WHERE event_type = 'delete' AND asset_id IN ({})",
+            ids_sql(&kept)
+        )),
+        0
+    );
     // 캐시 파일: 지운 자산의 것만 삭제
     assert!(gone_files.iter().all(|p| !p.exists()));
     assert!(kept_files.iter().all(|p| p.exists()));
     // 백업 1회, 진행 이벤트는 마지막에 finished
     assert_eq!(*backups.lock().unwrap(), 1);
     let last = log.lock().unwrap().last().cloned().unwrap();
-    assert_eq!((last.folder_id, last.done, last.total, last.finished, last.error), (lib, 2, 2, true, None));
-    assert_eq!(snapshot(&env.vol), originals, "originals untouched (content + mtime)");
+    assert_eq!(
+        (
+            last.folder_id,
+            last.done,
+            last.total,
+            last.finished,
+            last.error
+        ),
+        (lib, 2, 2, true, None)
+    );
+    assert_eq!(
+        snapshot(&env.vol),
+        originals,
+        "originals untouched (content + mtime)"
+    );
 }
 
 #[test]
@@ -164,11 +222,28 @@ fn t_rmv_02_batches_of_500_report_progress_and_commit_atomically() {
 
     // Assert
     assert_eq!(run, RemovalRun::Finished);
-    let done: Vec<(u64, bool)> = log.lock().unwrap().iter().map(|p| (p.done, p.finished)).collect();
-    assert_eq!(done, [(0, false), (500, false), (1000, false), (1203, false), (1203, true)]);
+    let done: Vec<(u64, bool)> = log
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|p| (p.done, p.finished))
+        .collect();
+    assert_eq!(
+        done,
+        [
+            (0, false),
+            (500, false),
+            (1000, false),
+            (1203, false),
+            (1203, true)
+        ]
+    );
     assert!(log.lock().unwrap().iter().all(|p| p.total == 1203));
     assert_eq!(status_counts(&env, &ids, "deleted"), 1203);
-    assert_eq!(env.count("SELECT COUNT(*) FROM search_outbox WHERE event_type = 'delete'"), 1203);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM search_outbox WHERE event_type = 'delete'"),
+        1203
+    );
     assert_eq!(total_linked(&env, &ids), 0);
 }
 
@@ -194,7 +269,10 @@ fn t_rmv_03_interrupted_removal_resumes_after_restart_without_duplicate_events()
     // Assert 1: 500 건만 지워졌고 폴더 행은 제거 중으로 남는다 (화면에는 계속 없음)
     assert_eq!(run, RemovalRun::Interrupted);
     assert_eq!(status_counts(&env, &ids, "deleted"), 500);
-    assert_eq!(env.count("SELECT COUNT(*) FROM managed_folders WHERE enabled = 0 AND hidden = 1"), 1);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM managed_folders WHERE enabled = 0 AND hidden = 1"),
+        1
+    );
     assert!(folder_ids(&env).is_empty());
 
     // Act 2: "다음 실행" — 제거 중인 폴더를 찾아 이어서 끝낸다
@@ -204,8 +282,15 @@ fn t_rmv_03_interrupted_removal_resumes_after_restart_without_duplicate_events()
     // Assert 2
     assert_eq!(env.count("SELECT COUNT(*) FROM managed_folders"), 0);
     assert_eq!(status_counts(&env, &ids, "deleted"), 1203);
-    assert_eq!(env.count("SELECT COUNT(*) FROM search_outbox WHERE event_type = 'delete'"), 1203);
-    assert_eq!(env.ingest.resume_removals().unwrap(), 0, "nothing left to resume");
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM search_outbox WHERE event_type = 'delete'"),
+        1203
+    );
+    assert_eq!(
+        env.ingest.resume_removals().unwrap(),
+        0,
+        "nothing left to resume"
+    );
 }
 
 #[test]
@@ -239,7 +324,8 @@ fn t_rmv_04_other_folders_on_the_same_disk_and_prefix_siblings_are_untouched() {
 }
 
 #[test]
-fn t_rmv_05_asset_relocated_to_another_folder_keeps_everything_and_loses_only_the_old_location_row() {
+fn t_rmv_05_asset_relocated_to_another_folder_keeps_everything_and_loses_only_the_old_location_row()
+{
     // Arrange: X 는 b 폴더에 활성 위치, a 폴더에 옛 detach 위치 (경로 변경 뒤 남는 모양). Y 는 a 의 일반 자산
     let env = Env::new();
     for d in ["a", "b"] {
@@ -255,7 +341,10 @@ fn t_rmv_05_asset_relocated_to_another_folder_keeps_everything_and_loses_only_th
     seed_linked(&env, &x);
     seed_linked(&env, &y);
     let x_before = total_linked(&env, &x);
-    let x_revision = env.count(&format!("SELECT revision FROM media_assets WHERE asset_id = {}", x[0]));
+    let x_revision = env.count(&format!(
+        "SELECT revision FROM media_assets WHERE asset_id = {}",
+        x[0]
+    ));
 
     // Act
     env.ingest.remove_folder(a).unwrap();
@@ -264,12 +353,27 @@ fn t_rmv_05_asset_relocated_to_another_folder_keeps_everything_and_loses_only_th
     // Assert
     assert_eq!(status_counts(&env, &x, "active"), 1);
     assert_eq!(total_linked(&env, &x), x_before);
-    assert_eq!(env.count(&format!("SELECT revision FROM media_assets WHERE asset_id = {}", x[0])), x_revision);
+    assert_eq!(
+        env.count(&format!(
+            "SELECT revision FROM media_assets WHERE asset_id = {}",
+            x[0]
+        )),
+        x_revision
+    );
     let rows: Vec<String> = env.read(|c| {
-        let mut s = c.prepare("SELECT rel_path FROM file_locations WHERE asset_id = ?1").unwrap();
-        s.query_map([x[0]], |r| r.get(0)).unwrap().map(Result::unwrap).collect()
+        let mut s = c
+            .prepare("SELECT rel_path FROM file_locations WHERE asset_id = ?1")
+            .unwrap();
+        s.query_map([x[0]], |r| r.get(0))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
     });
-    assert_eq!(rows.len(), 1, "only the active location in b remains: {rows:?}");
+    assert_eq!(
+        rows.len(),
+        1,
+        "only the active location in b remains: {rows:?}"
+    );
     assert!(rows[0].starts_with("b/"));
     assert_eq!(status_counts(&env, &y, "deleted"), 1);
 }
@@ -297,8 +401,14 @@ fn t_rmv_06_mixed_collection_keeps_the_other_folders_members_and_tag_names_survi
     // Assert
     assert_eq!(members_after_a, 2);
     assert_eq!(env.count("SELECT COUNT(*) FROM collection_assets"), 0);
-    assert_eq!(env.count("SELECT COUNT(*) FROM collections WHERE name_key = 'seed-collection'"), 1);
-    assert_eq!(env.count("SELECT COUNT(*) FROM tags WHERE name_key = 'seed-tag'"), 1);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM collections WHERE name_key = 'seed-collection'"),
+        1
+    );
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM tags WHERE name_key = 'seed-tag'"),
+        1
+    );
     assert_eq!(env.count("SELECT COUNT(*) FROM asset_tags"), 0);
 }
 
@@ -312,7 +422,10 @@ fn t_rmv_07_offline_folder_can_be_removed_without_reading_the_disk() {
     let ids = ids_under(&env, "lib");
     seed_linked(&env, &ids);
     env.volumes.set_connected("vol-a", false);
-    exec(&env, "UPDATE volumes SET availability = 'offline' WHERE volume_key = 'vol-a'");
+    exec(
+        &env,
+        "UPDATE volumes SET availability = 'offline' WHERE volume_key = 'vol-a'",
+    );
     let originals = snapshot(&env.vol);
 
     // Act
@@ -337,16 +450,28 @@ fn t_rmv_08_repeating_the_removal_is_safe_and_adds_no_events() {
 
     // Act + Assert: 이미 제거 중이면 아무것도 바꾸지 않는다
     assert!(!env.ingest.begin_folder_removal(lib).unwrap());
-    assert_eq!(env.ingest.run_folder_removal(lib, &|| false).unwrap(), RemovalRun::Finished);
+    assert_eq!(
+        env.ingest.run_folder_removal(lib, &|| false).unwrap(),
+        RemovalRun::Finished
+    );
     let outbox = env.count("SELECT COUNT(*) FROM search_outbox");
-    assert_eq!(env.ingest.run_folder_removal(lib, &|| false).unwrap(), RemovalRun::Finished);
-    assert!(matches!(env.ingest.remove_folder(lib), Err(IngestError::NotFound)));
+    assert_eq!(
+        env.ingest.run_folder_removal(lib, &|| false).unwrap(),
+        RemovalRun::Finished
+    );
+    assert!(matches!(
+        env.ingest.remove_folder(lib),
+        Err(IngestError::NotFound)
+    ));
     assert_eq!(env.count("SELECT COUNT(*) FROM search_outbox"), outbox);
     assert_eq!(status_counts(&env, &ids, "deleted"), 3);
     // 제거 중이 아닌 폴더에 삭제 루프를 돌리는 것은 거부 (활성 폴더 보호)
     fs::create_dir_all(env.path("live")).unwrap();
     let live = add(&env, "live");
-    assert!(matches!(env.ingest.run_folder_removal(live, &|| false), Err(IngestError::InvalidInput(_))));
+    assert!(matches!(
+        env.ingest.run_folder_removal(live, &|| false),
+        Err(IngestError::InvalidInput(_))
+    ));
 }
 
 #[test]
@@ -367,7 +492,10 @@ fn t_rmv_09_adding_the_same_folder_again_scans_from_scratch_as_new_assets() {
     scan(&env, again);
 
     // Assert: 새 자산 번호, 옛 자산은 deleted 로 남고 태그·메모는 돌아오지 않는다
-    let new: Vec<i64> = ids_under(&env, "lib").into_iter().filter(|id| !old.contains(id)).collect();
+    let new: Vec<i64> = ids_under(&env, "lib")
+        .into_iter()
+        .filter(|id| !old.contains(id))
+        .collect();
     assert_eq!(new.len(), 2);
     assert!(new.iter().all(|id| old.iter().all(|o| id > o)));
     assert_eq!(status_counts(&env, &new, "active"), 2);
@@ -396,7 +524,10 @@ fn t_rmv_10_backup_failure_changes_nothing_and_the_folder_stays_usable() {
     assert!(matches!(err, IngestError::BackupFailed), "{err:?}");
     assert_eq!(*calls.lock().unwrap(), 1);
     assert_eq!(folder_ids(&env), vec![lib]);
-    assert_eq!(env.count("SELECT COUNT(*) FROM managed_folders WHERE enabled = 1 AND hidden = 0"), 1);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM managed_folders WHERE enabled = 1 AND hidden = 0"),
+        1
+    );
     assert_eq!(total_linked(&env, &ids), before);
     assert_eq!(status_counts(&env, &ids, "active"), 3);
     assert_eq!(env.count("SELECT COUNT(*) FROM jobs"), jobs_before);
@@ -419,13 +550,35 @@ fn t_rmv_11_add_relocate_and_rescan_overlapping_a_removing_folder_are_busy() {
     let path = |rel: &str| env.path(rel).to_str().unwrap().to_string();
 
     // Act + Assert
-    assert!(matches!(env.ingest.add_folder(&path("p/q")), Err(IngestError::Busy)), "same path");
-    assert!(matches!(env.ingest.add_folder(&path("p")), Err(IngestError::Busy)), "parent");
+    assert!(
+        matches!(env.ingest.add_folder(&path("p/q")), Err(IngestError::Busy)),
+        "same path"
+    );
+    assert!(
+        matches!(env.ingest.add_folder(&path("p")), Err(IngestError::Busy)),
+        "parent"
+    );
     fs::create_dir_all(env.path("p/q/deep")).unwrap();
-    assert!(matches!(env.ingest.add_folder(&path("p/q/deep")), Err(IngestError::Busy)), "child");
-    assert!(matches!(env.ingest.relocate_folder(other, &path("p/q")), Err(IngestError::Busy)));
-    assert!(matches!(env.ingest.rescan_folder(pq), Err(IngestError::Busy)));
-    assert_eq!(env.ingest.retry_scan_errors(None).unwrap(), 0, "busy folders are skipped, not an error");
+    assert!(
+        matches!(
+            env.ingest.add_folder(&path("p/q/deep")),
+            Err(IngestError::Busy)
+        ),
+        "child"
+    );
+    assert!(matches!(
+        env.ingest.relocate_folder(other, &path("p/q")),
+        Err(IngestError::Busy)
+    ));
+    assert!(matches!(
+        env.ingest.rescan_folder(pq),
+        Err(IngestError::Busy)
+    ));
+    assert_eq!(
+        env.ingest.retry_scan_errors(None).unwrap(),
+        0,
+        "busy folders are skipped, not an error"
+    );
 
     // 삭제가 끝나면 다시 등록할 수 있다
     env.ingest.run_folder_removal(pq, &|| false).unwrap();
@@ -440,14 +593,27 @@ fn t_rmv_12_removal_cancels_pending_jobs_of_the_folder_and_its_assets() {
     let lib = add(&env, "lib");
     let ids = insert_assets(&env, "vol-a", "lib", 2, "image");
     seed_linked(&env, &ids);
-    assert_eq!(env.count(&format!("SELECT COUNT(*) FROM jobs WHERE folder_id = {lib}")), 1);
+    assert_eq!(
+        env.count(&format!(
+            "SELECT COUNT(*) FROM jobs WHERE folder_id = {lib}"
+        )),
+        1
+    );
 
     // Act
     env.ingest.begin_folder_removal(lib).unwrap();
-    let after_begin = env.count(&format!("SELECT COUNT(*) FROM jobs WHERE folder_id = {lib}"));
+    let after_begin = env.count(&format!(
+        "SELECT COUNT(*) FROM jobs WHERE folder_id = {lib}"
+    ));
     env.ingest.run_folder_removal(lib, &|| false).unwrap();
 
     // Assert
     assert_eq!(after_begin, 0);
-    assert_eq!(env.count(&format!("SELECT COUNT(*) FROM jobs WHERE asset_id IN ({})", ids_sql(&ids))), 0);
+    assert_eq!(
+        env.count(&format!(
+            "SELECT COUNT(*) FROM jobs WHERE asset_id IN ({})",
+            ids_sql(&ids)
+        )),
+        0
+    );
 }

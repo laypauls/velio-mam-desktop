@@ -9,13 +9,18 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 
 use mam_core::jobs::JobKind;
-use mam_db::plugin_tasks::{ProviderTypes, enqueue_jobs_tx, feed_batch, feed_cursor, init_feed_cursor, kind_busy, max_event_id, pending_count, set_feed_cursor};
+use mam_db::plugin_tasks::{
+    ProviderTypes, enqueue_jobs_tx, feed_batch, feed_cursor, init_feed_cursor, kind_busy,
+    max_event_id, pending_count, set_feed_cursor,
+};
 
 use super::core::{Core, JobsTuning, put_err};
 use crate::api::{AssetKind, ProviderKind, ProviderSpec};
 
 pub(super) fn spawn(core: Arc<Core>) -> io::Result<JoinHandle<()>> {
-    std::thread::Builder::new().name("mam-plugin-feed".into()).spawn(move || run(&core))
+    std::thread::Builder::new()
+        .name("mam-plugin-feed".into())
+        .spawn(move || run(&core))
 }
 
 fn run(core: &Core) {
@@ -25,7 +30,10 @@ fn run(core: &Core) {
         }
         let t = core.tuning();
         let more = tick(core, &t);
-        if core.stopper.sleep(if more { t.feed_busy_pause } else { t.feed_idle }) {
+        if core
+            .stopper
+            .sleep(if more { t.feed_busy_pause } else { t.feed_idle })
+        {
             return;
         }
     }
@@ -33,11 +41,15 @@ fn run(core: &Core) {
 
 /// 피드가 비켜 주는 종류 — 스캔 파이프라인이 만드는 작업(스캔·메타·썸네일·해시). 사용자가 시작하는 장시간 작업(AI·장면)과
 /// 인덱스 작업은 제외한다(몇 시간씩 피드를 굶기지 않도록). 일시정지된 종류는 진행하지 않으므로 기다리지 않는다.
-pub(super) const SCAN_FAMILY: [JobKind; 4] = [JobKind::Scan, JobKind::Meta, JobKind::Thumb, JobKind::Hash];
+pub(super) const SCAN_FAMILY: [JobKind; 4] =
+    [JobKind::Scan, JobKind::Meta, JobKind::Thumb, JobKind::Hash];
 
 fn scan_family_busy(core: &Core) -> bool {
     SCAN_FAMILY.iter().any(|k| {
-        !core.queue.is_paused(*k) && core.read(|c| Ok(kind_busy(c, k.as_str())?)).unwrap_or_else(|e| warn_false(&e))
+        !core.queue.is_paused(*k)
+            && core
+                .read(|c| Ok(kind_busy(c, k.as_str())?))
+                .unwrap_or_else(|e| warn_false(&e))
     })
 }
 
@@ -62,7 +74,10 @@ pub(super) fn tick(core: &Core, t: &JobsTuning) -> bool {
     let mut by_plugin: BTreeMap<String, Vec<ProviderSpec>> = BTreeMap::new();
     for spec in core.invoker.auto_providers() {
         if spec.kind != ProviderKind::Export {
-            by_plugin.entry(spec.plugin.as_str().to_owned()).or_default().push(spec);
+            by_plugin
+                .entry(spec.plugin.as_str().to_owned())
+                .or_default()
+                .push(spec);
         }
     }
     let mut more = false;
@@ -78,7 +93,13 @@ pub(super) fn tick(core: &Core, t: &JobsTuning) -> bool {
 /// 플러그인 하나의 한 구간. 구간이 남았으면 `true`
 fn feed_plugin(core: &Core, t: &JobsTuning, plugin: &str, specs: &[ProviderSpec]) -> bool {
     // 읽기 단계: 상한·커서·끝 — 쓰기 스레드를 점유하지 않는다
-    let view = core.read(|c| Ok((pending_count(c, plugin)?, feed_cursor(c, plugin)?, max_event_id(c)?)));
+    let view = core.read(|c| {
+        Ok((
+            pending_count(c, plugin)?,
+            feed_cursor(c, plugin)?,
+            max_event_id(c)?,
+        ))
+    });
     let (pending, cursor, max) = match view {
         Ok(v) => v,
         Err(e) => return warn(plugin, "read", &e),
@@ -86,7 +107,9 @@ fn feed_plugin(core: &Core, t: &JobsTuning, plugin: &str, specs: &[ProviderSpec]
     let Some(cursor) = cursor else {
         // 커서가 없으면(설치 훅 실패·손상) 지금 끝으로 — 이후 이벤트부터 처리한다
         let id = plugin.to_owned();
-        if let Err(e) = core.write_installed(plugin, move |tx, _| init_feed_cursor(tx, &id).map_err(put_err)) {
+        if let Err(e) = core.write_installed(plugin, move |tx, _| {
+            init_feed_cursor(tx, &id).map_err(put_err)
+        }) {
             warn(plugin, "cursor init", &e);
         }
         return false;
@@ -95,8 +118,15 @@ fn feed_plugin(core: &Core, t: &JobsTuning, plugin: &str, specs: &[ProviderSpec]
         return false;
     }
     let upto = max.min(cursor.saturating_add(t.feed_batch));
-    let kinds: Vec<(String, Vec<&'static str>)> =
-        specs.iter().map(|s| (s.provider.clone(), s.asset_kinds.iter().map(|k| media_type(*k)).collect())).collect();
+    let kinds: Vec<(String, Vec<&'static str>)> = specs
+        .iter()
+        .map(|s| {
+            (
+                s.provider.clone(),
+                s.asset_kinds.iter().map(|k| media_type(*k)).collect(),
+            )
+        })
+        .collect();
     let priority = JobKind::Plugin.default_priority();
     let id = plugin.to_owned();
     let done = core.write_installed(plugin, move |tx, now| {
@@ -104,7 +134,10 @@ fn feed_plugin(core: &Core, t: &JobsTuning, plugin: &str, specs: &[ProviderSpec]
         if feed_cursor(tx, &id)? != Some(cursor) {
             return Ok(0);
         }
-        let providers: Vec<ProviderTypes<'_>> = kinds.iter().map(|(p, k)| (p.as_str(), k.as_slice())).collect();
+        let providers: Vec<ProviderTypes<'_>> = kinds
+            .iter()
+            .map(|(p, k)| (p.as_str(), k.as_slice()))
+            .collect();
         let ids = feed_batch(tx, &id, &providers, cursor, upto, now)?;
         enqueue_jobs_tx(tx, &ids, priority, now)?;
         set_feed_cursor(tx, &id, upto).map_err(put_err)?;

@@ -14,14 +14,17 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
+use super::RemoteSource;
 use super::mapper::{Mapper, same_dir, within_dir};
 use super::parse::{is_noise, parse_line};
 use super::runner::{RemoteRunner, RunError};
 use super::stats::{Counts, KickGate};
 use super::tail::{Cursor, LogTail, Polled};
-use super::RemoteSource;
 
-pub use super::contract::{Attached, BatchCommitter, CommitError, CommitOutcome, Deps, Feed, FeedItem, Folders, SourceLoader, Timings};
+pub use super::contract::{
+    Attached, BatchCommitter, CommitError, CommitOutcome, Deps, Feed, FeedItem, Folders,
+    SourceLoader, Timings,
+};
 
 pub struct Collector {
     src: RemoteSource,
@@ -51,7 +54,9 @@ pub(super) fn health_key(e: &RunError) -> &'static str {
     match e {
         RunError::Connect(_) => "watch.health.remote_connect",
         RunError::Auth | RunError::BadKey => "watch.health.remote_auth",
-        RunError::HostKeyMismatch { .. } | RunError::HostKeyUnconfirmed { .. } => "watch.health.remote_host_key",
+        RunError::HostKeyMismatch { .. } | RunError::HostKeyUnconfirmed { .. } => {
+            "watch.health.remote_host_key"
+        }
         RunError::Timeout => "watch.health.remote_timeout",
         RunError::NoLogDir | RunError::NoAuditFiles => "watch.health.remote_log_dir",
         RunError::NoSqlite => "watch.health.remote_sqlite_missing",
@@ -62,17 +67,32 @@ pub(super) fn health_key(e: &RunError) -> &'static str {
 
 /// 설정(계정·호스트 키)이 바뀌어야 풀리는 오류 — 같은 접속을 자주 다시 시도하지 않는다
 pub(super) fn is_hard(e: &RunError) -> bool {
-    matches!(e, RunError::Auth | RunError::BadKey | RunError::HostKeyMismatch { .. } | RunError::HostKeyUnconfirmed { .. })
+    matches!(
+        e,
+        RunError::Auth
+            | RunError::BadKey
+            | RunError::HostKeyMismatch { .. }
+            | RunError::HostKeyUnconfirmed { .. }
+    )
 }
 
 /// 접속 자체가 끊겼을 가능성이 있는 오류 (로그 폴더 문제는 접속을 닫을 이유가 아니다)
 pub(super) fn is_link_error(e: &RunError) -> bool {
-    !matches!(e, RunError::NoLogDir | RunError::NoAuditFiles | RunError::NoSqlite | RunError::DbUnreadable(_))
+    !matches!(
+        e,
+        RunError::NoLogDir
+            | RunError::NoAuditFiles
+            | RunError::NoSqlite
+            | RunError::DbUnreadable(_)
+    )
 }
 
 impl Collector {
     pub fn new(src: RemoteSource, d: Deps) -> Self {
-        let resumed = d.committer.load_cursor(src.source_id).and_then(|c| Cursor::from_json(&c));
+        let resumed = d
+            .committer
+            .load_cursor(src.source_id)
+            .and_then(|c| Cursor::from_json(&c));
         let now = d.clock.now_ms();
         Self {
             mapper: Mapper::new(&src.path_map),
@@ -123,7 +143,10 @@ impl Collector {
         let wait = match self.poll_once() {
             Ok(()) => {
                 self.fail_streak = 0;
-                self.d.timings.poll_override.unwrap_or_else(|| Duration::from_secs(u64::from(self.src.poll_sec.max(1))))
+                self.d
+                    .timings
+                    .poll_override
+                    .unwrap_or_else(|| Duration::from_secs(u64::from(self.src.poll_sec.max(1))))
             }
             Err(e) => self.on_fail(&e, now),
         };
@@ -139,7 +162,9 @@ impl Collector {
                 self.run = Some(self.d.connector.connect(&self.src)?);
                 fresh = true;
             }
-            let Some(run) = self.run.as_mut() else { return Err(RunError::Closed) };
+            let Some(run) = self.run.as_mut() else {
+                return Err(RunError::Closed);
+            };
             match self.tail.poll(run.as_mut()) {
                 Ok(p) => {
                     self.recover_if_degraded();
@@ -194,7 +219,9 @@ impl Collector {
             return t.hard_retry;
         }
         let shift = (self.fail_streak - 1).min(10);
-        t.reconnect_base.saturating_mul(1 << shift).min(t.reconnect_max)
+        t.reconnect_base
+            .saturating_mul(1 << shift)
+            .min(t.reconnect_max)
     }
 
     /// 읽은 줄을 폴더별로 나눠 기록하고(대기열 + 커서), 성공하면 커서를 올린다.
@@ -207,7 +234,11 @@ impl Collector {
             return Ok(());
         }
         let cursor_json = p.next.to_json();
-        match self.d.committer.commit(self.src.source_id, &items, &cursor_json) {
+        match self
+            .d
+            .committer
+            .commit(self.src.source_id, &items, &cursor_json)
+        {
             Ok(out) => {
                 self.tail.commit(p.next);
                 self.want.extend(out.overflowed);
@@ -224,7 +255,9 @@ impl Collector {
                 }
             }
             // 연결 문제가 아니다 — 커서를 올리지 않았으니 다음 주기에 같은 오프셋부터 다시 읽는다
-            Err(e) => tracing::warn!(source = %self.src.name, error = %e, "cannot record remote changes; will retry from the same offsets"),
+            Err(e) => {
+                tracing::warn!(source = %self.src.name, error = %e, "cannot record remote changes; will retry from the same offsets")
+            }
         }
         Ok(())
     }

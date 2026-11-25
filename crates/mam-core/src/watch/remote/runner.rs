@@ -67,7 +67,9 @@ impl RunError {
     /// 지문을 알려 줄 수 있는 오류인가 (접속 시험이 사용자에게 보여 준다)
     pub fn fingerprint(&self) -> Option<&str> {
         match self {
-            Self::HostKeyMismatch { actual, .. } | Self::HostKeyUnconfirmed { actual } => Some(actual),
+            Self::HostKeyMismatch { actual, .. } | Self::HostKeyUnconfirmed { actual } => {
+                Some(actual)
+            }
             _ => None,
         }
     }
@@ -92,9 +94,14 @@ pub trait RemoteConnector: Send + Sync {
 /// 정확히 같아야 통과한다 (대소문자·공백 포함 — 조용한 허용 없음).
 pub fn check_host_key(expected: Option<&str>, actual: &str) -> Result<(), RunError> {
     match expected {
-        None => Err(RunError::HostKeyUnconfirmed { actual: actual.to_string() }),
+        None => Err(RunError::HostKeyUnconfirmed {
+            actual: actual.to_string(),
+        }),
         Some(e) if e == actual => Ok(()),
-        Some(e) => Err(RunError::HostKeyMismatch { expected: e.to_string(), actual: actual.to_string() }),
+        Some(e) => Err(RunError::HostKeyMismatch {
+            expected: e.to_string(),
+            actual: actual.to_string(),
+        }),
     }
 }
 

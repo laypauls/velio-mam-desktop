@@ -11,8 +11,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use common::env::Env;
-use mam_core::jobs::{Job, JobKind, JobOutcome};
 use mam_core::VolumeKind;
+use mam_core::jobs::{Job, JobKind, JobOutcome};
 use serde_json::json;
 
 fn claim(env: &Env) -> Option<Job> {
@@ -28,20 +28,28 @@ fn folder_on_new_volume(env: &Env, name: &str) -> i64 {
     let dir: PathBuf = env.vol.parent().unwrap().join(name);
     fs::create_dir_all(dir.join("lib")).unwrap();
     env.volumes.add(name, VolumeKind::Fixed, &dir);
-    env.ingest.add_folder(dir.join("lib").to_str().unwrap()).unwrap().folder_id
+    env.ingest
+        .add_folder(dir.join("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id
 }
 
 /// 기본 볼륨(vol_a) 안의 하위 폴더 등록 — 같은 볼륨의 폴더가 여러 개일 때
 fn folder_on_default_volume(env: &Env, rel: &str) -> i64 {
     env.write(&format!("{rel}/x.jpg"), 1);
-    env.ingest.add_folder(env.path(rel).to_str().unwrap()).unwrap().folder_id
+    env.ingest
+        .add_folder(env.path(rel).to_str().unwrap())
+        .unwrap()
+        .folder_id
 }
 
 fn set_cap_setting(env: &Env, v: serde_json::Value) -> Result<(), mam_db::settings::SettingsError> {
     let patch = json!({ "maxConcurrentScans": v });
     let patch = patch.as_object().unwrap().clone();
     env.pool
-        .write(mam_db::Priority::High, move |c| Ok(mam_db::settings::update(c, &patch)))
+        .write(mam_db::Priority::High, move |c| {
+            Ok(mam_db::settings::update(c, &patch))
+        })
         .unwrap()
         .map(|_| ())
 }
@@ -61,7 +69,10 @@ fn t_lane_01_two_folders_on_the_same_volume_scan_one_at_a_time() {
     let second = claim(&env).expect("second scan after the lane is free");
     assert_ne!(first.folder_id, second.folder_id);
     assert_eq!(
-        [first.folder_id, second.folder_id].into_iter().flatten().collect::<std::collections::BTreeSet<_>>(),
+        [first.folder_id, second.folder_id]
+            .into_iter()
+            .flatten()
+            .collect::<std::collections::BTreeSet<_>>(),
         [a, b].into_iter().collect()
     );
 }
@@ -92,7 +103,9 @@ fn t_lane_03_global_cap_is_honored_and_a_raised_cap_takes_effect() {
     assert_eq!(env.ingest.jobs().scan_cap(), 3);
 
     // Act / Assert: 3개까지만 동시에, 상한을 올리면 4번째가 집힌다
-    let held: Vec<Job> = (0..3).map(|_| claim(&env).expect("under the cap")).collect();
+    let held: Vec<Job> = (0..3)
+        .map(|_| claim(&env).expect("under the cap"))
+        .collect();
     assert!(claim(&env).is_none(), "global cap of 3 reached");
     env.ingest.set_scan_concurrency(4);
     assert!(claim(&env).is_some(), "raised cap admits the fourth volume");
@@ -142,8 +155,18 @@ fn t_lane_05_setting_change_is_applied_and_invalid_values_are_rejected() {
     assert!(claim(&env).is_none());
 
     // Assert 3: 잘못된 값은 거부되고 상한은 그대로
-    for bad in [json!(0), json!(9), json!(-1), json!("3"), json!(2.5), json!(null)] {
-        assert!(set_cap_setting(&env, bad.clone()).is_err(), "{bad} must be rejected");
+    for bad in [
+        json!(0),
+        json!(9),
+        json!(-1),
+        json!("3"),
+        json!(2.5),
+        json!(null),
+    ] {
+        assert!(
+            set_cap_setting(&env, bad.clone()).is_err(),
+            "{bad} must be rejected"
+        );
     }
     env.ingest.supervise_once().unwrap();
     assert_eq!(env.ingest.jobs().scan_cap(), 2);
@@ -178,11 +201,20 @@ fn t_lane_07_a_yielded_scan_frees_its_lane_and_resumes_without_a_failure() {
     assert!(claim(&env).is_none());
 
     // Act
-    env.ingest.jobs().finish(&first, Ok(JobOutcome::Yielded)).unwrap();
+    env.ingest
+        .jobs()
+        .finish(&first, Ok(JobOutcome::Yielded))
+        .unwrap();
 
     // Assert: 차선이 비었고 양보한 작업은 실패·시도 횟수 없이 대기로 돌아왔다 (이어하기는 실행기의 체크포인트 몫)
     let again = claim(&env).expect("lane is free again");
-    assert_eq!(again.job_id, first.job_id, "the yielded (older) job is picked first");
+    assert_eq!(
+        again.job_id, first.job_id,
+        "the yielded (older) job is picked first"
+    );
     assert_eq!(again.attempts, 0);
-    assert_eq!(env.count("SELECT COUNT(*) FROM jobs WHERE status = 'failed'"), 0);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM jobs WHERE status = 'failed'"),
+        0
+    );
 }

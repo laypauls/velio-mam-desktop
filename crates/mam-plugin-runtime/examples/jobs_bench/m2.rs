@@ -24,7 +24,10 @@ fn copy_db(from: &Path, to_dir: &Path) -> std::path::PathBuf {
 fn counts(db: &Path) -> (i64, i64) {
     let c = open(db).expect("open");
     let q = |sql: &str| c.query_row(sql, [], |r| r.get::<_, i64>(0)).expect("count");
-    (q("SELECT COUNT(*) FROM plugin_kv"), q("SELECT COUNT(*) FROM plugin_tasks"))
+    (
+        q("SELECT COUNT(*) FROM plugin_kv"),
+        q("SELECT COUNT(*) FROM plugin_tasks"),
+    )
 }
 
 pub fn run(scratch: &Path, rows: u64) {
@@ -33,29 +36,49 @@ pub fn run(scratch: &Path, rows: u64) {
     let t = Instant::now();
     let src = synth::build(&base.join("base"), rows, false, 0);
     synth::seed_orphans(&src, rows);
-    say(format!("M2 dataset: {rows} assets + {rows} plugin_kv + {rows} plugin_tasks (plugin {PLUGIN_GONE}, not installed), built in {:.1}s; db {:.1} MiB", t.elapsed().as_secs_f64(), mib(db_files_bytes(&src))));
+    say(format!(
+        "M2 dataset: {rows} assets + {rows} plugin_kv + {rows} plugin_tasks (plugin {PLUGIN_GONE}, not installed), built in {:.1}s; db {:.1} MiB",
+        t.elapsed().as_secs_f64(),
+        mib(db_files_bytes(&src))
+    ));
 
     // (a) purge_uninstalled — 복원 경로(부팅 차단). 복사 직후라 OS 캐시는 따뜻하다(콜드 캐시 아님)
     let db_a = copy_db(&src, &base.join("a"));
     let c = open(&db_a).expect("open");
     let t = Instant::now();
     let ids = data_plugin_ids(&c).expect("ids");
-    say(format!("  (a) data_plugin_ids skip-scan: {:.1} ms -> {ids:?}", t.elapsed().as_secs_f64() * 1000.0));
+    say(format!(
+        "  (a) data_plugin_ids skip-scan: {:.1} ms -> {ids:?}",
+        t.elapsed().as_secs_f64() * 1000.0
+    ));
     let t = Instant::now();
     let removed = purge_uninstalled(&c, &BTreeSet::new()).expect("purge");
     let total = t.elapsed();
     drop(c);
-    say(format!("  (a) purge_uninstalled(batch {BATCH}/table): removed {removed} rows in {:.2}s ({:.0} rows/s) => boot blocked {:.2}s", total.as_secs_f64(), removed as f64 / total.as_secs_f64(), total.as_secs_f64()));
+    say(format!(
+        "  (a) purge_uninstalled(batch {BATCH}/table): removed {removed} rows in {:.2}s ({:.0} rows/s) => boot blocked {:.2}s",
+        total.as_secs_f64(),
+        removed as f64 / total.as_secs_f64(),
+        total.as_secs_f64()
+    ));
     say(format!("  (a) rows left (kv, tasks) = {:?}", counts(&db_a)));
     let _ = std::fs::remove_dir_all(base.join("a"));
 
     // (b) 제거 !keepData 루프 + 동시 High 쓰기
     let db_b = copy_db(&src, &base.join("b").join("MAMData"));
     let root = db_b.parent().expect("root").to_path_buf();
-    let env = Env::with_pool(std::sync::Arc::new(DbPool::open(&db_b, 4).expect("pool")), &root, None, None);
+    let env = Env::with_pool(
+        std::sync::Arc::new(DbPool::open(&db_b, 4).expect("pool")),
+        &root,
+        None,
+        None,
+    );
     let w = Load::spawn(Duration::from_millis(5), env.editor(rows, 11));
     std::thread::sleep(Duration::from_secs(5));
-    say(w.finish().0.line("  (b) High write idle baseline 5s (no delete loop)"));
+    say(w
+        .finish()
+        .0
+        .line("  (b) High write idle baseline 5s (no delete loop)"));
     let w = Load::spawn(Duration::from_millis(5), env.editor(rows, 12));
     let (mut batches, mut removed) = (Lat::default(), 0usize);
     let t = Instant::now();
@@ -79,13 +102,26 @@ pub fn run(scratch: &Path, rows: u64) {
     }
     let total = t.elapsed();
     let (high, failed) = w.finish();
-    say(format!("  (b) uninstall loop: removed {removed} rows in {:.2}s, {} batches (last is the empty check) ({:.0} rows/s)", total.as_secs_f64(), batches.0.len(), removed as f64 / total.as_secs_f64()));
+    say(format!(
+        "  (b) uninstall loop: removed {removed} rows in {:.2}s, {} batches (last is the empty check) ({:.0} rows/s)",
+        total.as_secs_f64(),
+        batches.0.len(),
+        removed as f64 / total.as_secs_f64()
+    ));
     say(batches.line("  (b) per-batch Low tx (5,000 rows/table, kv-asset + kv-global + tasks)"));
-    say(high.line(&format!("  (b) High write DURING delete loop, real update_asset_tags (fail {failed})")));
-    say(format!("  (b) writer occupancy by delete batches = {:.1}% of wall", 100.0 * batches.sum_ms() / (total.as_secs_f64() * 1000.0)));
+    say(high.line(&format!(
+        "  (b) High write DURING delete loop, real update_asset_tags (fail {failed})"
+    )));
+    say(format!(
+        "  (b) writer occupancy by delete batches = {:.1}% of wall",
+        100.0 * batches.sum_ms() / (total.as_secs_f64() * 1000.0)
+    ));
     env.shutdown();
     drop(env);
-    say(format!("  (b) plugin rows left (kv, tasks) = {:?}", counts(&db_b)));
+    say(format!(
+        "  (b) plugin rows left (kv, tasks) = {:?}",
+        counts(&db_b)
+    ));
     let _ = std::fs::remove_dir_all(&base);
     say("M2 cleanup: dataset directory deleted");
 }

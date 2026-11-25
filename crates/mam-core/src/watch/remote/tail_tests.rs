@@ -23,7 +23,10 @@ fn primed(f: &FakeDdp) -> LogTail {
 #[test]
 fn t_remote_tail_01_first_poll_sets_the_baseline_without_replaying_history_and_flags_a_gap() {
     let f = FakeDdp::new("/tmp/audit");
-    f.write("audit-log.0", &(line("CREATE", "/old1.mxf") + &line("CREATE", "/old2.mxf")));
+    f.write(
+        "audit-log.0",
+        &(line("CREATE", "/old1.mxf") + &line("CREATE", "/old2.mxf")),
+    );
     let mut t = tail(&f, None);
     let p = read(&mut t, &f);
     assert!(p.lines.is_empty() && p.gap);
@@ -50,7 +53,10 @@ fn t_remote_tail_03_a_rotated_in_file_is_read_from_the_start_and_removed_files_a
     f.write("audit-log.0", &line("CREATE", "/a.mxf"));
     f.write("audit-log.9", "");
     let mut t = primed(&f);
-    f.write("audit-log.10", &(line("CREATE", "/b.mxf") + &line("WRITE", "/c.mxf")));
+    f.write(
+        "audit-log.10",
+        &(line("CREATE", "/b.mxf") + &line("WRITE", "/c.mxf")),
+    );
     let p = read(&mut t, &f);
     assert_eq!(p.lines.len(), 2, "new file read from byte 0");
     f.remove("audit-log.0");
@@ -93,7 +99,10 @@ fn t_remote_tail_05_an_unfinished_line_waits_for_its_newline() {
 #[test]
 fn t_remote_tail_06_a_shrunk_file_is_read_again_from_the_start_and_flags_a_gap() {
     let f = FakeDdp::new("/tmp/audit");
-    f.write("audit-log.0", &(line("CREATE", "/a.mxf") + &line("CREATE", "/b.mxf")));
+    f.write(
+        "audit-log.0",
+        &(line("CREATE", "/a.mxf") + &line("CREATE", "/b.mxf")),
+    );
     let mut t = primed(&f);
     f.set("audit-log.0", &line("CREATE", "/c.mxf"));
     let p = read(&mut t, &f);
@@ -107,9 +116,15 @@ fn t_remote_tail_07_more_than_1mib_in_one_read_skips_to_the_end_and_flags_a_gap(
     let f = FakeDdp::new("/tmp/audit");
     f.write("audit-log.0", "");
     let mut t = primed(&f);
-    f.write("audit-log.0", &("x".repeat(MAX_FETCH as usize + 1) + "\n" + &line("CREATE", "/a.mxf")));
+    f.write(
+        "audit-log.0",
+        &("x".repeat(MAX_FETCH as usize + 1) + "\n" + &line("CREATE", "/a.mxf")),
+    );
     let p = read(&mut t, &f);
-    assert!(p.lines.is_empty() && p.gap && p.skipped_bytes > MAX_FETCH, "{p:?}");
+    assert!(
+        p.lines.is_empty() && p.gap && p.skipped_bytes > MAX_FETCH,
+        "{p:?}"
+    );
     // 건너뛴 뒤에는 다시 이어 읽는다
     f.write("audit-log.0", &line("CREATE", "/b.mxf"));
     let p = read(&mut t, &f);
@@ -135,12 +150,22 @@ fn t_remote_tail_09_a_huge_backlog_is_spread_over_polls_by_the_per_poll_budget()
     let f = FakeDdp::new("/tmp/audit");
     f.write("audit-log.0", "");
     let mut t = primed(&f);
-    let big = |tag: &str| format!("{}{}", line("CREATE", tag), "z".repeat(MAX_FETCH as usize - 200)) + "\n";
+    let big = |tag: &str| {
+        format!(
+            "{}{}",
+            line("CREATE", tag),
+            "z".repeat(MAX_FETCH as usize - 200)
+        ) + "\n"
+    };
     for i in 1..=12 {
         f.write(&format!("audit-log.{i}"), &big(&format!("/f{i}.mxf")));
     }
     let first = read(&mut t, &f);
-    assert!(!first.lines.is_empty() && first.lines.len() < 24, "{}", first.lines.len());
+    assert!(
+        !first.lines.is_empty() && first.lines.len() < 24,
+        "{}",
+        first.lines.len()
+    );
     let mut total = first.lines.len();
     for _ in 0..4 {
         total += read(&mut t, &f).lines.len();
@@ -161,16 +186,25 @@ fn t_remote_tail_10_empty_or_missing_log_dir_are_distinct_errors() {
 fn t_remote_tail_11_log_order_is_numeric_and_quoting_survives_spaces_and_quotes() {
     let mut v = vec!["audit-log.10", "audit-log.2", "audit-log.0", "audit-log.x"];
     v.sort_by(|a, b| log_cmp(a, b));
-    assert_eq!(v, vec!["audit-log.0", "audit-log.2", "audit-log.10", "audit-log.x"]);
+    assert_eq!(
+        v,
+        vec!["audit-log.0", "audit-log.2", "audit-log.10", "audit-log.x"]
+    );
     assert_eq!(cmd::sh_quote("/tmp/감사 로그"), "'/tmp/감사 로그'");
     assert_eq!(cmd::sh_quote("/tmp/a'b"), r"'/tmp/a'\''b'");
 }
 
 #[test]
 fn t_remote_tail_12_only_read_commands_are_ever_built() {
-    for c in [cmd::list_sizes("/tmp/a b"), cmd::tail_from("/tmp/a", "audit-log.0", 5)] {
+    for c in [
+        cmd::list_sizes("/tmp/a b"),
+        cmd::tail_from("/tmp/a", "audit-log.0", 5),
+    ] {
         for banned in [">", "rm ", "mv ", "cp ", "chmod", "tee", "dd ", "sudo"] {
-            assert!(!c.replace("2>/dev/null", "").contains(banned), "{banned} in {c}");
+            assert!(
+                !c.replace("2>/dev/null", "").contains(banned),
+                "{banned} in {c}"
+            );
         }
     }
     assert!(cmd::tail_from("/tmp/a", "audit-log.0", 5).starts_with("tail -c +6 "));

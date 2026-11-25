@@ -15,8 +15,8 @@ use mam_core::ingest::rescan_policy::FixedOffsetZone;
 use mam_core::ingest::{Ingest, IngestConfig, IngestDeps};
 use mam_core::scan::scan_folder;
 use mam_core::watch::{
-    ChangeDetector, ChangeSink, DetectError, DetectorOptions, DetectorRegistry, OsEvents, ProbeResult,
-    ScanOnly, WatchHandle, WatchMsg, WatchTarget,
+    ChangeDetector, ChangeSink, DetectError, DetectorOptions, DetectorRegistry, OsEvents,
+    ProbeResult, ScanOnly, WatchHandle, WatchMsg, WatchTarget,
 };
 use mam_core::{Blake3Hasher, WindowsFileIdentity};
 use serde_json::{Value, json};
@@ -32,7 +32,11 @@ fn env_kst() -> Env {
 /// 폴더 등록 + 첫 스캔 완료(완료 시각 = T0) + 작업 비우기
 fn registered(env: &Env) -> i64 {
     env.write("lib/a.jpg", 1);
-    let id = env.ingest.add_folder(env.path("lib").to_str().unwrap()).unwrap().folder_id;
+    let id = env
+        .ingest
+        .add_folder(env.path("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id;
     scan_folder(env.ingest.env(), id, &|| false, &AtomicBool::new(false)).unwrap();
     clear_jobs(env);
     id
@@ -40,7 +44,9 @@ fn registered(env: &Env) -> i64 {
 
 fn clear_jobs(env: &Env) {
     env.pool
-        .write(mam_db::Priority::Low, |c| Ok(c.execute("DELETE FROM jobs", [])?))
+        .write(mam_db::Priority::Low, |c| {
+            Ok(c.execute("DELETE FROM jobs", [])?)
+        })
         .unwrap();
 }
 
@@ -72,7 +78,11 @@ fn t_rsched_01_folder_without_policy_follows_the_global_interval() {
 fn t_rsched_02_one_hour_interval_fires_before_the_six_hour_default() {
     let env = env_kst();
     let id = registered(&env);
-    policy(&env, id, json!({"trigger": {"kind": "interval", "hours": 1}}));
+    policy(
+        &env,
+        id,
+        json!({"trigger": {"kind": "interval", "hours": 1}}),
+    );
 
     env.clock.advance(HOUR - 1);
     assert!(tick(&env).is_empty());
@@ -86,7 +96,11 @@ fn t_rsched_03_schedule_fires_once_per_slot() {
     // Arrange: 매일 03:00 KST
     let env = env_kst();
     let id = registered(&env);
-    policy(&env, id, json!({"trigger": {"kind": "schedule", "days": [], "at": "03:00"}}));
+    policy(
+        &env,
+        id,
+        json!({"trigger": {"kind": "schedule", "days": [], "at": "03:00"}}),
+    );
     let view = env.ingest.list_folders().unwrap().remove(0);
     assert_eq!(view.next_rescan_at, Some(T0 + TO_NEXT_0300));
 
@@ -117,7 +131,11 @@ fn t_rsched_04_on_start_fires_on_the_first_tick_of_each_process_only() {
     // Arrange
     let env = env_kst();
     let id = registered(&env);
-    policy(&env, id, json!({"trigger": {"kind": "manual"}, "onStart": true}));
+    policy(
+        &env,
+        id,
+        json!({"trigger": {"kind": "manual"}, "onStart": true}),
+    );
 
     // Act / Assert: 첫 점검에서만
     assert_eq!(tick(&env), vec![id]);
@@ -152,8 +170,13 @@ fn t_rsched_05_manual_policy_schedules_nothing_but_reconnect_and_overflow_still_
     assert_eq!(env.ingest.list_folders().unwrap()[0].next_rescan_at, None);
 
     // 감시 넘침 재스캔은 동작
-    env.ingest.handle_watch_now(WatchMsg::Rescan { folder_id: id }).unwrap();
-    assert_eq!(env.count("SELECT COUNT(*) FROM jobs WHERE kind = 'scan' AND status = 'pending'"), 1);
+    env.ingest
+        .handle_watch_now(WatchMsg::Rescan { folder_id: id })
+        .unwrap();
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM jobs WHERE kind = 'scan' AND status = 'pending'"),
+        1
+    );
     clear_jobs(&env);
 
     // 볼륨 재연결 재스캔은 동작
@@ -167,15 +190,24 @@ fn t_rsched_05_manual_policy_schedules_nothing_but_reconnect_and_overflow_still_
 fn t_rsched_06_no_duplicate_when_pending_or_failed() {
     let env = env_kst();
     let id = registered(&env);
-    policy(&env, id, json!({"trigger": {"kind": "interval", "hours": 1}}));
+    policy(
+        &env,
+        id,
+        json!({"trigger": {"kind": "interval", "hours": 1}}),
+    );
     env.clock.advance(HOUR);
 
     assert_eq!(tick(&env), vec![id]);
     assert!(tick(&env).is_empty(), "pending");
     env.pool
-        .write(mam_db::Priority::Low, |c| Ok(c.execute("UPDATE jobs SET status = 'failed'", [])?))
+        .write(mam_db::Priority::Low, |c| {
+            Ok(c.execute("UPDATE jobs SET status = 'failed'", [])?)
+        })
         .unwrap();
-    assert!(tick(&env).is_empty(), "failed jobs are retried manually only");
+    assert!(
+        tick(&env).is_empty(),
+        "failed jobs are retried manually only"
+    );
     assert_eq!(env.count("SELECT COUNT(*) FROM jobs"), 1);
 }
 
@@ -216,8 +248,17 @@ fn t_rsched_08_corrupt_stored_policy_behaves_like_the_global_default() {
     env.clock.advance(1);
 
     assert_eq!(tick(&env), vec![id]);
-    let stored: Option<String> = env.read(|c| c.query_row("SELECT rescan_policy FROM managed_folders", [], |r| r.get(0)).unwrap());
-    assert_eq!(stored.as_deref(), Some("{garbage"), "DB value is left untouched");
+    let stored: Option<String> = env.read(|c| {
+        c.query_row("SELECT rescan_policy FROM managed_folders", [], |r| {
+            r.get(0)
+        })
+        .unwrap()
+    });
+    assert_eq!(
+        stored.as_deref(),
+        Some("{garbage"),
+        "DB value is left untouched"
+    );
     let view = env.ingest.list_folders().unwrap().remove(0);
     assert_eq!(view.rescan_policy, None, "not JSON -> nothing to show");
 }
@@ -240,7 +281,12 @@ impl ChangeDetector for FlakyDetector {
     fn probe(&self, _t: &WatchTarget) -> ProbeResult {
         ProbeResult::Available
     }
-    fn start(&self, _t: &WatchTarget, _o: &DetectorOptions, _s: ChangeSink) -> Result<Box<dyn WatchHandle>, DetectError> {
+    fn start(
+        &self,
+        _t: &WatchTarget,
+        _o: &DetectorOptions,
+        _s: ChangeSink,
+    ) -> Result<Box<dyn WatchHandle>, DetectError> {
         self.0.starts.fetch_add(1, Ordering::SeqCst);
         if self.0.fail.load(Ordering::SeqCst) {
             return Err(DetectError::Start("share offline".into()));
@@ -252,17 +298,35 @@ impl ChangeDetector for FlakyDetector {
 #[test]
 fn t_rsched_09_detector_that_failed_to_start_is_retried_on_the_next_tick() {
     // Arrange
-    let flaky = Arc::new(Flaky { fail: AtomicBool::new(true), starts: AtomicUsize::new(0) });
+    let flaky = Arc::new(Flaky {
+        fail: AtomicBool::new(true),
+        starts: AtomicUsize::new(0),
+    });
     let f2 = Arc::clone(&flaky);
     let env = Env::with_config(move |c, _| {
         c.detectors = Arc::new(DetectorRegistry::new(
-            vec![Arc::new(FlakyDetector(Arc::clone(&f2))), Arc::new(OsEvents), Arc::new(ScanOnly)],
+            vec![
+                Arc::new(FlakyDetector(Arc::clone(&f2))),
+                Arc::new(OsEvents),
+                Arc::new(ScanOnly),
+            ],
             &["flaky", "os_events"],
         ));
     });
     env.write("lib/a.jpg", 1);
-    let id = env.ingest.add_folder(env.path("lib").to_str().unwrap()).unwrap().folder_id;
-    let view = |env: &Env| env.ingest.list_folders().unwrap().into_iter().find(|v| v.folder_id == id).unwrap();
+    let id = env
+        .ingest
+        .add_folder(env.path("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id;
+    let view = |env: &Env| {
+        env.ingest
+            .list_folders()
+            .unwrap()
+            .into_iter()
+            .find(|v| v.folder_id == id)
+            .unwrap()
+    };
 
     // Act / Assert: 실패 -> 다음 후보(os_events)로 폴백, 사유 노출
     let v = view(&env);
@@ -279,8 +343,15 @@ fn t_rsched_09_detector_that_failed_to_start_is_retried_on_the_next_tick() {
     flaky.fail.store(false, Ordering::SeqCst);
     env.ingest.supervise_once().unwrap();
     let v = view(&env);
-    assert_eq!((v.watch_active.as_deref(), v.watch_fallback_key.clone()), (Some("flaky"), None));
+    assert_eq!(
+        (v.watch_active.as_deref(), v.watch_fallback_key.clone()),
+        (Some("flaky"), None)
+    );
     let settled = flaky.starts.load(Ordering::SeqCst);
     env.ingest.supervise_once().unwrap();
-    assert_eq!(flaky.starts.load(Ordering::SeqCst), settled, "settled watch is not restarted");
+    assert_eq!(
+        flaky.starts.load(Ordering::SeqCst),
+        settled,
+        "settled watch is not restarted"
+    );
 }

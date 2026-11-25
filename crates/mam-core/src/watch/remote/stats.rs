@@ -14,7 +14,10 @@ pub struct KickGate {
 
 impl KickGate {
     pub fn new(every_ms: i64) -> Self {
-        Self { every_ms, last: HashMap::new() }
+        Self {
+            every_ms,
+            last: HashMap::new(),
+        }
     }
 
     /// 지금 요청해도 되면 true 로 돌려주고 시각을 기록한다.

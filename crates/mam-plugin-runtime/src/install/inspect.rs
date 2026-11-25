@@ -36,7 +36,8 @@ impl PluginRuntime {
     fn preview_of(&self, pkg: &Package, locale: &str) -> Result<PluginPreview, InstallError> {
         let m = &pkg.manifest;
         let id = m.id.as_str().to_owned();
-        let (installed_raw, granted_raw) = self.db_read(|c| Ok((get(c, INSTALLED, &id)?, get(c, GRANTED, &id)?)))?;
+        let (installed_raw, granted_raw) =
+            self.db_read(|c| Ok((get(c, INSTALLED, &id)?, get(c, GRANTED, &id)?)))?;
         let previous = installed_raw.as_deref().and_then(parse_installed);
         let granted = known_perms(granted_raw.as_deref());
         let change = match &previous {
@@ -48,7 +49,11 @@ impl PluginRuntime {
             },
         };
         let has_kept_data = previous.is_none() && self.db_read(|c| kept_data_exists(c, &id))?;
-        let added_permissions = if previous.is_some() { m.permissions.difference(&granted).copied().collect() } else { Vec::new() };
+        let added_permissions = if previous.is_some() {
+            m.permissions.difference(&granted).copied().collect()
+        } else {
+            Vec::new()
+        };
         let b = &pkg.locales;
         Ok(PluginPreview {
             id: m.id.to_string(),
@@ -59,7 +64,10 @@ impl PluginRuntime {
             commands: l10n::commands_info(m, b, locale),
             providers: l10n::providers_info(m, b, locale),
             unsigned: true,
-            installed: previous.map(|(version, _)| InstalledSummary { version, granted: granted.into_iter().collect() }),
+            installed: previous.map(|(version, _)| InstalledSummary {
+                version,
+                granted: granted.into_iter().collect(),
+            }),
             change,
             added_permissions,
             has_kept_data,
@@ -71,5 +79,7 @@ impl PluginRuntime {
 /// (done 뿐인 작업 행은 의도적으로 "남은 데이터"로 세지 않는다 — 사용자에게 보일 가치가 없는 완료 기록)
 fn kept_data_exists(c: &rusqlite::Connection, id: &str) -> Result<bool, mam_db::DbError> {
     use mam_db::{plugin_kv, plugin_tasks};
-    Ok(plugin_kv::sum_cost(c, id)? > 0 || plugin_tasks::pending_count(c, id)? > 0 || plugin_tasks::failed_count(c, id)? > 0)
+    Ok(plugin_kv::sum_cost(c, id)? > 0
+        || plugin_tasks::pending_count(c, id)? > 0
+        || plugin_tasks::failed_count(c, id)? > 0)
 }

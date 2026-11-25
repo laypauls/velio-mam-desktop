@@ -119,9 +119,11 @@ fn t_settings_theme_03_invalid_stored_value_falls_back_to_whole_default_with_war
     }
     let n: i64 = db
         .conn
-        .query_row("SELECT COUNT(*) FROM settings WHERE key = 'theme'", [], |r| {
-            r.get(0)
-        })
+        .query_row(
+            "SELECT COUNT(*) FROM settings WHERE key = 'theme'",
+            [],
+            |r| r.get(0),
+        )
         .unwrap();
     assert_eq!(n, 0);
 }

@@ -225,10 +225,7 @@ fn t_coord_co_07_text_and_filters_narrow_the_set_but_keep_the_collection_order()
     by_filter.filters.media_types = vec![MediaType::Video];
     let filter_ids = h.search(&by_filter).unwrap().ids;
 
-    let want: Vec<u64> = expected(false)
-        .into_iter()
-        .filter(|i| i % 2 == 0)
-        .collect();
+    let want: Vec<u64> = expected(false).into_iter().filter(|i| i % 2 == 0).collect();
     assert_eq!(text_ids, want);
     assert_eq!(filter_ids, want);
 }

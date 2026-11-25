@@ -108,7 +108,11 @@ impl WorkerSpawner for ProcessSpawner {
             .creation_flags(CREATE_NO_WINDOW)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(if self.inherit_stderr { Stdio::inherit() } else { Stdio::null() })
+            .stderr(if self.inherit_stderr {
+                Stdio::inherit()
+            } else {
+                Stdio::null()
+            })
             .spawn()
             .map_err(|e| io("spawn", e))?;
         let mut process = ChildProcess { child };
@@ -116,13 +120,23 @@ impl WorkerSpawner for ProcessSpawner {
         let deadline = Instant::now() + CONNECT_TIMEOUT;
         loop {
             match pipe::open_client(&name) {
-                Ok((cmd, evt)) => return Ok(WorkerConn { process: Box::new(process), cmd: Box::new(cmd), evt: Box::new(evt) }),
+                Ok((cmd, evt)) => {
+                    return Ok(WorkerConn {
+                        process: Box::new(process),
+                        cmd: Box::new(cmd),
+                        evt: Box::new(evt),
+                    });
+                }
                 Err(e) => {
                     if process.has_exited() {
-                        return Err(PlayerError::SpawnFailed("worker exited before connecting".into()));
+                        return Err(PlayerError::SpawnFailed(
+                            "worker exited before connecting".into(),
+                        ));
                     }
                     if Instant::now() >= deadline {
-                        return Err(PlayerError::SpawnFailed(format!("pipe connect timed out: {e}")));
+                        return Err(PlayerError::SpawnFailed(format!(
+                            "pipe connect timed out: {e}"
+                        )));
                     }
                     std::thread::sleep(Duration::from_millis(20));
                 }
@@ -138,7 +152,13 @@ mod tests {
     // 분류: External(비정상 종료) / Validation(실행 파일 없음)
 
     fn spawn_cmd(args: &[&str]) -> ChildProcess {
-        ChildProcess { child: std::process::Command::new("cmd").args(args).stdout(Stdio::null()).spawn().unwrap() }
+        ChildProcess {
+            child: std::process::Command::new("cmd")
+                .args(args)
+                .stdout(Stdio::null())
+                .spawn()
+                .unwrap(),
+        }
     }
 
     #[test]
@@ -150,7 +170,11 @@ mod tests {
 
     #[test]
     fn t_player_exit_02_running_process_times_out_then_kill_by_handle() {
-        let child = std::process::Command::new("ping").args(["-n", "30", "127.0.0.1"]).stdout(Stdio::null()).spawn().unwrap();
+        let child = std::process::Command::new("ping")
+            .args(["-n", "30", "127.0.0.1"])
+            .stdout(Stdio::null())
+            .spawn()
+            .unwrap();
         let mut p = ChildProcess { child };
         assert!(!p.wait_exit(Duration::from_millis(100)), "아직 실행 중");
         p.kill();
@@ -160,14 +184,24 @@ mod tests {
 
     #[test]
     fn t_player_exit_03_spawn_missing_exe_is_error() {
-        let s = ProcessSpawner { worker_exe: PathBuf::from(r"C:\no\such\worker.exe"), libmpv_dir: PathBuf::from("."), inherit_stderr: false, env: vec![] };
+        let s = ProcessSpawner {
+            worker_exe: PathBuf::from(r"C:\no\such\worker.exe"),
+            libmpv_dir: PathBuf::from("."),
+            inherit_stderr: false,
+            env: vec![],
+        };
         assert!(matches!(s.spawn(), Err(PlayerError::SpawnFailed(_))));
     }
 
     #[test]
     fn t_player_exit_04_worker_dying_before_connect_is_reported_quickly() {
         // 파이프를 만들지 않고 바로 끝나는 프로그램 → 연결 대기 중 종료를 감지해 10초를 다 기다리지 않는다
-        let s = ProcessSpawner { worker_exe: PathBuf::from(r"C:\Windows\System32\whoami.exe"), libmpv_dir: PathBuf::from("."), inherit_stderr: false, env: vec![] };
+        let s = ProcessSpawner {
+            worker_exe: PathBuf::from(r"C:\Windows\System32\whoami.exe"),
+            libmpv_dir: PathBuf::from("."),
+            inherit_stderr: false,
+            env: vec![],
+        };
         let t = Instant::now();
         let r = s.spawn();
         assert!(matches!(r, Err(PlayerError::SpawnFailed(_))));

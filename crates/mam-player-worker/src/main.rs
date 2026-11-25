@@ -16,7 +16,10 @@ mod render;
 mod session;
 
 use mam_player::host::pipe::{self, ServerPipes};
-use mam_player::protocol::{Command, Message, PROTOCOL_VERSION, Request, WorkerErrorCode, decode_line, encode_line, read_bounded_line};
+use mam_player::protocol::{
+    Command, Message, PROTOCOL_VERSION, Request, WorkerErrorCode, decode_line, encode_line,
+    read_bounded_line,
+};
 use std::io::{BufReader, Write};
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -28,7 +31,11 @@ struct Args {
 }
 
 fn parse_args(mut it: impl Iterator<Item = String>) -> Result<Args, String> {
-    let (mut pipe, mut dir, mut log) = (None, std::env::var_os("MAM_LIBMPV_DIR").map(PathBuf::from), std::env::var_os("MAM_PLAYER_LOG").is_some());
+    let (mut pipe, mut dir, mut log) = (
+        None,
+        std::env::var_os("MAM_LIBMPV_DIR").map(PathBuf::from),
+        std::env::var_os("MAM_PLAYER_LOG").is_some(),
+    );
     while let Some(a) = it.next() {
         match a.as_str() {
             "--pipe" => pipe = Some(it.next().ok_or("--pipe value missing")?),
@@ -41,7 +48,11 @@ fn parse_args(mut it: impl Iterator<Item = String>) -> Result<Args, String> {
     if !pipe::is_valid_pipe_name(&pipe) {
         return Err("invalid pipe name".into());
     }
-    Ok(Args { pipe, mpv_dir: dir.ok_or("--mpv DIR or MAM_LIBMPV_DIR is required")?, log })
+    Ok(Args {
+        pipe,
+        mpv_dir: dir.ok_or("--mpv DIR or MAM_LIBMPV_DIR is required")?,
+        log,
+    })
 }
 
 fn fail(code: i32, msg: &str) -> ! {
@@ -52,8 +63,11 @@ fn fail(code: i32, msg: &str) -> ! {
 fn main() {
     let args = parse_args(std::env::args().skip(1)).unwrap_or_else(|e| fail(64, &e));
     // 파이프를 먼저 열어 호스트가 연결되게 한다 — 이후 libmpv 로드 실패도 오류 메시지로 알릴 수 있다
-    let server = ServerPipes::create(&args.pipe).unwrap_or_else(|e| fail(65, &format!("pipe create failed: {e}")));
-    let (cmd_pipe, mut evt_pipe) = server.accept().unwrap_or_else(|e| fail(65, &format!("pipe connect failed: {e}")));
+    let server = ServerPipes::create(&args.pipe)
+        .unwrap_or_else(|e| fail(65, &format!("pipe create failed: {e}")));
+    let (cmd_pipe, mut evt_pipe) = server
+        .accept()
+        .unwrap_or_else(|e| fail(65, &format!("pipe connect failed: {e}")));
     let (tx, rx) = mpsc::channel::<Message>();
     // 이벤트 쓰기 전용 스레드 — 모든 스레드는 채널로만 보낸다
     let writer = std::thread::spawn(move || {
@@ -67,26 +81,36 @@ fn main() {
 
     let opts = player::Options {
         log: args.log,
-        ao: std::env::var("MAM_PLAYER_AO").ok().filter(|v| !v.is_empty()),
+        ao: std::env::var("MAM_PLAYER_AO")
+            .ok()
+            .filter(|v| !v.is_empty()),
         force_sw: match std::env::var("MAM_PLAYER_RENDER_API").as_deref() {
             Ok("sw") => Some(true),
             Ok("d3d11") => Some(false),
             _ => None,
         },
     };
-    let started = mpv_api::load_api(&args.mpv_dir).and_then(|api| player::Player::start(api, &opts, tx.clone()));
+    let started = mpv_api::load_api(&args.mpv_dir)
+        .and_then(|api| player::Player::start(api, &opts, tx.clone()));
     let player = match started {
         Ok(p) => p,
         Err(e) => {
             // 호스트에는 분류된 문구만 — 경로는 stderr 로만
             eprintln!("mam-player-worker: start failed: {e}");
-            let _ = tx.send(Message::Error { code: WorkerErrorCode::Internal, msg: "player engine failed to start".into() });
+            let _ = tx.send(Message::Error {
+                code: WorkerErrorCode::Internal,
+                msg: "player engine failed to start".into(),
+            });
             drop(tx);
             let _ = writer.join();
             std::process::exit(2);
         }
     };
-    let _ = tx.send(Message::Ready { mpv_api: player.api_version(), protocol: PROTOCOL_VERSION, render_path: player.inner.render_path });
+    let _ = tx.send(Message::Ready {
+        mpv_api: player.api_version(),
+        protocol: PROTOCOL_VERSION,
+        render_path: player.inner.render_path,
+    });
 
     let mut reader = BufReader::new(cmd_pipe);
     let mut line = String::new();
@@ -99,7 +123,10 @@ fn main() {
         let req: Request = match decode_line(&line) {
             Ok(r) => r,
             Err(e) => {
-                let _ = tx.send(Message::Error { code: WorkerErrorCode::InvalidArgument, msg: format!("bad command: {e}") });
+                let _ = tx.send(Message::Error {
+                    code: WorkerErrorCode::InvalidArgument,
+                    msg: format!("bad command: {e}"),
+                });
                 continue;
             }
         };
@@ -108,8 +135,20 @@ fn main() {
         // id=0 은 응답하지 않는 고빈도 명령(Release) — 실패해도 오류 응답 대신 통계(ignored)로만 센다
         if req.id != 0 {
             let reply = match result {
-                Ok(data) => Message::Reply { id: req.id, ok: true, code: None, error: None, data },
-                Err((code, error)) => Message::Reply { id: req.id, ok: false, code: Some(code), error: Some(error), data: None },
+                Ok(data) => Message::Reply {
+                    id: req.id,
+                    ok: true,
+                    code: None,
+                    error: None,
+                    data,
+                },
+                Err((code, error)) => Message::Reply {
+                    id: req.id,
+                    ok: false,
+                    code: Some(code),
+                    error: Some(error),
+                    data: None,
+                },
             };
             let _ = tx.send(reply);
         }
@@ -129,7 +168,10 @@ mod tests {
     // 분류: Validation(인자) / 보안(파이프 이름)
 
     fn args(v: &[&str]) -> impl Iterator<Item = String> {
-        v.iter().map(|s| s.to_string()).collect::<Vec<_>>().into_iter()
+        v.iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+            .into_iter()
     }
 
     const NAME: &str = "mam-player-0123456789abcdef0123456789abcdef";
@@ -137,9 +179,15 @@ mod tests {
     #[test]
     fn t_player_worker_args_01_valid_and_invalid() {
         let a = parse_args(args(&["--pipe", NAME, "--mpv", r"C:\libmpv"])).unwrap();
-        assert_eq!((a.pipe.as_str(), a.mpv_dir), (NAME, PathBuf::from(r"C:\libmpv")));
+        assert_eq!(
+            (a.pipe.as_str(), a.mpv_dir),
+            (NAME, PathBuf::from(r"C:\libmpv"))
+        );
         assert!(parse_args(args(&["--mpv", r"C:\x"])).is_err(), "pipe 필수");
-        assert!(parse_args(args(&["--pipe", "evil", "--mpv", "x"])).is_err(), "pipe 이름 형식");
+        assert!(
+            parse_args(args(&["--pipe", "evil", "--mpv", "x"])).is_err(),
+            "pipe 이름 형식"
+        );
         assert!(parse_args(args(&["--pipe", NAME, "--bogus"])).is_err());
         assert!(parse_args(args(&["--pipe"])).is_err());
     }

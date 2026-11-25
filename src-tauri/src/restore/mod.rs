@@ -13,14 +13,14 @@
 pub(crate) mod commands;
 pub mod hint;
 pub mod notice;
+#[cfg(test)]
+mod plugin_tests;
 pub mod plugins;
 pub mod post;
 mod prepare;
 pub mod recover;
 #[cfg(test)]
 mod recover_tests;
-#[cfg(test)]
-mod plugin_tests;
 #[cfg(test)]
 mod test_support;
 #[cfg(test)]

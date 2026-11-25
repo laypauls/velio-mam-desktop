@@ -280,7 +280,10 @@ fn t_id_15_sync_does_not_touch_network_volumes_or_register_new_ones() {
     let report = sync_volumes(&w.db.conn, &w.clock, &FakeVolumes(vec![stranger])).unwrap();
 
     // `present`(연결된 볼륨 목록, 새 디스크 감지용)는 상태 변화가 아니다 - 전환이 없다는 것만 본다
-    assert!(report.went_online.is_empty() && report.went_offline.is_empty(), "{report:?}");
+    assert!(
+        report.went_online.is_empty() && report.went_offline.is_empty(),
+        "{report:?}"
+    );
     let avail: String =
         w.db.conn
             .query_row(

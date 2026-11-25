@@ -36,14 +36,31 @@ fn three_folders(env: &Env) -> (Vec<i64>, i64) {
     env.write("lib1/a.jpg", 1);
     env.write("lib2/b.jpg", 2);
     let usb = plug_usb(env);
-    let a1 = env.ingest.add_folder(env.path("lib1").to_str().unwrap()).unwrap().folder_id;
-    let a2 = env.ingest.add_folder(env.path("lib2").to_str().unwrap()).unwrap().folder_id;
-    let u = env.ingest.add_folder(usb.join("lib").to_str().unwrap()).unwrap().folder_id;
+    let a1 = env
+        .ingest
+        .add_folder(env.path("lib1").to_str().unwrap())
+        .unwrap()
+        .folder_id;
+    let a2 = env
+        .ingest
+        .add_folder(env.path("lib2").to_str().unwrap())
+        .unwrap()
+        .folder_id;
+    let u = env
+        .ingest
+        .add_folder(usb.join("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id;
     (vec![a1, a2], u)
 }
 
 fn view(env: &Env, id: i64) -> mam_core::scan::ManagedFolderView {
-    env.ingest.list_folders().unwrap().into_iter().find(|f| f.folder_id == id).unwrap()
+    env.ingest
+        .list_folders()
+        .unwrap()
+        .into_iter()
+        .find(|f| f.folder_id == id)
+        .unwrap()
 }
 
 #[test]
@@ -64,7 +81,10 @@ fn t_eject_01_prepare_stops_every_watch_on_the_volume_and_supervise_never_restar
     assert!(env.ingest.is_watching(u));
     // 점검 두 번이 지나도 온라인 전환·감시 재시작·재스캔 예약이 없다
     for r in [&report1, &report2] {
-        assert!(r.went_online.is_empty() && r.scheduled.iter().all(|f| *f == u), "{r:?}");
+        assert!(
+            r.went_online.is_empty() && r.scheduled.iter().all(|f| *f == u),
+            "{r:?}"
+        );
     }
     assert!(a.iter().all(|id| !env.ingest.is_watching(*id)));
     // 목록: 오프라인 + 준비 표시 (다른 디스크는 아님)
@@ -77,7 +97,10 @@ fn t_eject_01_prepare_stops_every_watch_on_the_volume_and_supervise_never_restar
     assert!(!other.eject_prepared);
     assert_eq!(other.availability, Availability::Online);
     // 반환 마운트 지점은 사용자 표기
-    assert_eq!(res.mount_point, mam_core::volume::strip_verbatim(&env.vol.to_string_lossy()));
+    assert_eq!(
+        res.mount_point,
+        mam_core::volume::strip_verbatim(&env.vol.to_string_lossy())
+    );
 }
 
 #[test]
@@ -87,7 +110,11 @@ fn t_eject_02_network_folder_is_rejected_as_invalid_input() {
     let net = env.vol.parent().unwrap().join("net");
     fs::create_dir_all(net.join("lib")).unwrap();
     env.volumes.add("nas", VolumeKind::Network, &net);
-    let id = env.ingest.add_folder(net.join("lib").to_str().unwrap()).unwrap().folder_id;
+    let id = env
+        .ingest
+        .add_folder(net.join("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id;
 
     // Act
     let err = env.ingest.prepare_volume_eject(id).unwrap_err();
@@ -129,16 +156,28 @@ fn t_eject_04_prepare_is_idempotent_and_resume_without_prepare_is_a_no_op() {
     // Assert
     assert_eq!(first, second);
     assert_eq!(env.ingest.ejected_volumes().len(), 1);
-    assert!(env.ingest.resume_volume_watch(u).is_ok(), "other volume: not prepared -> no-op");
-    assert!(!env.ingest.is_watching(a[0]), "an unrelated resume does not release the hold");
+    assert!(
+        env.ingest.resume_volume_watch(u).is_ok(),
+        "other volume: not prepared -> no-op"
+    );
+    assert!(
+        !env.ingest.is_watching(a[0]),
+        "an unrelated resume does not release the hold"
+    );
 }
 
 #[test]
 fn t_eject_05_unknown_folder_is_not_found() {
     let env = Env::new();
 
-    assert!(matches!(env.ingest.prepare_volume_eject(999).unwrap_err(), IngestError::NotFound));
-    assert!(matches!(env.ingest.resume_volume_watch(999).unwrap_err(), IngestError::NotFound));
+    assert!(matches!(
+        env.ingest.prepare_volume_eject(999).unwrap_err(),
+        IngestError::NotFound
+    ));
+    assert!(matches!(
+        env.ingest.resume_volume_watch(999).unwrap_err(),
+        IngestError::NotFound
+    ));
 }
 
 /// 메타(vol-a 자산)·썸네일(usb 자산) 종류에 꽂는 대역 실행기: 자산별로 취소 신호를 볼 때까지 돈다.
@@ -180,7 +219,8 @@ fn asset_of(env: &Env, name: &str) -> i64 {
 }
 
 #[test]
-fn t_eject_06_running_job_on_the_volume_is_cancelled_and_stays_queued_while_other_volumes_keep_running() {
+fn t_eject_06_running_job_on_the_volume_is_cancelled_and_stays_queued_while_other_volumes_keep_running()
+ {
     // Arrange: 두 디스크의 자산마다 작업 1개 (종류가 달라 동시에 돈다)
     let env = Env::new();
     let (tx, rx) = channel();
@@ -193,15 +233,28 @@ fn t_eject_06_running_job_on_the_volume_is_cancelled_and_stays_queued_while_othe
         ejected_asset: Mutex::default(),
     });
     env.ingest.register_executor(JobKind::Meta, blocker.clone());
-    env.ingest.register_executor(JobKind::Thumb, blocker.clone());
+    env.ingest
+        .register_executor(JobKind::Thumb, blocker.clone());
     let (a, u) = three_folders(&env);
     env.ingest.start().unwrap();
-    assert!(wait_until(WAIT, || env.count("SELECT COUNT(*) FROM media_assets") == 3), "scan finished");
+    assert!(
+        wait_until(WAIT, || env.count("SELECT COUNT(*) FROM media_assets") == 3),
+        "scan finished"
+    );
     let (on_a, on_usb) = (asset_of(&env, "a.jpg"), asset_of(&env, "u.jpg"));
     *blocker.ejected_asset.lock().unwrap() = Some(on_a);
-    env.ingest.jobs().enqueue(NewJob::for_asset(JobKind::Meta, on_a)).unwrap();
-    env.ingest.jobs().enqueue(NewJob::for_asset(JobKind::Thumb, on_usb)).unwrap();
-    let mut entered = vec![rx.recv_timeout(WAIT).unwrap(), rx.recv_timeout(WAIT).unwrap()];
+    env.ingest
+        .jobs()
+        .enqueue(NewJob::for_asset(JobKind::Meta, on_a))
+        .unwrap();
+    env.ingest
+        .jobs()
+        .enqueue(NewJob::for_asset(JobKind::Thumb, on_usb))
+        .unwrap();
+    let mut entered = vec![
+        rx.recv_timeout(WAIT).unwrap(),
+        rx.recv_timeout(WAIT).unwrap(),
+    ];
     entered.sort_unstable();
     assert_eq!(entered, {
         let mut e = vec![on_a, on_usb];
@@ -222,10 +275,19 @@ fn t_eject_06_running_job_on_the_volume_is_cancelled_and_stays_queued_while_othe
         "SELECT COUNT(*) FROM jobs WHERE kind='meta' AND asset_id={on_a} AND attempts = 0 AND status IN ('pending','running')"
     ));
     assert_eq!(meta, 1, "cancelled job stays queued without a failure");
-    assert_eq!(env.count("SELECT COUNT(*) FROM jobs WHERE status = 'failed'"), 0);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM jobs WHERE status = 'failed'"),
+        0
+    );
     // 다른 디스크의 작업은 그대로 실행 중이다
     assert_eq!(env.count(&format!("SELECT COUNT(*) FROM jobs WHERE kind='thumb' AND asset_id={on_usb} AND status='running'")), 1);
-    assert!(env.ingest.jobs().running_jobs().iter().any(|j| j.asset_id == Some(on_usb)));
+    assert!(
+        env.ingest
+            .jobs()
+            .running_jobs()
+            .iter()
+            .any(|j| j.asset_id == Some(on_usb))
+    );
     let _ = u;
     release.store(true, Ordering::SeqCst);
     env.ingest.shutdown();
@@ -238,7 +300,10 @@ fn t_eject_07_reconnect_after_real_removal_clears_the_hold_and_catches_up_with_a
     let (a, _) = three_folders(&env);
     env.ingest.prepare_volume_eject(a[0]).unwrap();
     env.ingest.supervise_once().unwrap();
-    assert!(!env.ingest.ejected_volumes().is_empty(), "still held while the device is physically present");
+    assert!(
+        !env.ingest.ejected_volumes().is_empty(),
+        "still held while the device is physically present"
+    );
 
     // Act 1: 장치가 실제로 빠졌다
     env.volumes.set_connected("vol-a", false);
@@ -258,7 +323,11 @@ fn t_eject_07_reconnect_after_real_removal_clears_the_hold_and_catches_up_with_a
     assert_eq!(back.went_online.len(), 1);
     // 따라잡기 재스캔이 대기열에 있다 (추가 때 예약된 작업이 아직 대기 중이면 중복 예약은 하지 않는다)
     for id in &a {
-        assert!(env.count(&format!("SELECT COUNT(*) FROM jobs WHERE kind='scan' AND folder_id = {id}")) >= 1);
+        assert!(
+            env.count(&format!(
+                "SELECT COUNT(*) FROM jobs WHERE kind='scan' AND folder_id = {id}"
+            )) >= 1
+        );
     }
     assert!(a.iter().all(|id| env.ingest.is_watching(*id)));
     assert_eq!(view(&env, a[1]).availability, Availability::Online);
@@ -285,7 +354,12 @@ fn t_eject_08_resume_releases_the_hold_and_runs_the_reconnect_handling() {
     }
     assert!(env.ingest.is_watching(u));
     // 따라잡기 재스캔이 대기열에 있다
-    assert!(env.count(&format!("SELECT COUNT(*) FROM jobs WHERE kind='scan' AND folder_id = {}", a[0])) >= 1);
+    assert!(
+        env.count(&format!(
+            "SELECT COUNT(*) FROM jobs WHERE kind='scan' AND folder_id = {}",
+            a[0]
+        )) >= 1
+    );
     // 다시 준비할 수 있다
     assert_eq!(env.ingest.prepare_volume_eject(a[0]).unwrap().folder_ids, a);
 }
@@ -315,14 +389,21 @@ fn t_eject_10_adding_a_folder_on_a_held_volume_is_refused_until_resume() {
     env.ingest.prepare_volume_eject(a[0]).unwrap();
 
     // Act
-    let err = env.ingest.add_folder(env.path("lib3").to_str().unwrap()).unwrap_err();
+    let err = env
+        .ingest
+        .add_folder(env.path("lib3").to_str().unwrap())
+        .unwrap_err();
 
     // Assert: 등록이 볼륨을 온라인으로 되돌리거나 감시를 시작하지 않는다
     assert!(matches!(err, IngestError::Offline), "{err:?}");
     assert_eq!(view(&env, a[0]).availability, Availability::Offline);
     assert!(!env.ingest.is_watching(a[0]));
     env.ingest.resume_volume_watch(a[0]).unwrap();
-    assert!(env.ingest.add_folder(env.path("lib3").to_str().unwrap()).is_ok());
+    assert!(
+        env.ingest
+            .add_folder(env.path("lib3").to_str().unwrap())
+            .is_ok()
+    );
 }
 
 #[test]
@@ -331,12 +412,18 @@ fn t_eject_11_hook_sees_the_volume_and_can_tell_which_assets_are_on_it() {
     let env = Env::new();
     let (a, u) = three_folders(&env);
     env.ingest.start().unwrap();
-    assert!(wait_until(WAIT, || env.count("SELECT COUNT(*) FROM media_assets") == 3));
+    assert!(wait_until(WAIT, || env
+        .count("SELECT COUNT(*) FROM media_assets")
+        == 3));
     let (on_a, on_usb) = (asset_of(&env, "a.jpg"), asset_of(&env, "u.jpg"));
     let seen: Arc<Mutex<Vec<(String, bool, bool)>>> = Arc::default();
     let sink = Arc::clone(&seen);
     env.ingest.set_eject_hook(Arc::new(move |scope| {
-        sink.lock().unwrap().push((scope.mount_point.clone(), scope.contains_asset(on_a), scope.contains_asset(on_usb)));
+        sink.lock().unwrap().push((
+            scope.mount_point.clone(),
+            scope.contains_asset(on_a),
+            scope.contains_asset(on_usb),
+        ));
     }));
 
     // Act
@@ -362,15 +449,22 @@ fn t_eject_12_gate_kills_the_real_sidecar_process_tree_and_blocks_new_ones() {
     env.ingest.set_sidecar_gate(Arc::clone(&gate));
     let script = env.data.join("fake-ffmpeg.cmd");
     fs::write(&script, "@echo off\r\nping -n 30 127.0.0.1 >nul\r\n").unwrap();
-    let runner = CancellableProcessRunner::new(env.ingest.jobs().shutdown_handle()).with_gate(Arc::clone(&gate));
+    let runner = CancellableProcessRunner::new(env.ingest.jobs().shutdown_handle())
+        .with_gate(Arc::clone(&gate));
     let target = env.path("lib1/a.jpg");
     let args = vec!["-i".into(), target.clone().into_os_string()];
-    let opts = RunOptions { timeout: Duration::from_secs(60), max_stdout: 1 << 20 };
+    let opts = RunOptions {
+        timeout: Duration::from_secs(60),
+        max_stdout: 1 << 20,
+    };
     let worker = {
         let (script, args) = (script.clone(), args.clone());
         std::thread::spawn(move || runner.run(Tool::Ffmpeg, &script, &args, &opts))
     };
-    assert!(wait_until(WAIT, || gate.running_under(env.vol.to_str().unwrap()) == 1), "sidecar running");
+    assert!(
+        wait_until(WAIT, || gate.running_under(env.vol.to_str().unwrap()) == 1),
+        "sidecar running"
+    );
 
     // Act
     let started = std::time::Instant::now();
@@ -379,23 +473,47 @@ fn t_eject_12_gate_kills_the_real_sidecar_process_tree_and_blocks_new_ones() {
     let result = worker.join().unwrap();
 
     // Assert: 30초 ping 을 기다리지 않고 트리가 죽었으며, 등록이 비었다
-    assert!(matches!(result, Err(MediaError::Cancelled { .. })), "{result:?}");
+    assert!(
+        matches!(result, Err(MediaError::Cancelled { .. })),
+        "{result:?}"
+    );
     assert!(took < Duration::from_secs(10), "{took:?}");
     assert_eq!(gate.running_under(env.vol.to_str().unwrap()), 0);
     // 붙들려 있는 동안 같은 경로의 새 실행은 띄우지 않는다
-    let again = CancellableProcessRunner::new(env.ingest.jobs().shutdown_handle()).with_gate(Arc::clone(&gate));
+    let again = CancellableProcessRunner::new(env.ingest.jobs().shutdown_handle())
+        .with_gate(Arc::clone(&gate));
     let err = again
-        .run(Tool::Ffmpeg, &script, &args, &RunOptions { timeout: Duration::from_secs(60), max_stdout: 1 << 20 })
+        .run(
+            Tool::Ffmpeg,
+            &script,
+            &args,
+            &RunOptions {
+                timeout: Duration::from_secs(60),
+                max_stdout: 1 << 20,
+            },
+        )
         .unwrap_err();
     assert!(matches!(err, MediaError::Cancelled { .. }), "{err:?}");
     // 해제하면 다시 허용된다
     env.ingest.resume_volume_watch(a[0]).unwrap();
     let ok = env.data.join("ok.cmd");
-    fs::write(&ok, "@echo off
+    fs::write(
+        &ok,
+        "@echo off
 exit /b 3
-").unwrap();
+",
+    )
+    .unwrap();
     let out = again
-        .run(Tool::Ffmpeg, &ok, &args, &RunOptions { timeout: Duration::from_secs(60), max_stdout: 1 << 20 })
+        .run(
+            Tool::Ffmpeg,
+            &ok,
+            &args,
+            &RunOptions {
+                timeout: Duration::from_secs(60),
+                max_stdout: 1 << 20,
+            },
+        )
         .unwrap();
     assert_eq!(out.code, Some(3));
 }
@@ -425,10 +543,19 @@ fn t_eject_13_no_directory_handle_remains_open_under_the_volume_after_prepare() 
     env.ingest.prepare_volume_eject(a[0]).unwrap();
 
     // Assert: 그 디스크의 폴더는 모두 독점으로 열린다 - 남은 핸들 없음. 다른 디스크의 감시는 그대로
-    assert!(can_open_exclusively(&env.path("lib1")), "watch handle still open on lib1");
-    assert!(can_open_exclusively(&env.path("lib2")), "watch handle still open on lib2");
+    assert!(
+        can_open_exclusively(&env.path("lib1")),
+        "watch handle still open on lib1"
+    );
+    assert!(
+        can_open_exclusively(&env.path("lib2")),
+        "watch handle still open on lib2"
+    );
     assert!(env.ingest.is_watching(u));
-    assert!(!can_open_exclusively(&usb_lib), "other volume keeps its watch");
+    assert!(
+        !can_open_exclusively(&usb_lib),
+        "other volume keeps its watch"
+    );
 }
 
 #[test]
@@ -439,7 +566,10 @@ fn t_eject_14_control_a_watched_directory_cannot_be_opened_exclusively_without_p
     assert!(env.ingest.is_watching(a[0]));
 
     // Act / Assert
-    assert!(!can_open_exclusively(&env.path("lib1")), "the check must detect an open watch handle");
+    assert!(
+        !can_open_exclusively(&env.path("lib1")),
+        "the check must detect an open watch handle"
+    );
     env.ingest.resume_volume_watch(a[0]).unwrap(); // 준비하지 않은 해제는 아무것도 바꾸지 않는다
     assert!(!can_open_exclusively(&env.path("lib1")));
 }
@@ -452,7 +582,10 @@ fn ejectable_of(env: &Env, id: i64) -> bool {
 
 fn folder_on(env: &Env, key_dir: &str) -> i64 {
     env.write(&format!("{key_dir}/x.jpg"), 5);
-    env.ingest.add_folder(env.path(key_dir).to_str().unwrap()).unwrap().folder_id
+    env.ingest
+        .add_folder(env.path(key_dir).to_str().unwrap())
+        .unwrap()
+        .folder_id
 }
 
 #[test]
@@ -500,12 +633,18 @@ fn t_eject_17_system_volume_is_never_ejectable_even_on_a_usb_bus() {
     // Act / Assert
     assert!(!ejectable_of(&env, a));
     assert!(ejectable_of(&env, u));
-    assert!(matches!(env.ingest.prepare_volume_eject(a).unwrap_err(), IngestError::InvalidInput(_)));
+    assert!(matches!(
+        env.ingest.prepare_volume_eject(a).unwrap_err(),
+        IngestError::InvalidInput(_)
+    ));
 }
 
 fn three_usb_folder(env: &Env) -> i64 {
     let usb = plug_usb(env);
-    env.ingest.add_folder(usb.join("lib").to_str().unwrap()).unwrap().folder_id
+    env.ingest
+        .add_folder(usb.join("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id
 }
 
 #[test]
@@ -518,7 +657,10 @@ fn t_eject_18_volume_holding_mamdata_or_the_backup_dir_is_not_ejectable() {
     // Act / Assert
     assert!(!ejectable_of(&env, a));
     assert!(ejectable_of(&env, u));
-    assert!(matches!(env.ingest.prepare_volume_eject(a).unwrap_err(), IngestError::InvalidInput(_)));
+    assert!(matches!(
+        env.ingest.prepare_volume_eject(a).unwrap_err(),
+        IngestError::InvalidInput(_)
+    ));
 }
 
 #[test]
@@ -528,7 +670,11 @@ fn t_eject_19_network_volume_is_never_ejectable() {
     let net = env.vol.parent().unwrap().join("net");
     fs::create_dir_all(net.join("lib")).unwrap();
     env.volumes.add("nas", VolumeKind::Network, &net);
-    let id = env.ingest.add_folder(net.join("lib").to_str().unwrap()).unwrap().folder_id;
+    let id = env
+        .ingest
+        .add_folder(net.join("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id;
 
     // Act / Assert
     assert!(!ejectable_of(&env, id));

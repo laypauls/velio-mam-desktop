@@ -57,7 +57,13 @@ fn t_alias_02_alias_serializes_as_camel_case_key() {
     set(&env, id, "A").unwrap();
 
     // Act
-    let view = env.ingest.list_folders().unwrap().into_iter().find(|f| f.folder_id == id).unwrap();
+    let view = env
+        .ingest
+        .list_folders()
+        .unwrap()
+        .into_iter()
+        .find(|f| f.folder_id == id)
+        .unwrap();
     let json = serde_json::to_value(&view).unwrap();
 
     // Assert
@@ -120,7 +126,11 @@ fn t_alias_06_64_chars_ok_65_rejected_and_keeps_previous_value() {
 
     let err = set(&env, id, &"a".repeat(65)).unwrap_err();
     assert!(matches!(err, IngestError::InvalidInput("alias")), "{err:?}");
-    assert_eq!(alias_of(&env, id).map(|s| s.len()), Some(64), "거부 시 값 유지");
+    assert_eq!(
+        alias_of(&env, id).map(|s| s.len()),
+        Some(64),
+        "거부 시 값 유지"
+    );
 }
 
 #[test]
@@ -145,9 +155,15 @@ fn t_alias_08_unknown_folder_is_not_found() {
     let id = lib(&env);
 
     assert!(matches!(set(&env, 9999, "x"), Err(IngestError::NotFound)));
-    assert!(matches!(env.ingest.set_folder_alias(-1, None), Err(IngestError::NotFound)));
+    assert!(matches!(
+        env.ingest.set_folder_alias(-1, None),
+        Err(IngestError::NotFound)
+    ));
     // 검증은 존재 확인보다 먼저: 없는 폴더라도 길이 위반은 InvalidInput
-    assert!(matches!(set(&env, 9999, &"a".repeat(65)), Err(IngestError::InvalidInput("alias"))));
+    assert!(matches!(
+        set(&env, 9999, &"a".repeat(65)),
+        Err(IngestError::InvalidInput("alias"))
+    ));
     assert_eq!(alias_of(&env, id), None);
 }
 

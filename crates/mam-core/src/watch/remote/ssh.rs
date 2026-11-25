@@ -25,7 +25,9 @@ pub struct SshConnector {
 
 impl Default for SshConnector {
     fn default() -> Self {
-        Self { timeout: Duration::from_secs(20) }
+        Self {
+            timeout: Duration::from_secs(20),
+        }
     }
 }
 
@@ -39,15 +41,22 @@ struct Verifier {
 
 fn fingerprint_of(k: &PublicKeyOrCertificate) -> String {
     match k {
-        PublicKeyOrCertificate::PublicKey { key, .. } => key.fingerprint(HashAlg::Sha256).to_string(),
-        PublicKeyOrCertificate::Certificate(c) => c.public_key().fingerprint(HashAlg::Sha256).to_string(),
+        PublicKeyOrCertificate::PublicKey { key, .. } => {
+            key.fingerprint(HashAlg::Sha256).to_string()
+        }
+        PublicKeyOrCertificate::Certificate(c) => {
+            c.public_key().fingerprint(HashAlg::Sha256).to_string()
+        }
     }
 }
 
 impl client::Handler for Verifier {
     type Error = russh::Error;
 
-    async fn check_server_key(&mut self, key: &PublicKeyOrCertificate) -> Result<bool, Self::Error> {
+    async fn check_server_key(
+        &mut self,
+        key: &PublicKeyOrCertificate,
+    ) -> Result<bool, Self::Error> {
         let fp = fingerprint_of(key);
         let ok = !self.probe_only && check_host_key(self.expected.as_deref(), &fp).is_ok();
         *self.seen.lock().unwrap_or_else(|p| p.into_inner()) = Some(fp);
@@ -56,7 +65,11 @@ impl client::Handler for Verifier {
 }
 
 fn short(e: &impl std::fmt::Display) -> String {
-    e.to_string().chars().filter(|c| !c.is_control()).take(200).collect()
+    e.to_string()
+        .chars()
+        .filter(|c| !c.is_control())
+        .take(200)
+        .collect()
 }
 
 fn runtime() -> Result<Runtime, RunError> {
@@ -77,19 +90,30 @@ fn classify(e: russh::Error, expected: Option<&str>, seen: &Mutex<Option<String>
     }
 }
 
-async fn open(src: &RemoteSource, to: Duration, probe_only: bool, seen: Arc<Mutex<Option<String>>>) -> Result<Handle<Verifier>, RunError> {
+async fn open(
+    src: &RemoteSource,
+    to: Duration,
+    probe_only: bool,
+    seen: Arc<Mutex<Option<String>>>,
+) -> Result<Handle<Verifier>, RunError> {
     let cfg = Arc::new(client::Config {
         keepalive_interval: Some(Duration::from_secs(30)),
         inactivity_timeout: None,
         ..client::Config::default()
     });
-    let verifier = Verifier { expected: src.host_key.clone(), probe_only, seen: Arc::clone(&seen) };
+    let verifier = Verifier {
+        expected: src.host_key.clone(),
+        probe_only,
+        seen: Arc::clone(&seen),
+    };
     let connecting = client::connect(cfg, (src.host.as_str(), src.port), verifier);
     let mut h = tokio::time::timeout(to, connecting)
         .await
         .map_err(|_| RunError::Connect("connection timed out".into()))?
         .map_err(|e| classify(e, src.host_key.as_deref(), &seen))?;
-    let authed = tokio::time::timeout(to, authenticate(&mut h, src)).await.map_err(|_| RunError::Timeout)??;
+    let authed = tokio::time::timeout(to, authenticate(&mut h, src))
+        .await
+        .map_err(|_| RunError::Timeout)??;
     if !authed {
         return Err(RunError::Auth);
     }
@@ -98,15 +122,27 @@ async fn open(src: &RemoteSource, to: Duration, probe_only: bool, seen: Arc<Mute
 
 async fn authenticate(h: &mut Handle<Verifier>, src: &RemoteSource) -> Result<bool, RunError> {
     let res = match &src.auth {
-        Auth::Password(p) => h.authenticate_password(src.user.clone(), p.expose().to_string()).await,
+        Auth::Password(p) => {
+            h.authenticate_password(src.user.clone(), p.expose().to_string())
+                .await
+        }
         Auth::Key(pem) => {
             // 암호가 걸린 키는 지원하지 않는다 — 오류에 키 내용은 없다
             let key = decode_secret_key(pem.expose(), None).map_err(|_| RunError::BadKey)?;
-            let hash = h.best_supported_rsa_hash().await.map_err(|e| RunError::Connect(short(&e)))?.flatten();
-            h.authenticate_publickey(src.user.clone(), PrivateKeyWithHashAlg::new(Arc::new(key), hash)).await
+            let hash = h
+                .best_supported_rsa_hash()
+                .await
+                .map_err(|e| RunError::Connect(short(&e)))?
+                .flatten();
+            h.authenticate_publickey(
+                src.user.clone(),
+                PrivateKeyWithHashAlg::new(Arc::new(key), hash),
+            )
+            .await
         }
     };
-    res.map(|r| r.success()).map_err(|e| RunError::Connect(short(&e)))
+    res.map(|r| r.success())
+        .map_err(|e| RunError::Connect(short(&e)))
 }
 
 impl RemoteConnector for SshConnector {
@@ -114,7 +150,11 @@ impl RemoteConnector for SshConnector {
         let rt = runtime()?;
         let seen = Arc::new(Mutex::new(None));
         let handle = rt.block_on(open(src, self.timeout, false, seen))?;
-        Ok(Box::new(SshRunner { rt: Some(rt), handle, timeout: self.timeout }))
+        Ok(Box::new(SshRunner {
+            rt: Some(rt),
+            handle,
+            timeout: self.timeout,
+        }))
     }
 
     fn fingerprint(&self, host: &str, port: u16) -> Result<String, RunError> {
@@ -153,7 +193,10 @@ struct SshRunner {
 }
 
 async fn exec(h: &Handle<Verifier>, cmd: &str) -> Result<Vec<u8>, RunError> {
-    let mut ch = h.channel_open_session().await.map_err(|_| RunError::Closed)?;
+    let mut ch = h
+        .channel_open_session()
+        .await
+        .map_err(|_| RunError::Closed)?;
     ch.exec(true, cmd).await.map_err(|_| RunError::Closed)?;
     let (mut out, mut err, mut code) = (Vec::new(), Vec::new(), None);
     while let Some(msg) = ch.wait().await {
@@ -164,7 +207,9 @@ async fn exec(h: &Handle<Verifier>, cmd: &str) -> Result<Vec<u8>, RunError> {
                 }
                 out.extend_from_slice(&data);
             }
-            ChannelMsg::ExtendedData { data, ext: 1 } if err.len() < 256 => err.extend_from_slice(&data),
+            ChannelMsg::ExtendedData { data, ext: 1 } if err.len() < 256 => {
+                err.extend_from_slice(&data)
+            }
             ChannelMsg::ExitStatus { exit_status } => code = Some(exit_status),
             _ => {}
         }
@@ -176,16 +221,27 @@ async fn exec(h: &Handle<Verifier>, cmd: &str) -> Result<Vec<u8>, RunError> {
         // 종료 코드 10·11·12 = sqlite3 없음 / DB 파일을 읽을 수 없음 / sqlite3 실행 실패 (`ses::cmd` 의 래퍼)
         Some(10) => Err(RunError::NoSqlite),
         Some(11) => Err(RunError::DbUnreadable(String::new())),
-        Some(12) => Err(RunError::DbUnreadable(short(&String::from_utf8_lossy(&err)))),
-        Some(c) => Err(RunError::Exec(format!("exit status {c}: {}", short(&String::from_utf8_lossy(&err))))),
+        Some(12) => Err(RunError::DbUnreadable(short(&String::from_utf8_lossy(
+            &err,
+        )))),
+        Some(c) => Err(RunError::Exec(format!(
+            "exit status {c}: {}",
+            short(&String::from_utf8_lossy(&err))
+        ))),
         None => Err(RunError::Closed),
     }
 }
 
 impl RemoteRunner for SshRunner {
     fn run(&mut self, cmd: &str) -> Result<Vec<u8>, RunError> {
-        let Some(rt) = self.rt.as_ref() else { return Err(RunError::Closed) };
-        rt.block_on(async { tokio::time::timeout(self.timeout, exec(&self.handle, cmd)).await.map_err(|_| RunError::Timeout)? })
+        let Some(rt) = self.rt.as_ref() else {
+            return Err(RunError::Closed);
+        };
+        rt.block_on(async {
+            tokio::time::timeout(self.timeout, exec(&self.handle, cmd))
+                .await
+                .map_err(|_| RunError::Timeout)?
+        })
     }
 }
 
@@ -194,7 +250,11 @@ impl Drop for SshRunner {
         if let Some(rt) = self.rt.take() {
             // 정중히 끊되 오래 기다리지 않는다
             let _ = rt.block_on(async {
-                tokio::time::timeout(Duration::from_secs(2), self.handle.disconnect(Disconnect::ByApplication, "", "en")).await
+                tokio::time::timeout(
+                    Duration::from_secs(2),
+                    self.handle.disconnect(Disconnect::ByApplication, "", "en"),
+                )
+                .await
             });
             rt.shutdown_background();
         }

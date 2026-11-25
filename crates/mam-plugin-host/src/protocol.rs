@@ -53,8 +53,18 @@ pub struct ErrorBody {
 #[serde(tag = "t", rename_all = "snake_case")]
 pub enum HostMsg {
     /// 첫 메시지 — 플러그인 id·JS 소스 본문·한도. 워커는 경로로 파일을 열지 않는다
-    Init { v: u32, plugin_id: String, source: String, limits: Limits },
-    Invoke { id: u64, kind: InvokeKind, target: String, params: Value },
+    Init {
+        v: u32,
+        plugin_id: String,
+        source: String,
+        limits: Limits,
+    },
+    Invoke {
+        id: u64,
+        kind: InvokeKind,
+        target: String,
+        params: Value,
+    },
     HostResult {
         id: u64,
         ok: bool,
@@ -69,9 +79,19 @@ pub enum HostMsg {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "t", rename_all = "snake_case")]
 pub enum WorkerMsg {
-    Ready { v: u32, commands: Vec<String>, providers: Vec<String> },
-    InitError { message: String },
-    HostCall { id: u64, method: String, params: Value },
+    Ready {
+        v: u32,
+        commands: Vec<String>,
+        providers: Vec<String>,
+    },
+    InitError {
+        message: String,
+    },
+    HostCall {
+        id: u64,
+        method: String,
+        params: Value,
+    },
     Result {
         id: u64,
         ok: bool,
@@ -80,7 +100,10 @@ pub enum WorkerMsg {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         error: Option<ErrorBody>,
     },
-    Log { level: LogLevel, message: String },
+    Log {
+        level: LogLevel,
+        message: String,
+    },
 }
 
 /// 메시지를 한 줄(끝 `\n` 포함)로 직렬화한다
@@ -109,7 +132,12 @@ mod tests {
     #[test]
     fn t_phost_proto_01_round_trip_and_newline_framing() {
         // Arrange
-        let msg = HostMsg::Invoke { id: 7, kind: InvokeKind::Command, target: "a.b".into(), params: json!({"x": "줄\n바꿈"}) };
+        let msg = HostMsg::Invoke {
+            id: 7,
+            kind: InvokeKind::Command,
+            target: "a.b".into(),
+            params: json!({"x": "줄\n바꿈"}),
+        };
         // Act
         let line = encode_line(&msg).unwrap();
         // Assert: 내용 속 개행은 이스케이프되어 한 줄만 남는다
@@ -119,14 +147,39 @@ mod tests {
 
     #[test]
     fn t_phost_proto_02_unknown_malformed_and_incomplete_worker_lines_are_errors() {
-        for bad in [&b"not json"[..], b"{}", br#"{"t":"nonsense"}"#, br#"{"t":"result"}"#, br#"{"t":"host_call","id":"x","method":"m","params":null}"#, b""] {
-            assert!(parse_worker_line(bad).is_err(), "{}", String::from_utf8_lossy(bad));
+        for bad in [
+            &b"not json"[..],
+            b"{}",
+            br#"{"t":"nonsense"}"#,
+            br#"{"t":"result"}"#,
+            br#"{"t":"host_call","id":"x","method":"m","params":null}"#,
+            b"",
+        ] {
+            assert!(
+                parse_worker_line(bad).is_err(),
+                "{}",
+                String::from_utf8_lossy(bad)
+            );
         }
     }
 
     #[test]
     fn t_phost_proto_03_result_error_body_parses() {
-        let m = parse_worker_line(br#"{"t":"result","id":3,"ok":false,"error":{"code":"limit","message":"oom"}}"#).unwrap();
-        assert_eq!(m, WorkerMsg::Result { id: 3, ok: false, value: None, error: Some(ErrorBody { code: "limit".into(), message: "oom".into() }) });
+        let m = parse_worker_line(
+            br#"{"t":"result","id":3,"ok":false,"error":{"code":"limit","message":"oom"}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            m,
+            WorkerMsg::Result {
+                id: 3,
+                ok: false,
+                value: None,
+                error: Some(ErrorBody {
+                    code: "limit".into(),
+                    message: "oom".into()
+                })
+            }
+        );
     }
 }

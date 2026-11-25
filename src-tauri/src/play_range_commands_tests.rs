@@ -33,8 +33,10 @@ fn call<T: Send + 'static>(
 #[test]
 fn t_ipc_ranges_01_arguments_and_responses_use_camel_case_contract_shapes() {
     // Arrange + Act: command 인자(Vec<PlayRange>) 역직렬화
-    let ok: Vec<PlayRange> =
-        serde_json::from_value(json!([{"startMs": 100, "endMs": 900}, {"startMs": 2000, "endMs": 3000}])).unwrap();
+    let ok: Vec<PlayRange> = serde_json::from_value(
+        json!([{"startMs": 100, "endMs": 900}, {"startMs": 2000, "endMs": 3000}]),
+    )
+    .unwrap();
 
     // Assert: 계약 모양만 받는다 (snake_case·누락·소수·문자열은 command 진입 전에 거부)
     assert_eq!(ok.len(), 2);
@@ -45,28 +47,54 @@ fn t_ipc_ranges_01_arguments_and_responses_use_camel_case_contract_shapes() {
         json!({"startMs": "1", "endMs": 900}),
         json!(null),
     ] {
-        assert!(serde_json::from_value::<PlayRange>(bad.clone()).is_err(), "{bad}");
+        assert!(
+            serde_json::from_value::<PlayRange>(bad.clone()).is_err(),
+            "{bad}"
+        );
     }
     // 응답 키
-    assert_eq!(serde_json::to_value(ok[0]).unwrap(), json!({"startMs": 100, "endMs": 900}));
-    let s = serde_json::to_value(PlayRangeSummary { asset_id: 1, range_count: 2, total_ms: 1500 }).unwrap();
+    assert_eq!(
+        serde_json::to_value(ok[0]).unwrap(),
+        json!({"startMs": 100, "endMs": 900})
+    );
+    let s = serde_json::to_value(PlayRangeSummary {
+        asset_id: 1,
+        range_count: 2,
+        total_ms: 1500,
+    })
+    .unwrap();
     assert_eq!(s, json!({"assetId": 1, "rangeCount": 2, "totalMs": 1500}));
 
     // 서비스 왕복 (command 본문과 같은 호출)
     let (_dir, ud) = fixture();
     let saved = call(&ud, move |u| u.play_ranges_set(1, &ok)).unwrap();
-    assert_eq!(serde_json::to_value(&saved).unwrap(), json!([{"startMs": 100, "endMs": 900}, {"startMs": 2000, "endMs": 3000}]));
+    assert_eq!(
+        serde_json::to_value(&saved).unwrap(),
+        json!([{"startMs": 100, "endMs": 900}, {"startMs": 2000, "endMs": 3000}])
+    );
     let cid = ud.create_collection("c").unwrap().collection_id;
     ud.add_to_collection(cid, &[1]).unwrap();
     let sum = call(&ud, move |u| u.collection_play_range_summary(cid)).unwrap();
-    assert_eq!(serde_json::to_value(&sum).unwrap(), json!([{"assetId": 1, "rangeCount": 2, "totalMs": 1800}]));
+    assert_eq!(
+        serde_json::to_value(&sum).unwrap(),
+        json!([{"assetId": 1, "rangeCount": 2, "totalMs": 1800}])
+    );
 }
 
 #[test]
 fn t_ipc_ranges_02_errors_map_to_contract_codes_without_internals() {
     // Arrange
     let (_dir, ud) = fixture();
-    call(&ud, |u| u.play_ranges_set(1, &[PlayRange { start_ms: 0, end_ms: 1000 }])).unwrap();
+    call(&ud, |u| {
+        u.play_ranges_set(
+            1,
+            &[PlayRange {
+                start_ms: 0,
+                end_ms: 1000,
+            }],
+        )
+    })
+    .unwrap();
 
     // Act
     let not_found = [
@@ -75,19 +103,61 @@ fn t_ipc_ranges_02_errors_map_to_contract_codes_without_internals() {
         call(&ud, |u| u.collection_play_range_summary(99)).unwrap_err(),
     ];
     let invalid = [
-        call(&ud, |u| u.play_ranges_set(2, &[PlayRange { start_ms: 0, end_ms: 1000 }])).unwrap_err(),
-        call(&ud, |u| u.play_ranges_set(1, &[PlayRange { start_ms: 10, end_ms: 5 }])).unwrap_err(),
-        call(&ud, |u| u.play_ranges_set(1, &[PlayRange { start_ms: -1, end_ms: 5 }])).unwrap_err(),
+        call(&ud, |u| {
+            u.play_ranges_set(
+                2,
+                &[PlayRange {
+                    start_ms: 0,
+                    end_ms: 1000,
+                }],
+            )
+        })
+        .unwrap_err(),
+        call(&ud, |u| {
+            u.play_ranges_set(
+                1,
+                &[PlayRange {
+                    start_ms: 10,
+                    end_ms: 5,
+                }],
+            )
+        })
+        .unwrap_err(),
+        call(&ud, |u| {
+            u.play_ranges_set(
+                1,
+                &[PlayRange {
+                    start_ms: -1,
+                    end_ms: 5,
+                }],
+            )
+        })
+        .unwrap_err(),
     ];
 
     // Assert
-    assert!(not_found.iter().all(|e| e.code() == ErrorCode::NotFound), "{not_found:?}");
-    assert!(invalid.iter().all(|e| e.code() == ErrorCode::InvalidInput), "{invalid:?}");
+    assert!(
+        not_found.iter().all(|e| e.code() == ErrorCode::NotFound),
+        "{not_found:?}"
+    );
+    assert!(
+        invalid.iter().all(|e| e.code() == ErrorCode::InvalidInput),
+        "{invalid:?}"
+    );
     for e in not_found.iter().chain(invalid.iter()) {
         let body = serde_json::to_string(e).unwrap();
-        assert!(!body.contains("SELECT") && !body.contains("mam.sqlite") && !body.contains("C:/"), "{body}");
+        assert!(
+            !body.contains("SELECT") && !body.contains("mam.sqlite") && !body.contains("C:/"),
+            "{body}"
+        );
     }
     // 실패한 호출은 기존 구간을 바꾸지 않았다
     let kept = call(&ud, |u| u.play_ranges_get(1)).unwrap();
-    assert_eq!(kept, [PlayRange { start_ms: 0, end_ms: 1000 }]);
+    assert_eq!(
+        kept,
+        [PlayRange {
+            start_ms: 0,
+            end_ms: 1000
+        }]
+    );
 }

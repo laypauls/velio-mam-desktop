@@ -48,7 +48,11 @@ impl Mapper {
         }
         self.rules.iter().find_map(|r| {
             let rest = under(&p, &r.from)?;
-            Some(if rest.is_empty() { r.to.clone() } else { join(&r.to, rest) })
+            Some(if rest.is_empty() {
+                r.to.clone()
+            } else {
+                join(&r.to, rest)
+            })
         })
     }
 
@@ -63,14 +67,21 @@ impl Mapper {
 
 /// 세그먼트가 안전한가 — 빈 칸(루트)은 통과, `..` 와 윈도우 예약 문자·제어 문자는 거부.
 fn safe_segment(seg: &str) -> bool {
-    seg != ".." && !seg.chars().any(|c| c.is_control() || "<>:\"|?*".contains(c))
+    seg != ".."
+        && !seg
+            .chars()
+            .any(|c| c.is_control() || "<>:\"|?*".contains(c))
 }
 
 /// 앞에 `/` 를 붙이고 뒤의 `/` 를 떼어 `/a/b` 꼴로 맞춘다. 루트는 빈 문자열.
 fn norm_from(s: &str) -> String {
     let t = s.trim().replace('\\', "/");
     let t = t.trim_matches('/');
-    if t.is_empty() { String::new() } else { format!("/{t}") }
+    if t.is_empty() {
+        String::new()
+    } else {
+        format!("/{t}")
+    }
 }
 
 /// `p` 가 `base` 아래인지 한 칸 단위로 본다 (`/Proto` 가 `/Protools/x` 를 먹지 않는다). 아래면 `base` 를 뗀 나머지.
@@ -137,11 +148,19 @@ fn clean_to(s: &str) -> Option<String> {
         return None;
     }
     let plen = prefix_len(t);
-    Some(if plen > 0 && plen == t.len() { clean(&format!("{t}\\")) } else { clean(t) })
+    Some(if plen > 0 && plen == t.len() {
+        clean(&format!("{t}\\"))
+    } else {
+        clean(t)
+    })
 }
 
 fn join(to: &str, rest: &str) -> String {
-    clean(&format!("{}\\{}", to.trim_end_matches('\\'), rest.replace('/', "\\")))
+    clean(&format!(
+        "{}\\{}",
+        to.trim_end_matches('\\'),
+        rest.replace('/', "\\")
+    ))
 }
 
 /// 절대 경로(드라이브 또는 UNC 로 시작)인가 — 저장 검증용. 드라이브 상대(`E:a`)·상대 경로는 거부한다.
@@ -185,7 +204,10 @@ mod tests {
     use super::*;
 
     fn m(from: &str, to: &str) -> Mapping {
-        Mapping { from: from.into(), to: to.into() }
+        Mapping {
+            from: from.into(),
+            to: to.into(),
+        }
     }
 
     #[test]
@@ -204,7 +226,10 @@ mod tests {
     #[test]
     fn t_remote_map_02_longest_rule_wins() {
         let mp = Mapper::new(&[m("/", r"F:\UHD"), m("/Protools", r"G:\프로툴")]);
-        assert_eq!(mp.map("/Protools/mov3.mov").as_deref(), Some(r"G:\프로툴\mov3.mov"));
+        assert_eq!(
+            mp.map("/Protools/mov3.mov").as_deref(),
+            Some(r"G:\프로툴\mov3.mov")
+        );
         assert_eq!(mp.map("/1TV/a.mxf").as_deref(), Some(r"F:\UHD\1TV\a.mxf"));
     }
 
@@ -218,7 +243,10 @@ mod tests {
 
     #[test]
     fn t_remote_map_04_no_rule_or_empty_target_means_no_mapping() {
-        assert_eq!(Mapper::new(&[m("/Protools", r"G:\프로툴")]).map("/1TV/a.mxf"), None);
+        assert_eq!(
+            Mapper::new(&[m("/Protools", r"G:\프로툴")]).map("/1TV/a.mxf"),
+            None
+        );
         assert_eq!(Mapper::new(&[m("/", "")]).map("/a.mxf"), None);
         assert!(Mapper::new(&[]).is_empty());
     }
@@ -226,7 +254,10 @@ mod tests {
     #[test]
     fn t_remote_map_05_unc_shares_work_as_targets() {
         let mp = Mapper::new(&[m("/data/incoming", r"\\nas\media")]);
-        assert_eq!(mp.map("/data/incoming/a.mov").as_deref(), Some(r"\\nas\media\a.mov"));
+        assert_eq!(
+            mp.map("/data/incoming/a.mov").as_deref(),
+            Some(r"\\nas\media\a.mov")
+        );
         assert_eq!(mp.map("/data/incoming").as_deref(), Some(r"\\nas\media\"));
     }
 
@@ -240,17 +271,31 @@ mod tests {
             (r"E:\UHD\", r"E:\UHD\smi-storage\test01.mp4"),
         ] {
             let mp = Mapper::new(&[m("/", to)]);
-            assert_eq!(mp.map("/smi-storage/test01.mp4").as_deref(), Some(want), "to={to:?}");
+            assert_eq!(
+                mp.map("/smi-storage/test01.mp4").as_deref(),
+                Some(want),
+                "to={to:?}"
+            );
         }
         let mp = Mapper::new(&[m("/", r"E:\")]);
-        assert!(within_dir(&mp.map("/smi-storage/test01.mp4").unwrap(), r"E:\smi-storage"));
+        assert!(within_dir(
+            &mp.map("/smi-storage/test01.mp4").unwrap(),
+            r"E:\smi-storage"
+        ));
         assert_eq!(mp.map("/").as_deref(), Some(r"E:\"));
     }
 
     #[test]
     fn t_remote_map_07_untrusted_paths_with_dotdot_or_reserved_characters_are_not_mapped() {
         let mp = Mapper::new(&[m("/", r"F:\UHD")]);
-        for bad in ["/../Windows/x", "/a/../../b", "/a/b:stream", "/a/b*c", "/a/\0b", "/a/<b>"] {
+        for bad in [
+            "/../Windows/x",
+            "/a/../../b",
+            "/a/b:stream",
+            "/a/b*c",
+            "/a/\0b",
+            "/a/<b>",
+        ] {
             assert_eq!(mp.map(bad), None, "{bad:?}");
         }
     }
@@ -290,12 +335,21 @@ mod tests {
         }
         assert!(!map_reaches(&[], r"F:\UHD"));
         // 규칙 중 하나만 닿아도 된다
-        assert!(map_reaches(&[m("/a", r"G:\x"), m("/b", r"F:\UHD")], r"F:\UHD"));
+        assert!(map_reaches(
+            &[m("/a", r"G:\x"), m("/b", r"F:\UHD")],
+            r"F:\UHD"
+        ));
     }
 
     #[test]
     fn t_remote_map_10_absolute_target_paths_only() {
-        for ok in [r"F:\UHD", r"F:\", "F:/UHD", r"\\nas\media", r"\\nas\media\sub"] {
+        for ok in [
+            r"F:\UHD",
+            r"F:\",
+            "F:/UHD",
+            r"\\nas\media",
+            r"\\nas\media\sub",
+        ] {
             assert!(is_absolute(ok), "{ok}");
         }
         for bad in ["", "UHD", r"\UHD", "F:UHD", r"\\nas", r"\\nas\", "/data"] {

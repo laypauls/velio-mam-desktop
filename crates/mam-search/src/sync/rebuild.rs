@@ -11,9 +11,9 @@ use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
 
+use super::user_values::{ALL_VALUES_SQL, UserValueStream};
 use super::worker::SyncWorker;
 use super::{FULLTEXT_INDEX, Result, load, outbox};
-use super::user_values::{ALL_VALUES_SQL, UserValueStream};
 use crate::index::SearchIndex;
 use crate::retry_dir::{RetryPolicy, retry_io};
 

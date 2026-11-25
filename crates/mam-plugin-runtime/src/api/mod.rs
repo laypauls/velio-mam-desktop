@@ -12,7 +12,9 @@ mod errors;
 pub use dto::*;
 pub use errors::{InstallError, RunError};
 pub use mam_plugin_host::{InvokeError, ScopeTooLarge};
-pub use mam_plugin_manifest::{AssetKind, EngineError, LocaleError, ManifestError, Permission, PluginId};
+pub use mam_plugin_manifest::{
+    AssetKind, EngineError, LocaleError, ManifestError, Permission, PluginId,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -41,7 +43,13 @@ pub trait ProviderInvoker: Send + Sync {
     fn allows(&self, plugin: &str, perm: Permission) -> bool;
     /// 블로킹 — 작업 스레드 또는 `spawn_blocking` 에서만. 자산을 정렬·중복 제거해 `InvokeScope` 를 만들고,
     /// 호출 중에는 런타임 락을 쥐지 않는다.
-    fn invoke_provider(&self, plugin: &str, provider: &str, assets: Vec<i64>, params: Value) -> Result<Value, RunError>;
+    fn invoke_provider(
+        &self,
+        plugin: &str,
+        provider: &str,
+        assets: Vec<i64>,
+        params: Value,
+    ) -> Result<Value, RunError>;
 }
 
 /// `PluginJobs`(P5)가 구현하고 `PluginRuntime`(P6)이 부른다. 기본 구현은 아무것도 하지 않아 P6 시험이 단독으로 돈다.

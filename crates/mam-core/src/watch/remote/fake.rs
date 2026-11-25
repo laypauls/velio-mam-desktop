@@ -8,9 +8,9 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use super::RemoteSource;
 use super::fake_ses::FakeSes;
+use super::runner::{RemoteConnector, RemoteRunner, RunError, check_host_key};
 use crate::secret::{SecretBox, SecretError};
 use zeroize::Zeroizing;
-use super::runner::{RemoteConnector, RemoteRunner, RunError, check_host_key};
 
 #[derive(Default)]
 struct State {
@@ -28,7 +28,10 @@ pub struct FakeDdp(Arc<Mutex<State>>);
 
 impl FakeDdp {
     pub fn new(dir: &str) -> Self {
-        Self(Arc::new(Mutex::new(State { dir: dir.trim_end_matches('/').into(), ..State::default() })))
+        Self(Arc::new(Mutex::new(State {
+            dir: dir.trim_end_matches('/').into(),
+            ..State::default()
+        })))
     }
 
     fn st(&self) -> MutexGuard<'_, State> {
@@ -90,12 +93,18 @@ impl RemoteRunner for FakeRunner {
             if st.dir_missing {
                 return Err(RunError::NoLogDir);
             }
-            let mut s: String = st.files.iter().map(|(n, c)| format!("{} {n}\n", c.len())).collect();
+            let mut s: String = st
+                .files
+                .iter()
+                .map(|(n, c)| format!("{} {n}\n", c.len()))
+                .collect();
             s.push_str(&st.extra_listing);
             return Ok(s.into_bytes());
         }
         if let Some(rest) = cmd.strip_prefix("tail -c +") {
-            let (n, path) = rest.split_once(' ').ok_or_else(|| RunError::Exec("bad tail".into()))?;
+            let (n, path) = rest
+                .split_once(' ')
+                .ok_or_else(|| RunError::Exec("bad tail".into()))?;
             let n: usize = n.parse().map_err(|_| RunError::Exec("bad offset".into()))?;
             let path = path.trim_matches('\'');
             let name = path.strip_prefix(&format!("{}/", st.dir)).unwrap_or(path);
@@ -133,7 +142,10 @@ impl FakeConnector {
 
     /// 가짜 SES 호스트에 붙는 연결기
     pub fn ses(ses: FakeSes, fingerprint: &str) -> Self {
-        Self { ses: Some(ses), ..Self::new(FakeDdp::default(), fingerprint) }
+        Self {
+            ses: Some(ses),
+            ..Self::new(FakeDdp::default(), fingerprint)
+        }
     }
 
     pub fn fail_connects(&self, times: u32, e: RunError) {
@@ -152,7 +164,10 @@ impl FakeConnector {
 impl RemoteConnector for FakeConnector {
     fn connect(&self, src: &RemoteSource) -> Result<Box<dyn RemoteRunner>, RunError> {
         self.connects.fetch_add(1, Ordering::SeqCst);
-        self.seen.lock().unwrap_or_else(|p| p.into_inner()).push((src.host.clone(), src.user.clone()));
+        self.seen
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .push((src.host.clone(), src.user.clone()));
         {
             let mut f = self.fail_next.lock().unwrap_or_else(|p| p.into_inner());
             if f.0 > 0 {
@@ -185,7 +200,9 @@ pub struct FakeSecretBox;
 
 impl SecretBox for FakeSecretBox {
     fn seal(&self, plain: &[u8]) -> Result<Vec<u8>, SecretError> {
-        Ok(std::iter::once(0xA5).chain(plain.iter().map(|b| b ^ 0x5A)).collect())
+        Ok(std::iter::once(0xA5)
+            .chain(plain.iter().map(|b| b ^ 0x5A))
+            .collect())
     }
 
     fn open(&self, blob: &[u8]) -> Result<Zeroizing<Vec<u8>>, SecretError> {

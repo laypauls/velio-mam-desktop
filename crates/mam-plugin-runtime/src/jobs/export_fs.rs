@@ -43,7 +43,9 @@ fn invalid(m: &'static str) -> ExportError {
 pub(super) fn check_shape(dest: &str, ext: &str) -> Result<PathBuf, ExportError> {
     // 매니페스트 검증과 같은 허용 목록을 한 번 더 — 실행·스크립트 형식은 쓰지 않는다
     if !export_extension_allowed(ext) {
-        return Err(invalid("provider file extension is not an allowed export format"));
+        return Err(invalid(
+            "provider file extension is not an allowed export format",
+        ));
     }
     if dest.is_empty() || dest.contains('\0') {
         return Err(invalid("destPath is empty or contains NUL"));
@@ -52,18 +54,30 @@ pub(super) fn check_shape(dest: &str, ext: &str) -> Result<PathBuf, ExportError>
     if !path.is_absolute() {
         return Err(invalid("destPath must be absolute"));
     }
-    let name = path.file_name().and_then(|n| n.to_str()).ok_or(invalid("destPath has no file name"))?;
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or(invalid("destPath has no file name"))?;
     // 대체 데이터 스트림(`a:b`)·와일드카드·제어 문자 이름은 거부한다
-    if name.chars().any(|c| c.is_control() || matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*')) {
+    if name
+        .chars()
+        .any(|c| c.is_control() || matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*'))
+    {
         return Err(invalid("destPath file name has invalid characters"));
     }
     if is_reserved_device_name(name) {
         return Err(invalid("destPath file name is a reserved device name"));
     }
-    if !path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case(ext)) {
+    if !path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case(ext))
+    {
         return Err(invalid("destPath extension does not match the provider"));
     }
-    let parent_ok = path.parent().is_some_and(|p| fs::metadata(p).is_ok_and(|m| m.is_dir()));
+    let parent_ok = path
+        .parent()
+        .is_some_and(|p| fs::metadata(p).is_ok_and(|m| m.is_dir()));
     if !parent_ok {
         return Err(invalid("destPath parent folder does not exist"));
     }
@@ -79,7 +93,11 @@ fn is_reserved_device_name(name: &str) -> bool {
 }
 
 /// 관리 폴더 루트·보호 경로(MAMData·백업) 어느 것과도 같거나 포함 관계면 거부
-pub(super) fn check_overlap(dest: &Path, roots: &[PathBuf], protected: &[PathBuf]) -> Result<(), ExportError> {
+pub(super) fn check_overlap(
+    dest: &Path,
+    roots: &[PathBuf],
+    protected: &[PathBuf],
+) -> Result<(), ExportError> {
     if roots.iter().any(|r| paths_overlap(dest, r)) {
         return Err(invalid(IN_MANAGED));
     }
@@ -92,9 +110,19 @@ pub(super) fn check_overlap(dest: &Path, roots: &[PathBuf], protected: &[PathBuf
 static SEQ: AtomicU64 = AtomicU64::new(0);
 
 fn temp_path(dest: &Path) -> PathBuf {
-    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
-    let name = dest.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-    let tag = format!("{:x}{:x}{:x}", nanos, std::process::id(), SEQ.fetch_add(1, Ordering::Relaxed));
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos());
+    let name = dest
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let tag = format!(
+        "{:x}{:x}{:x}",
+        nanos,
+        std::process::id(),
+        SEQ.fetch_add(1, Ordering::Relaxed)
+    );
     dest.with_file_name(format!("{name}.{tag}.mamtmp"))
 }
 
@@ -117,12 +145,21 @@ impl Drop for TempGuard<'_> {
 fn final_path(file: &fs::File, _fallback: &Path) -> io::Result<PathBuf> {
     use std::os::windows::ffi::OsStringExt;
     use std::os::windows::io::AsRawHandle;
-    use windows_sys::Win32::Storage::FileSystem::{FILE_NAME_NORMALIZED, GetFinalPathNameByHandleW, VOLUME_NAME_DOS};
+    use windows_sys::Win32::Storage::FileSystem::{
+        FILE_NAME_NORMALIZED, GetFinalPathNameByHandleW, VOLUME_NAME_DOS,
+    };
     let handle = file.as_raw_handle();
     let mut buf = vec![0u16; 512];
     loop {
         // SAFETY: `handle` 는 `file` 이 살아 있는 동안 유효하고, `buf` 길이를 함께 넘긴다
-        let n = unsafe { GetFinalPathNameByHandleW(handle as _, buf.as_mut_ptr(), buf.len() as u32, FILE_NAME_NORMALIZED | VOLUME_NAME_DOS) } as usize;
+        let n = unsafe {
+            GetFinalPathNameByHandleW(
+                handle as _,
+                buf.as_mut_ptr(),
+                buf.len() as u32,
+                FILE_NAME_NORMALIZED | VOLUME_NAME_DOS,
+            )
+        } as usize;
         if n == 0 {
             return Err(io::Error::last_os_error());
         }
@@ -140,7 +177,11 @@ fn final_path(_file: &fs::File, fallback: &Path) -> io::Result<PathBuf> {
 }
 
 /// 임시 파일을 만든 직후 그 실제 위치로 `check_real` 을 다시 돈다(TOCTOU) — 거부하면 임시 파일을 지우고 쓰지 않는다
-pub(super) fn write_temp_rename(dest: &Path, bytes: &[u8], check_real: &dyn Fn(&Path) -> Result<(), ExportError>) -> Result<(), ExportError> {
+pub(super) fn write_temp_rename(
+    dest: &Path,
+    bytes: &[u8],
+    check_real: &dyn Fn(&Path) -> Result<(), ExportError>,
+) -> Result<(), ExportError> {
     let mut last = io::Error::other("temp file name collision");
     for _ in 0..5 {
         let temp = temp_path(dest);
@@ -152,7 +193,10 @@ pub(super) fn write_temp_rename(dest: &Path, bytes: &[u8], check_real: &dyn Fn(&
             }
             Err(e) => return Err(e.into()),
         };
-        let mut guard = TempGuard { path: &temp, armed: true };
+        let mut guard = TempGuard {
+            path: &temp,
+            armed: true,
+        };
         check_real(&final_path(&file, &temp)?)?;
         file.write_all(bytes)?;
         file.sync_all()?;
@@ -184,11 +228,22 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let dir = tmp.path();
         let ok = dir.join("out.CSV");
-        assert!(check_shape(ok.to_str().unwrap(), "csv").is_ok(), "case-insensitive extension");
+        assert!(
+            check_shape(ok.to_str().unwrap(), "csv").is_ok(),
+            "case-insensitive extension"
+        );
         assert!(msg(check_shape("", "csv")).contains("empty"));
         assert!(msg(check_shape("out.csv", "csv")).contains("absolute"));
-        assert!(msg(check_shape(dir.join("out.txt").to_str().unwrap(), "csv")).contains("extension"));
-        assert!(msg(check_shape(dir.join("missing").join("out.csv").to_str().unwrap(), "csv")).contains("parent"));
+        assert!(
+            msg(check_shape(dir.join("out.txt").to_str().unwrap(), "csv")).contains("extension")
+        );
+        assert!(
+            msg(check_shape(
+                dir.join("missing").join("out.csv").to_str().unwrap(),
+                "csv"
+            ))
+            .contains("parent")
+        );
         let ads = format!(r"{}\a:b.csv", dir.display()); // `join` would treat `a:` as a drive prefix
         let m = msg(check_shape(&ads, "csv"));
         assert!(m.contains("invalid characters"), "{m}");
@@ -208,12 +263,18 @@ mod tests {
         }
         let (roots, prot) = (vec![root.clone()], vec![data.clone()]);
         assert!(check_overlap(&free.join("o.csv"), &roots, &prot).is_ok());
-        assert!(matches!(check_overlap(&root.join("o.csv"), &roots, &prot), Err(ExportError::InvalidInput(m)) if m == IN_MANAGED));
-        assert!(matches!(check_overlap(&root.join("sub").join("o.csv"), &roots, &prot), Err(ExportError::InvalidInput(m)) if m == IN_MANAGED));
+        assert!(
+            matches!(check_overlap(&root.join("o.csv"), &roots, &prot), Err(ExportError::InvalidInput(m)) if m == IN_MANAGED)
+        );
+        assert!(
+            matches!(check_overlap(&root.join("sub").join("o.csv"), &roots, &prot), Err(ExportError::InvalidInput(m)) if m == IN_MANAGED)
+        );
         // 대소문자 변형
         let upper = PathBuf::from(root.to_string_lossy().to_uppercase()).join("o.csv");
         assert!(check_overlap(&upper, &roots, &prot).is_err());
-        assert!(matches!(check_overlap(&data.join("o.csv"), &roots, &prot), Err(ExportError::InvalidInput(m)) if m == IN_PROTECTED));
+        assert!(
+            matches!(check_overlap(&data.join("o.csv"), &roots, &prot), Err(ExportError::InvalidInput(m)) if m == IN_PROTECTED)
+        );
     }
 
     #[test]
@@ -223,7 +284,11 @@ mod tests {
         fs::write(&dest, b"old").unwrap();
         write_temp_rename(&dest, b"new,data", &|_| Ok(())).unwrap();
         assert_eq!(fs::read(&dest).unwrap(), b"new,data");
-        let leftovers: Vec<_> = fs::read_dir(tmp.path()).unwrap().flatten().filter(|e| e.file_name().to_string_lossy().ends_with(".mamtmp")).collect();
+        let leftovers: Vec<_> = fs::read_dir(tmp.path())
+            .unwrap()
+            .flatten()
+            .filter(|e| e.file_name().to_string_lossy().ends_with(".mamtmp"))
+            .collect();
         assert!(leftovers.is_empty());
     }
 
@@ -233,12 +298,20 @@ mod tests {
         let dest = tmp.path().join("out.csv");
         fs::create_dir(&dest).unwrap(); // rename onto a directory fails
         assert!(write_temp_rename(&dest, b"x", &|_| Ok(())).is_err());
-        let leftovers = fs::read_dir(tmp.path()).unwrap().flatten().filter(|e| e.file_name().to_string_lossy().ends_with(".mamtmp")).count();
+        let leftovers = fs::read_dir(tmp.path())
+            .unwrap()
+            .flatten()
+            .filter(|e| e.file_name().to_string_lossy().ends_with(".mamtmp"))
+            .count();
         assert_eq!(leftovers, 0, "temp file cleaned after a write failure");
     }
 
     fn temp_leftovers(dir: &Path) -> usize {
-        fs::read_dir(dir).unwrap().flatten().filter(|e| e.file_name().to_string_lossy().ends_with(".mamtmp")).count()
+        fs::read_dir(dir)
+            .unwrap()
+            .flatten()
+            .filter(|e| e.file_name().to_string_lossy().ends_with(".mamtmp"))
+            .count()
     }
 
     #[test]
@@ -262,7 +335,11 @@ mod tests {
         // Act
         let r = write_temp_rename(&dest, b"new", &|_| {
             calls.set(calls.get() + 1);
-            if calls.get() >= 2 { Err(invalid(IN_MANAGED)) } else { Ok(()) }
+            if calls.get() >= 2 {
+                Err(invalid(IN_MANAGED))
+            } else {
+                Ok(())
+            }
         });
 
         // Assert — 기존 대상은 그대로, 임시 파일은 없음
@@ -274,10 +351,25 @@ mod tests {
 
     #[test]
     fn t_pjob_exportfs_06_reserved_names_incl_superscript_and_extension_allowlist() {
-        for name in ["COM1.csv", "lpt9.csv", "COM\u{b9}.csv", "COM\u{b2}.csv", "LPT\u{b3}.csv", "CONIN$.csv", "conout$.csv", "nul.csv"] {
+        for name in [
+            "COM1.csv",
+            "lpt9.csv",
+            "COM\u{b9}.csv",
+            "COM\u{b2}.csv",
+            "LPT\u{b3}.csv",
+            "CONIN$.csv",
+            "conout$.csv",
+            "nul.csv",
+        ] {
             assert!(is_reserved_device_name(name), "{name}");
         }
-        for name in ["COM0.csv", "COM10.csv", "COMA.csv", "console.csv", "out.csv"] {
+        for name in [
+            "COM0.csv",
+            "COM10.csv",
+            "COMA.csv",
+            "console.csv",
+            "out.csv",
+        ] {
             assert!(!is_reserved_device_name(name), "{name}");
         }
         let tmp = tempfile::tempdir().unwrap();
@@ -295,18 +387,37 @@ mod tests {
         let root = tmp.path().join("media");
         let link = tmp.path().join("link");
         fs::create_dir(&root).unwrap();
-        let status = std::process::Command::new("cmd").args(["/C", "mklink", "/J"]).arg(&link).arg(&root).output().unwrap();
+        let status = std::process::Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(&link)
+            .arg(&root)
+            .output()
+            .unwrap();
         assert!(status.status.success(), "mklink /J failed");
         let roots = vec![root.clone()];
         let dest = link.join("out.csv");
         let r = write_temp_rename(&dest, b"x", &|real| check_overlap(real, &roots, &[]));
-        assert!(matches!(r, Err(ExportError::InvalidInput(m)) if m == IN_MANAGED), "{r:?}");
-        assert_eq!(fs::read_dir(&root).unwrap().count(), 0, "temp file removed from the original folder");
+        assert!(
+            matches!(r, Err(ExportError::InvalidInput(m)) if m == IN_MANAGED),
+            "{r:?}"
+        );
+        assert_eq!(
+            fs::read_dir(&root).unwrap().count(),
+            0,
+            "temp file removed from the original folder"
+        );
         assert!(!root.join("out.csv").exists());
         // 정션이 아닌 일반 폴더는 같은 검사를 통과한다
         let free = tmp.path().join("free");
         fs::create_dir(&free).unwrap();
-        assert!(write_temp_rename(&free.join("out.csv"), b"ok", &|real| check_overlap(real, &roots, &[])).is_ok());
+        assert!(
+            write_temp_rename(&free.join("out.csv"), b"ok", &|real| check_overlap(
+                real,
+                &roots,
+                &[]
+            ))
+            .is_ok()
+        );
         let _ = fs::remove_dir(&link); // 정션만 지운다 (대상은 유지)
     }
 }

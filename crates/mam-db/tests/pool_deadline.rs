@@ -16,18 +16,28 @@ const SHORT: Duration = Duration::from_millis(150);
 
 fn pool(readers: usize) -> (tempfile::TempDir, Arc<DbPool>) {
     let db = migrated_db();
-    db.conn.execute_batch("CREATE TABLE t (n INTEGER NOT NULL, tag TEXT NOT NULL DEFAULT '')").unwrap();
+    db.conn
+        .execute_batch("CREATE TABLE t (n INTEGER NOT NULL, tag TEXT NOT NULL DEFAULT '')")
+        .unwrap();
     let (dir, path) = (db.dir, db.db_path);
     drop(db.conn);
     (dir, Arc::new(DbPool::open(&path, readers).unwrap()))
 }
 
 fn rows(pool: &DbPool) -> Vec<String> {
-    pool.read(|c| Ok(c.prepare("SELECT tag FROM t ORDER BY rowid")?.query_map([], |r| r.get(0))?.collect::<Result<_, _>>()?)).unwrap()
+    pool.read(|c| {
+        Ok(c.prepare("SELECT tag FROM t ORDER BY rowid")?
+            .query_map([], |r| r.get(0))?
+            .collect::<Result<_, _>>()?)
+    })
+    .unwrap()
 }
 
 /// 쓰기 스레드를 막는 작업을 시작하고 (시작 확인 후) 해제 송신자를 돌려준다
-fn block_writer(pool: &Arc<DbPool>, priority: Priority) -> (mpsc::Sender<()>, std::thread::JoinHandle<()>) {
+fn block_writer(
+    pool: &Arc<DbPool>,
+    priority: Priority,
+) -> (mpsc::Sender<()>, std::thread::JoinHandle<()>) {
     let (started_tx, started_rx) = mpsc::channel();
     let (release_tx, release_rx) = mpsc::channel::<()>();
     let p = Arc::clone(pool);
@@ -43,7 +53,9 @@ fn block_writer(pool: &Arc<DbPool>, priority: Priority) -> (mpsc::Sender<()>, st
     (release_tx, h)
 }
 
-fn insert(tag: &'static str) -> impl FnOnce(&mut rusqlite::Connection) -> Result<(), mam_db::DbError> + Send + 'static {
+fn insert(
+    tag: &'static str,
+) -> impl FnOnce(&mut rusqlite::Connection) -> Result<(), mam_db::DbError> + Send + 'static {
     move |c| {
         c.execute("INSERT INTO t (n, tag) VALUES (0, ?1)", [tag])?;
         Ok(())
@@ -53,7 +65,8 @@ fn insert(tag: &'static str) -> impl FnOnce(&mut rusqlite::Connection) -> Result
 #[test]
 fn t_pool_01_write_until_runs_normally_before_the_deadline() {
     let (_d, pool) = pool(2);
-    pool.write_until(Priority::Low, Instant::now() + WAIT, insert("ok")).unwrap();
+    pool.write_until(Priority::Low, Instant::now() + WAIT, insert("ok"))
+        .unwrap();
     assert_eq!(rows(&pool), ["ok"]);
 }
 
@@ -64,7 +77,9 @@ fn t_pool_02_write_blocked_past_deadline_is_cancelled_and_never_runs_later() {
     let (release, gate) = block_writer(&pool, Priority::High);
     // Act: 짧은 마감
     let t = Instant::now();
-    let e = pool.write_until(Priority::Low, Instant::now() + SHORT, insert("late")).unwrap_err();
+    let e = pool
+        .write_until(Priority::Low, Instant::now() + SHORT, insert("late"))
+        .unwrap_err();
     // Assert: 마감 안에 돌아오고, 막힘이 풀린 뒤에도 실행되지 않는다
     assert!(matches!(e, PoolError::DeadlineExceeded), "{e:?}");
     assert!(t.elapsed() < WAIT);
@@ -78,8 +93,14 @@ fn t_pool_02_write_blocked_past_deadline_is_cancelled_and_never_runs_later() {
 fn t_pool_03_already_expired_deadline_never_touches_the_queue_or_a_reader() {
     let (_d, pool) = pool(1);
     let past = Instant::now();
-    assert!(matches!(pool.write_until(Priority::High, past, insert("x")), Err(PoolError::DeadlineExceeded)));
-    assert!(matches!(pool.read_until(past, |_| Ok(())), Err(PoolError::DeadlineExceeded)));
+    assert!(matches!(
+        pool.write_until(Priority::High, past, insert("x")),
+        Err(PoolError::DeadlineExceeded)
+    ));
+    assert!(matches!(
+        pool.read_until(past, |_| Ok(())),
+        Err(PoolError::DeadlineExceeded)
+    ));
     assert_eq!(pool.pending_writes(), 0);
     assert!(rows(&pool).is_empty());
 }
@@ -114,17 +135,24 @@ fn t_pool_05_low_write_yields_to_high_and_cancelled_job_does_not_block_the_queue
     let (_d, pool) = pool(2);
     let (release, gate) = block_writer(&pool, Priority::Low);
     let p = Arc::clone(&pool);
-    let low = std::thread::spawn(move || p.write_until(Priority::Low, Instant::now() + WAIT, insert("low")));
+    let low = std::thread::spawn(move || {
+        p.write_until(Priority::Low, Instant::now() + WAIT, insert("low"))
+    });
     while pool.pending_writes() < 1 {
         std::thread::yield_now();
     }
     let p = Arc::clone(&pool);
-    let high = std::thread::spawn(move || p.write_until(Priority::High, Instant::now() + WAIT, insert("high")));
+    let high = std::thread::spawn(move || {
+        p.write_until(Priority::High, Instant::now() + WAIT, insert("high"))
+    });
     while pool.pending_writes() < 2 {
         std::thread::yield_now();
     }
     // 취소될 Low 도 하나 더 — 건너뛰어도 뒤 작업이 진행돼야 한다
-    assert!(pool.write_until(Priority::Low, Instant::now() + SHORT, insert("cancelled")).is_err());
+    assert!(
+        pool.write_until(Priority::Low, Instant::now() + SHORT, insert("cancelled"))
+            .is_err()
+    );
     // Act
     release.send(()).unwrap();
     gate.join().unwrap();
@@ -170,13 +198,23 @@ fn t_pool_07_read_until_times_out_when_all_readers_are_busy_and_recovers() {
     started_rx.recv_timeout(WAIT).unwrap();
     // Act
     let t = Instant::now();
-    let e = pool.read_until(Instant::now() + SHORT, |_| Ok(())).unwrap_err();
+    let e = pool
+        .read_until(Instant::now() + SHORT, |_| Ok(()))
+        .unwrap_err();
     // Assert: 마감 안에 포기, 연결을 돌려주면 다시 읽힌다
     assert!(matches!(e, PoolError::DeadlineExceeded), "{e:?}");
     assert!(t.elapsed() < WAIT);
     release_tx.send(()).unwrap();
     h.join().unwrap().unwrap();
-    assert_eq!(pool.read_until(Instant::now() + WAIT, |c| Ok(c.query_row("SELECT 7", [], |r| r.get::<_, i64>(0))?)).unwrap(), 7);
+    assert_eq!(
+        pool.read_until(Instant::now() + WAIT, |c| Ok(c.query_row(
+            "SELECT 7",
+            [],
+            |r| r.get::<_, i64>(0)
+        )?))
+        .unwrap(),
+        7
+    );
 }
 
 #[test]
@@ -202,7 +240,10 @@ fn t_pool_09_closed_pool_is_writer_gone_and_a_waiting_caller_is_released() {
     let (_d, pool) = pool(1);
     pool.shutdown();
     // Act / Assert
-    assert!(matches!(pool.write_until(Priority::Low, Instant::now() + WAIT, insert("x")), Err(PoolError::WriterGone)));
+    assert!(matches!(
+        pool.write_until(Priority::Low, Instant::now() + WAIT, insert("x")),
+        Err(PoolError::WriterGone)
+    ));
     // 읽기는 닫힌 풀에서도 동작한다(기존 `read` 와 같음)
     assert!(pool.read_until(Instant::now() + WAIT, |_| Ok(())).is_ok());
 }
@@ -210,8 +251,10 @@ fn t_pool_09_closed_pool_is_writer_gone_and_a_waiting_caller_is_released() {
 #[test]
 fn t_pool_10_panicking_write_until_reports_panicked_and_writer_survives() {
     let (_d, pool) = pool(1);
-    let r: Result<(), _> = pool.write_until(Priority::Low, Instant::now() + WAIT, |_| panic!("boom"));
+    let r: Result<(), _> =
+        pool.write_until(Priority::Low, Instant::now() + WAIT, |_| panic!("boom"));
     assert!(matches!(r, Err(PoolError::Panicked)));
-    pool.write_until(Priority::Low, Instant::now() + WAIT, insert("alive")).unwrap();
+    pool.write_until(Priority::Low, Instant::now() + WAIT, insert("alive"))
+        .unwrap();
     assert_eq!(rows(&pool), ["alive"]);
 }

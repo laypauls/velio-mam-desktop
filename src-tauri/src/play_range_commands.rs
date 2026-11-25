@@ -46,7 +46,10 @@ pub async fn collection_play_range_summary(
     svc: Shared<'_>,
     collection_id: i64,
 ) -> Result<Vec<PlayRangeSummary>, CommandError> {
-    blocking(&svc, move |u| u.collection_play_range_summary(collection_id)).await
+    blocking(&svc, move |u| {
+        u.collection_play_range_summary(collection_id)
+    })
+    .await
 }
 
 #[cfg(test)]

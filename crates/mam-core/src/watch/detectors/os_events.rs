@@ -37,15 +37,16 @@ impl ChangeDetector for OsEvents {
         // 핸들러가 버려질 때(= notify 스레드가 디렉터리 핸들을 닫은 뒤) 토큰이 풀린다
         let token = sink.release_token();
         let s = sink.clone();
-        let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
-            let _keep = &token;
-            let failed = res.is_err();
-            let msgs = convert(s.folder_id(), res);
-            report_health(&s, failed, &msgs);
-            for m in msgs {
-                s.emit(m);
-            }
-        })?;
+        let mut watcher =
+            notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+                let _keep = &token;
+                let failed = res.is_err();
+                let msgs = convert(s.folder_id(), res);
+                report_health(&s, failed, &msgs);
+                for m in msgs {
+                    s.emit(m);
+                }
+            })?;
         watcher.watch(&target.root, RecursiveMode::Recursive)?;
         Ok(Box::new(OsEventsHandle(watcher)))
     }
@@ -54,7 +55,11 @@ impl ChangeDetector for OsEvents {
 /// 이벤트 넘침·감시 오류는 잠시 `Degraded`(재스캔이 보완), 변경이 있으면 마지막 신호 시각만 갱신한다.
 pub(crate) fn report_health(sink: &ChangeSink, failed: bool, msgs: &[WatchMsg]) {
     if msgs.iter().any(|m| matches!(m, WatchMsg::Rescan { .. })) {
-        let key = if failed { HEALTH_ERROR } else { HEALTH_OVERFLOW };
+        let key = if failed {
+            HEALTH_ERROR
+        } else {
+            HEALTH_OVERFLOW
+        };
         sink.degraded_for(key, DEGRADED_HOLD_MS);
     } else if !msgs.is_empty() {
         sink.signal();

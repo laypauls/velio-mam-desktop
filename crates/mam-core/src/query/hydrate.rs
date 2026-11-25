@@ -5,7 +5,9 @@ use std::collections::HashMap;
 
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
-use super::types::{AiCardState, AssetDetail, AssetSummary, Availability, CollectionRef, MediaKind, TagRef};
+use super::types::{
+    AiCardState, AssetDetail, AssetSummary, Availability, CollectionRef, MediaKind, TagRef,
+};
 use crate::processing::media_info;
 use crate::scan::IngestError;
 use crate::userdata::json_ids;

@@ -399,7 +399,13 @@ fn t_exit_search_01_worker_stops_on_signal_within_the_deadline_and_stopping_twic
 fn set_title_setting(fx: &Fx, on: bool) {
     fx.pool
         .write(Priority::High, move |c| {
-            Ok(mam_db::settings::update(c, serde_json::json!({"titleEditEnabled": on}).as_object().unwrap()).is_ok())
+            Ok(mam_db::settings::update(
+                c,
+                serde_json::json!({"titleEditEnabled": on})
+                    .as_object()
+                    .unwrap(),
+            )
+            .is_ok())
         })
         .unwrap()
         .then_some(())
@@ -469,10 +475,17 @@ fn t_ipc_40_backward_and_at_pages_report_positions_and_a_js_safe_generation() {
     assert_eq!(at1.start_offset, 1);
     assert_eq!(ids(&at1), [ids(&first)[1], ids(&second)[0]]);
     assert!(end.items.is_empty());
-    assert_eq!((end.total, end.start_offset), (3, 3), "at == total is an empty page");
+    assert_eq!(
+        (end.total, end.start_offset),
+        (3, 3),
+        "at == total is an empty page"
+    );
     for p in [&first, &second, &before, &at1, &end] {
         assert_eq!(p.generation, first.generation);
-        assert!((0..(1i64 << 53)).contains(&p.generation), "fits a JS safe integer");
+        assert!(
+            (0..(1i64 << 53)).contains(&p.generation),
+            "fits a JS safe integer"
+        );
     }
 }
 
@@ -496,8 +509,16 @@ fn t_ipc_41_conflicting_paging_arguments_map_to_invalid_input() {
     negative.at = Some(-1);
 
     // Act + Assert
-    for (name, r) in [("cursor+at", both), ("backward without cursor", orphan), ("negative at", negative)] {
-        assert_eq!(code_of(fx.search.search(&r).unwrap_err()), ErrorCode::InvalidInput, "{name}");
+    for (name, r) in [
+        ("cursor+at", both),
+        ("backward without cursor", orphan),
+        ("negative at", negative),
+    ] {
+        assert_eq!(
+            code_of(fx.search.search(&r).unwrap_err()),
+            ErrorCode::InvalidInput,
+            "{name}"
+        );
     }
 }
 
@@ -505,7 +526,10 @@ fn index_request(sort: SortField, direction: SortDirection) -> SearchIndexReques
     SearchIndexRequest {
         query: String::new(),
         filters: filters(),
-        sort: SortSpec { field: sort, direction },
+        sort: SortSpec {
+            field: sort,
+            direction,
+        },
         mode: None,
     }
 }
@@ -517,23 +541,63 @@ fn t_ipc_42_search_index_has_the_contract_shape_and_matches_the_search_total() {
     ready(&fx, 3);
 
     // Act
-    let by_name = fx.search.search_index(&index_request(SortField::Name, SortDirection::Asc)).unwrap();
-    let by_name_desc = fx.search.search_index(&index_request(SortField::Name, SortDirection::Desc)).unwrap();
-    let by_size = fx.search.search_index(&index_request(SortField::Size, SortDirection::Asc)).unwrap();
-    let by_modified = fx.search.search_index(&index_request(SortField::ModifiedAt, SortDirection::Desc)).unwrap();
+    let by_name = fx
+        .search
+        .search_index(&index_request(SortField::Name, SortDirection::Asc))
+        .unwrap();
+    let by_name_desc = fx
+        .search
+        .search_index(&index_request(SortField::Name, SortDirection::Desc))
+        .unwrap();
+    let by_size = fx
+        .search
+        .search_index(&index_request(SortField::Size, SortDirection::Asc))
+        .unwrap();
+    let by_modified = fx
+        .search
+        .search_index(&index_request(SortField::ModifiedAt, SortDirection::Desc))
+        .unwrap();
     let json = serde_json::to_value(&by_name).unwrap();
     let page = fx.search.search(&request("")).unwrap();
 
     // Assert: 파일명 beach party / forest / sunset beach -> b, f, s
-    let pairs = |i: &SearchIndex| i.sections.iter().map(|s| (s.key.clone(), s.count)).collect::<Vec<_>>();
-    assert_eq!(pairs(&by_name), [("b".to_string(), 1), ("f".to_string(), 1), ("s".to_string(), 1)]);
-    assert_eq!(pairs(&by_name_desc), [("s".to_string(), 1), ("f".to_string(), 1), ("b".to_string(), 1)]);
+    let pairs = |i: &SearchIndex| {
+        i.sections
+            .iter()
+            .map(|s| (s.key.clone(), s.count))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        pairs(&by_name),
+        [
+            ("b".to_string(), 1),
+            ("f".to_string(), 1),
+            ("s".to_string(), 1)
+        ]
+    );
+    assert_eq!(
+        pairs(&by_name_desc),
+        [
+            ("s".to_string(), 1),
+            ("f".to_string(), 1),
+            ("b".to_string(), 1)
+        ]
+    );
     assert_eq!(by_name.kind, IndexKind::Initial);
-    assert_eq!((by_size.kind, pairs(&by_size)), (IndexKind::None, vec![("all".to_string(), 3)]));
+    assert_eq!(
+        (by_size.kind, pairs(&by_size)),
+        (IndexKind::None, vec![("all".to_string(), 3)])
+    );
     assert_eq!(by_modified.kind, IndexKind::Month);
-    assert_eq!(by_modified.sections.iter().map(|s| s.count).sum::<i64>(), by_modified.total);
+    assert_eq!(
+        by_modified.sections.iter().map(|s| s.count).sum::<i64>(),
+        by_modified.total
+    );
     assert_eq!(by_name.total, page.total);
-    assert_eq!(by_name.generation, page.generation, "index and page agree on the generation");
+    assert_eq!(
+        by_name.generation, page.generation,
+        "index and page agree on the generation"
+    );
     assert_eq!(keys(&json), ["generation", "kind", "sections", "total"]);
     assert_eq!(keys(&json["sections"][0]), ["count", "key", "label"]);
     assert!(json["sections"][0]["label"].is_null());
@@ -550,12 +614,25 @@ fn t_ipc_43_search_index_validates_filters_like_search() {
     let mut long = index_request(SortField::Name, SortDirection::Asc);
     long.query = "가".repeat(501);
     let mut unknown = index_request(SortField::Name, SortDirection::Asc);
-    unknown.filters.folder = Some(FolderScope { folder_id: 99, rel_path: None, recursive: true });
+    unknown.filters.folder = Some(FolderScope {
+        folder_id: 99,
+        rel_path: None,
+        recursive: true,
+    });
 
     // Act + Assert
-    assert_eq!(code_of(fx.search.search_index(&negative).unwrap_err()), ErrorCode::InvalidInput);
-    assert_eq!(code_of(fx.search.search_index(&long).unwrap_err()), ErrorCode::InvalidInput);
-    assert_eq!(code_of(fx.search.search_index(&unknown).unwrap_err()), ErrorCode::NotFound);
+    assert_eq!(
+        code_of(fx.search.search_index(&negative).unwrap_err()),
+        ErrorCode::InvalidInput
+    );
+    assert_eq!(
+        code_of(fx.search.search_index(&long).unwrap_err()),
+        ErrorCode::InvalidInput
+    );
+    assert_eq!(
+        code_of(fx.search.search_index(&unknown).unwrap_err()),
+        ErrorCode::NotFound
+    );
     // 필터가 구간 합에 반영된다 (USB 볼륨 오프라인 숨김 -> 2건)
     let mut hide = index_request(SortField::Name, SortDirection::Asc);
     hide.filters.include_offline = false;
@@ -578,8 +655,11 @@ fn capfb_fixture() -> Fx {
             (2, T_2024_05_15_NOON_MS),
             (3, T_2022_01_15_NOON_MS + 999),
         ] {
-            c.execute("UPDATE media_assets SET modified_at = ?2 WHERE asset_id = ?1", rusqlite::params![id, modified])
-                .unwrap();
+            c.execute(
+                "UPDATE media_assets SET modified_at = ?2 WHERE asset_id = ?1",
+                rusqlite::params![id, modified],
+            )
+            .unwrap();
         }
         c.execute(
             "INSERT INTO media_metadata (asset_id, duration_ms, captured_at) VALUES (1, 1000, ?1)",
@@ -594,7 +674,9 @@ fn capfb_fixture() -> Fx {
 fn set_fallback(fx: &Fx, value: &str) {
     let patch = serde_json::json!({ "capturedAtFallback": value });
     fx.pool
-        .write(Priority::High, move |c| Ok(mam_db::settings::update(c, patch.as_object().unwrap()).is_ok()))
+        .write(Priority::High, move |c| {
+            Ok(mam_db::settings::update(c, patch.as_object().unwrap()).is_ok())
+        })
         .unwrap()
         .then_some(())
         .unwrap();
@@ -602,7 +684,10 @@ fn set_fallback(fx: &Fx, value: &str) {
 
 fn captured_request(dir: SortDirection) -> SearchRequest {
     let mut r = request("");
-    r.sort = SortSpec { field: SortField::CapturedAt, direction: dir };
+    r.sort = SortSpec {
+        field: SortField::CapturedAt,
+        direction: dir,
+    };
     r
 }
 
@@ -614,22 +699,58 @@ fn month_sections(fx: &Fx, dir: SortDirection) -> Vec<(String, i64)> {
 }
 
 #[test]
-fn t_capfb_ipc_01_default_uses_modified_for_assets_without_a_capture_date_and_none_leaves_them_last() {
+fn t_capfb_ipc_01_default_uses_modified_for_assets_without_a_capture_date_and_none_leaves_them_last()
+ {
     // Arrange: 설정을 저장하지 않은 상태 = 기본값 "modified"
     let fx = capfb_fixture();
 
     // Act + Assert (기본 = 수정일 대체): 2024-05(수정일) > 2024-03(촬영일) > 2022-01(수정일)
-    assert_eq!(ids_of(&fx.search.search(&captured_request(SortDirection::Desc)).unwrap()), [2, 1, 3]);
-    assert_eq!(ids_of(&fx.search.search(&captured_request(SortDirection::Asc)).unwrap()), [3, 1, 2]);
+    assert_eq!(
+        ids_of(
+            &fx.search
+                .search(&captured_request(SortDirection::Desc))
+                .unwrap()
+        ),
+        [2, 1, 3]
+    );
+    assert_eq!(
+        ids_of(
+            &fx.search
+                .search(&captured_request(SortDirection::Asc))
+                .unwrap()
+        ),
+        [3, 1, 2]
+    );
 
     // Act + Assert ("none"): 촬영일 있는 자산이 먼저, 없는 자산은 방향과 무관하게 뒤(asset_id 순) — 같은 인덱스, 재색인 없음
     set_fallback(&fx, "none");
-    assert_eq!(ids_of(&fx.search.search(&captured_request(SortDirection::Desc)).unwrap()), [1, 2, 3]);
-    assert_eq!(ids_of(&fx.search.search(&captured_request(SortDirection::Asc)).unwrap()), [1, 2, 3]);
+    assert_eq!(
+        ids_of(
+            &fx.search
+                .search(&captured_request(SortDirection::Desc))
+                .unwrap()
+        ),
+        [1, 2, 3]
+    );
+    assert_eq!(
+        ids_of(
+            &fx.search
+                .search(&captured_request(SortDirection::Asc))
+                .unwrap()
+        ),
+        [1, 2, 3]
+    );
 
     // 다시 "modified"
     set_fallback(&fx, "modified");
-    assert_eq!(ids_of(&fx.search.search(&captured_request(SortDirection::Desc)).unwrap()), [2, 1, 3]);
+    assert_eq!(
+        ids_of(
+            &fx.search
+                .search(&captured_request(SortDirection::Desc))
+                .unwrap()
+        ),
+        [2, 1, 3]
+    );
 }
 
 #[test]
@@ -640,7 +761,11 @@ fn t_capfb_ipc_02_month_sections_follow_the_setting() {
     // Act + Assert (modified): 수정일로 대체된 달이 구간이 되고 "none" 이 없다
     assert_eq!(
         month_sections(&fx, SortDirection::Desc),
-        [("2024-05".to_string(), 1), ("2024-03".to_string(), 1), ("2022-01".to_string(), 1)]
+        [
+            ("2024-05".to_string(), 1),
+            ("2024-03".to_string(), 1),
+            ("2022-01".to_string(), 1)
+        ]
     );
 
     // Act + Assert (none): 촬영일 있는 달 + "none" 2건
@@ -685,8 +810,17 @@ fn t_capfb_ipc_04_modified_ms_is_floored_to_seconds_at_the_range_boundary() {
     };
 
     // Act + Assert: 상한이 정확히 12:00:00.000 이면 포함 (내림 값과 같다), 11:59:59.999 이면 제외
-    assert_eq!(ids_of(&fx.search.search(&to(T_2022_01_15_NOON_MS)).unwrap()), [3]);
-    assert!(fx.search.search(&to(T_2022_01_15_NOON_MS - 1)).unwrap().items.is_empty());
+    assert_eq!(
+        ids_of(&fx.search.search(&to(T_2022_01_15_NOON_MS)).unwrap()),
+        [3]
+    );
+    assert!(
+        fx.search
+            .search(&to(T_2022_01_15_NOON_MS - 1))
+            .unwrap()
+            .items
+            .is_empty()
+    );
 }
 
 #[test]
@@ -698,13 +832,19 @@ fn t_capfb_ipc_05_a_cursor_issued_before_the_toggle_is_stale_after_it() {
     let cursor = fx.search.search(&first).unwrap().next_cursor.unwrap();
     let mut next = first.clone();
     next.cursor = Some(cursor);
-    assert!(fx.search.search(&next).is_ok(), "same setting: cursor is accepted");
+    assert!(
+        fx.search.search(&next).is_ok(),
+        "same setting: cursor is accepted"
+    );
 
     // Act: 설정 전환
     set_fallback(&fx, "none");
 
     // Assert: 다른 필드로 만든 커서를 새 정렬에 재사용하지 못한다 (첫 페이지부터 다시)
-    assert_eq!(code_of(fx.search.search(&next).unwrap_err()), ErrorCode::InvalidInput);
+    assert_eq!(
+        code_of(fx.search.search(&next).unwrap_err()),
+        ErrorCode::InvalidInput
+    );
     assert_eq!(ids_of(&fx.search.search(&first).unwrap()), [1]);
 }
 
@@ -714,13 +854,23 @@ fn t_capfb_ipc_06_unreadable_setting_value_falls_back_to_modified() {
     let fx = capfb_fixture();
     fx.pool
         .write(Priority::High, |c| {
-            c.execute("INSERT INTO settings (key, value) VALUES ('captured_at_fallback', '\"bogus\"')", [])?;
+            c.execute(
+                "INSERT INTO settings (key, value) VALUES ('captured_at_fallback', '\"bogus\"')",
+                [],
+            )?;
             Ok(())
         })
         .unwrap();
 
     // Act + Assert: 기본값(수정일)으로 동작
-    assert_eq!(ids_of(&fx.search.search(&captured_request(SortDirection::Desc)).unwrap()), [2, 1, 3]);
+    assert_eq!(
+        ids_of(
+            &fx.search
+                .search(&captured_request(SortDirection::Desc))
+                .unwrap()
+        ),
+        [2, 1, 3]
+    );
 }
 
 // ---------------------------------------------------------------- 별점 (T-search-rating-ipc-*)
@@ -766,7 +916,10 @@ fn t_search_rating_ipc_01_rating_filter_sort_and_summary_follow_set_rating() {
 
     // Assert
     assert_eq!(ids_of(&both), [2, 1], "name order");
-    assert_eq!(both.items.iter().map(|i| i.rating).collect::<Vec<_>>(), [2, 5]);
+    assert_eq!(
+        both.items.iter().map(|i| i.rating).collect::<Vec<_>>(),
+        [2, 5]
+    );
     assert_eq!(ids_of(&fx.search.search(&exact).unwrap()), [1]);
     assert_eq!(ids_of(&fx.search.search(&unrated).unwrap()), [3]);
     assert_eq!(ids_of(&fx.search.search(&sorted).unwrap()), [1, 2, 3]);
@@ -809,7 +962,11 @@ fn t_search_rating_ipc_02_rating_bounds_above_5_are_invalid_input_in_search_and_
 
         // Assert
         assert_eq!(code_of(err), ErrorCode::InvalidInput, "{min:?}..{max:?}");
-        assert_eq!(code_of(idx_err), ErrorCode::InvalidInput, "{min:?}..{max:?}");
+        assert_eq!(
+            code_of(idx_err),
+            ErrorCode::InvalidInput,
+            "{min:?}..{max:?}"
+        );
     }
     // 경계값 5 는 허용
     let mut ok = request("");
@@ -827,12 +984,21 @@ fn t_ipc_44_collection_order_without_a_collection_is_invalid_input_for_search_an
     let fx = fixture();
     ready(&fx, 3);
     let mut r = request("");
-    r.sort = SortSpec { field: SortField::CollectionOrder, direction: SortDirection::Asc };
+    r.sort = SortSpec {
+        field: SortField::CollectionOrder,
+        direction: SortDirection::Asc,
+    };
 
     // Act + Assert: search_assets / search_index 모두 컬렉션 없이는 거부
-    assert_eq!(code_of(fx.search.search(&r).unwrap_err()), ErrorCode::InvalidInput);
+    assert_eq!(
+        code_of(fx.search.search(&r).unwrap_err()),
+        ErrorCode::InvalidInput
+    );
     let idx = index_request(SortField::CollectionOrder, SortDirection::Asc);
-    assert_eq!(code_of(fx.search.search_index(&idx).unwrap_err()), ErrorCode::InvalidInput);
+    assert_eq!(
+        code_of(fx.search.search_index(&idx).unwrap_err()),
+        ErrorCode::InvalidInput
+    );
     // 컬렉션이 있으면 search_index 는 구간 없는 목차를 돌려준다
     let mut with = index_request(SortField::CollectionOrder, SortDirection::Asc);
     with.filters.collection_id = Some(1);
@@ -850,7 +1016,10 @@ fn t_ipc_45_collection_order_page_reflects_a_reorder_immediately_without_outbox(
     fx.search.wake();
     let mut r = request("");
     r.filters.collection_id = Some(cid);
-    r.sort = SortSpec { field: SortField::CollectionOrder, direction: SortDirection::Asc };
+    r.sort = SortSpec {
+        field: SortField::CollectionOrder,
+        direction: SortDirection::Asc,
+    };
     let first = wait_total(&fx, &r, 3);
     assert_eq!(ids_of(&first), [3, 1, 2]);
     let outbox_before: i64 = fx
@@ -859,7 +1028,8 @@ fn t_ipc_45_collection_order_page_reflects_a_reorder_immediately_without_outbox(
         .unwrap();
 
     // Act: 재배치 직후 — 색인 대기 없이 바로 조회
-    ud.reorder_collection(cid, &[3], mam_core::userdata::ReorderTarget::End).unwrap();
+    ud.reorder_collection(cid, &[3], mam_core::userdata::ReorderTarget::End)
+        .unwrap();
     let after = fx.search.search(&r).unwrap();
     let mut desc = r.clone();
     desc.sort.direction = SortDirection::Desc;
@@ -871,7 +1041,10 @@ fn t_ipc_45_collection_order_page_reflects_a_reorder_immediately_without_outbox(
         .pool
         .read(|c| Ok(c.query_row("SELECT count(*) FROM search_outbox", [], |r| r.get(0))?))
         .unwrap();
-    assert_eq!(outbox_after, outbox_before, "재배치는 outbox 를 남기지 않는다");
+    assert_eq!(
+        outbox_after, outbox_before,
+        "재배치는 outbox 를 남기지 않는다"
+    );
     // 하이브리드 요청이 와도 순서 정렬은 키워드 경로로 처리된다 (degraded 표시)
     let mut hybrid = r.clone();
     hybrid.query = "beach".into();

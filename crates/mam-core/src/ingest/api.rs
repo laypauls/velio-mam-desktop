@@ -7,12 +7,12 @@ use mam_db::Priority;
 use super::Ingest;
 use crate::jobs::JobKind;
 use crate::registry::register_volume;
-use crate::watch::WatchTarget;
 use crate::scan::{
     FolderNode, IngestError, ManagedFolderView, MediaTypeCounts, MediaTypeSet, ScanErrorView,
-    add_folder_row, count_by_type, list_errors, list_folder_views, list_subfolders,
-    load_folder, retry_targets, set_alias, set_hidden, set_media_types,
+    add_folder_row, count_by_type, list_errors, list_folder_views, list_subfolders, load_folder,
+    retry_targets, set_alias, set_hidden, set_media_types,
 };
+use crate::watch::WatchTarget;
 
 /// 한 번에 가져올 수 있는 오류 목록 상한 (계약 `MAX_PAGE_LIMIT`)
 pub const MAX_PAGE_LIMIT: usize = 200;
@@ -183,7 +183,10 @@ impl Ingest {
     }
 
     /// 폴더 하위 활성 위치의 유형별 개수 (대상 유형 변경 전 영향 안내용). 없는 폴더는 `NotFound`.
-    pub fn count_folder_assets_by_type(&self, folder_id: i64) -> Result<MediaTypeCounts, IngestError> {
+    pub fn count_folder_assets_by_type(
+        &self,
+        folder_id: i64,
+    ) -> Result<MediaTypeCounts, IngestError> {
         self.env.pool.read(|c| {
             Ok((|| {
                 let folder = load_folder(c, folder_id)?;

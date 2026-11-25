@@ -13,9 +13,17 @@ fn v24_db() -> TestDb {
     let db_path = dir.path().join("mam.sqlite");
     let backup_dir = dir.path().join("backups");
     let mut conn = open(&db_path).unwrap();
-    let upto24: Vec<_> = shipped_migrations().into_iter().filter(|m| m.version() <= 24).collect();
+    let upto24: Vec<_> = shipped_migrations()
+        .into_iter()
+        .filter(|m| m.version() <= 24)
+        .collect();
     migrate_with(&mut conn, &upto24, &backup_dir, &FixedClock(T0)).unwrap();
-    TestDb { dir, db_path, backup_dir, conn }
+    TestDb {
+        dir,
+        db_path,
+        backup_dir,
+        conn,
+    }
 }
 
 #[test]
@@ -35,7 +43,12 @@ fn t_mig_resume_01_upgrade_from_v24_defaults_existing_folder_to_enabled() {
 
     // Assert
     assert_eq!(report.applied, vec![25, 26, 27]);
-    let v: i64 = db.conn.query_row("SELECT resume_enabled FROM managed_folders", [], |r| r.get(0)).unwrap();
+    let v: i64 = db
+        .conn
+        .query_row("SELECT resume_enabled FROM managed_folders", [], |r| {
+            r.get(0)
+        })
+        .unwrap();
     assert_eq!(v, 1);
 }
 
@@ -53,6 +66,14 @@ fn t_mig_resume_02_check_rejects_values_other_than_0_and_1() {
         .unwrap();
 
     // Act / Assert
-    assert!(db.conn.execute("UPDATE managed_folders SET resume_enabled = 2", []).is_err());
-    assert!(db.conn.execute("UPDATE managed_folders SET resume_enabled = 0", []).is_ok());
+    assert!(
+        db.conn
+            .execute("UPDATE managed_folders SET resume_enabled = 2", [])
+            .is_err()
+    );
+    assert!(
+        db.conn
+            .execute("UPDATE managed_folders SET resume_enabled = 0", [])
+            .is_ok()
+    );
 }

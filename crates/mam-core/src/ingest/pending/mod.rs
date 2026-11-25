@@ -15,8 +15,8 @@
 //! 처리기의 `apply_path` 와 행 삭제는 한 트랜잭션이 아니다 — 중간에 죽으면 다시 반영하지만 멱등이라 무해하다.
 
 mod marker;
-mod remote;
 mod processor;
+mod remote;
 mod settle;
 pub(crate) mod store;
 mod writer;
@@ -188,7 +188,9 @@ impl Ingest {
         // 청크마다 별도 쓰기 작업 — 사이에 사용자 편집(High)이 끼어들 수 있다 (store::MAX_ROWS_PER_TX)
         store::upsert_chunked(&items, store::MAX_ROWS_PER_TX, |part, _last| {
             let part = part.to_vec();
-            self.env.write(Priority::Low, move |c| store::upsert_batch(c, &part, now, due, cap))
+            self.env.write(Priority::Low, move |c| {
+                store::upsert_batch(c, &part, now, due, cap)
+            })
         })
     }
 

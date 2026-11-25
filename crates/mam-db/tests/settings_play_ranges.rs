@@ -48,9 +48,14 @@ fn t_settings_ranges_02_round_trip() {
 
     // Assert
     assert_eq!(after, loaded);
-    assert!(loaded.media_open_autoplay && loaded.play_ranges_only && loaded.collection_play_ranges_only);
+    assert!(
+        loaded.media_open_autoplay && loaded.play_ranges_only && loaded.collection_play_ranges_only
+    );
     assert_eq!(loaded.play_range_keys, PlayRangeKeys::Premiere);
-    assert_eq!(serde_json::to_value(&loaded).unwrap()["playRangeKeys"], json!("premiere"));
+    assert_eq!(
+        serde_json::to_value(&loaded).unwrap()["playRangeKeys"],
+        json!("premiere")
+    );
     assert!(warnings.is_empty());
     let back = settings::update(
         &mut db.conn,
@@ -76,7 +81,10 @@ fn t_settings_ranges_03_corrupt_stored_values_fall_back_with_warning_without_val
         // Arrange
         let db = migrated_db();
         db.conn
-            .execute("INSERT INTO settings (key, value) VALUES (?1, ?2)", [key, raw])
+            .execute(
+                "INSERT INTO settings (key, value) VALUES (?1, ?2)",
+                [key, raw],
+            )
             .unwrap();
 
         // Act
@@ -87,7 +95,10 @@ fn t_settings_ranges_03_corrupt_stored_values_fall_back_with_warning_without_val
         assert!(!s.media_open_autoplay && !s.play_ranges_only && !s.collection_play_ranges_only);
         assert_eq!(warnings.len(), 1, "{key}={raw}: {warnings:?}");
         assert!(warnings[0].contains(key));
-        assert!(!warnings[0].contains("Brackets") && !warnings[0].contains("not json"), "value leaked");
+        assert!(
+            !warnings[0].contains("Brackets") && !warnings[0].contains("not json"),
+            "value leaked"
+        );
     }
 }
 
@@ -105,7 +116,10 @@ fn t_settings_ranges_04_invalid_patch_is_rejected_and_stores_nothing() {
     ] {
         // Arrange
         let mut db = migrated_db();
-        let before: i64 = db.conn.query_row("SELECT count(*) FROM settings", [], |r| r.get(0)).unwrap();
+        let before: i64 = db
+            .conn
+            .query_row("SELECT count(*) FROM settings", [], |r| r.get(0))
+            .unwrap();
 
         // Act: 유효한 값과 한 패치에 섞어도 전부 거부
         let mut p = patch(json!({"playRangesOnly": true}));
@@ -115,7 +129,10 @@ fn t_settings_ranges_04_invalid_patch_is_rejected_and_stores_nothing() {
         // Assert
         let rejected = matches!(&err, SettingsError::Invalid(f) if f == field);
         assert!(rejected, "{field}={bad}: {err:?}");
-        let after: i64 = db.conn.query_row("SELECT count(*) FROM settings", [], |r| r.get(0)).unwrap();
+        let after: i64 = db
+            .conn
+            .query_row("SELECT count(*) FROM settings", [], |r| r.get(0))
+            .unwrap();
         assert_eq!(before, after, "{field}={bad}");
         assert!(!settings::load(&db.conn).unwrap().0.play_ranges_only);
     }

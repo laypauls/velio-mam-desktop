@@ -24,7 +24,12 @@ pub fn empty_db(data_root: &Path) -> PathBuf {
 }
 
 /// `1..=total` 을 `CHUNK` 단위 트랜잭션으로 `body(conn, lo, hi)` 에 넘긴다 (빌더 연결은 synchronous=OFF — 적재 속도용, 측정 대상이 아니다)
-fn chunked(conn: &mut Connection, total: u64, label: &str, body: impl Fn(&Connection, i64, i64) -> rusqlite::Result<()>) {
+fn chunked(
+    conn: &mut Connection,
+    total: u64,
+    label: &str,
+    body: impl Fn(&Connection, i64, i64) -> rusqlite::Result<()>,
+) {
     let t = Instant::now();
     let mut lo = 1;
     while lo <= total {
@@ -34,17 +39,22 @@ fn chunked(conn: &mut Connection, total: u64, label: &str, body: impl Fn(&Connec
         tx.commit().expect("commit");
         lo = hi + 1;
     }
-    say(format!("  synth {label}: {total} rows in {:.1}s", t.elapsed().as_secs_f64()));
+    say(format!(
+        "  synth {label}: {total} rows in {:.1}s",
+        t.elapsed().as_secs_f64()
+    ));
 }
 
-const SERIES: &str = "WITH RECURSIVE c(n) AS (SELECT ?1 UNION ALL SELECT n + 1 FROM c WHERE n < ?2)";
+const SERIES: &str =
+    "WITH RECURSIVE c(n) AS (SELECT ?1 UNION ALL SELECT n + 1 FROM c WHERE n < ?2)";
 
 /// 활성 이미지 자산 `assets` 개 (+ 활성 위치 + `outbox` 개의 `upsert` 이벤트). 볼륨 1개.
 /// 모든 자산이 `image` 이다 — 이미지 provider 1개의 run-all 이 자산 수만큼 행을 만드는 최악 경우.
 pub fn build(data_root: &Path, assets: u64, locations: bool, outbox: u64) -> PathBuf {
     let db = empty_db(data_root);
     let mut conn = open(&db).expect("open db");
-    conn.pragma_update(None, "synchronous", "OFF").expect("pragma");
+    conn.pragma_update(None, "synchronous", "OFF")
+        .expect("pragma");
     conn.execute(
         "INSERT INTO volumes (kind, volume_key, label, last_mount_point, last_seen_at) VALUES ('fixed', 'vol-bench', 'Bench', 'Z:\\', 1)",
         [],
@@ -91,9 +101,11 @@ pub fn build(data_root: &Path, assets: u64, locations: bool, outbox: u64) -> Pat
 /// M2: 설치되지 않은 플러그인 `PLUGIN_GONE` 의 KV 행 `rows` 개(자산당 1키)와 `plugin_tasks` 완료 행 `rows` 개
 pub fn seed_orphans(db: &Path, rows: u64) {
     let mut conn = open(db).expect("open db");
-    conn.pragma_update(None, "synchronous", "OFF").expect("pragma");
+    conn.pragma_update(None, "synchronous", "OFF")
+        .expect("pragma");
     let plugin_ref = mam_db::plugin_registry::ensure(&conn, PLUGIN_GONE).expect("registry");
-    let provider_ref = mam_db::plugin_registry::ensure_provider(&conn, plugin_ref, "meta.extract").expect("registry provider");
+    let provider_ref = mam_db::plugin_registry::ensure_provider(&conn, plugin_ref, "meta.extract")
+        .expect("registry provider");
     chunked(&mut conn, rows, "plugin_kv", |c, lo, hi| {
         c.execute(
             &format!(
@@ -118,6 +130,7 @@ pub fn seed_orphans(db: &Path, rows: u64) {
 }
 
 fn finish(conn: Connection) {
-    conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(())).expect("checkpoint");
+    conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()))
+        .expect("checkpoint");
     conn.close().map_err(|(_, e)| e).expect("close");
 }

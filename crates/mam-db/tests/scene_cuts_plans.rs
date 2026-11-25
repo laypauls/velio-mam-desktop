@@ -152,8 +152,18 @@ fn t_scene_13_bench_at_scale() {
              COMMIT;"
         ))
         .unwrap();
-    let videos: i64 = db.conn.query_row("SELECT COUNT(*) FROM media_assets WHERE media_type = 'video'", [], |r| r.get(0)).unwrap();
-    println!("BENCH setup: {total} assets, {videos} videos in {:.1}s", t.elapsed().as_secs_f64());
+    let videos: i64 = db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM media_assets WHERE media_type = 'video'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    println!(
+        "BENCH setup: {total} assets, {videos} videos in {:.1}s",
+        t.elapsed().as_secs_f64()
+    );
 
     // 영상의 1/3 은 평균 300컷 자동 추출 완료 행 (BLOB ~1.2KB)
     let cuts: Vec<i64> = (0..300).map(|k| 1000 + k * 7919).collect();
@@ -180,7 +190,11 @@ fn t_scene_13_bench_at_scale() {
             rusqlite::params![big_id, encode(&big).unwrap()],
         )
         .unwrap();
-    println!("BENCH rows: {} scene rows, db {:.0} MB", with_rows.len(), size_before);
+    println!(
+        "BENCH rows: {} scene rows, db {:.0} MB",
+        with_rows.len(),
+        size_before
+    );
 
     // Act / Report: get (무작위 행 있는 자산)
     let mut s = Vec::new();
@@ -204,7 +218,10 @@ fn t_scene_13_bench_at_scale() {
     // add / remove on the 20k-cut row (트랜잭션·커밋 포함)
     let mut s = Vec::new();
     for k in 0..100i64 {
-        let tx = db.conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).unwrap();
+        let tx = db
+            .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .unwrap();
         let t = Instant::now();
         add_user_tx(&tx, big_id, 500_000 + k * 5000 + 333, Some(25.0), None, NOW).unwrap();
         tx.commit().unwrap();
@@ -213,9 +230,20 @@ fn t_scene_13_bench_at_scale() {
     report("add_user(20000 auto cuts)", &mut s);
     let mut s = Vec::new();
     for k in 0..100i64 {
-        let tx = db.conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).unwrap();
+        let tx = db
+            .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .unwrap();
         let t = Instant::now();
-        remove_tx(&tx, big_id, 1000 + k * 1000, CutSource::Auto, Some(25.0), NOW).unwrap();
+        remove_tx(
+            &tx,
+            big_id,
+            1000 + k * 1000,
+            CutSource::Auto,
+            Some(25.0),
+            NOW,
+        )
+        .unwrap();
         tx.commit().unwrap();
         s.push(t.elapsed().as_secs_f64() * 1000.0);
     }
@@ -245,20 +273,31 @@ fn t_scene_13_bench_at_scale() {
             None => break,
         }
     }
-    println!("BENCH backfill total: {expected_targets} videos in {:.1}s", all.elapsed().as_secs_f64());
+    println!(
+        "BENCH backfill total: {expected_targets} videos in {:.1}s",
+        all.elapsed().as_secs_f64()
+    );
     report("backfill_batch(1000)", &mut s);
     assert_eq!(backfill_count(&db.conn).unwrap(), 0);
 
     // requeue: 작업이 모두 있는 상태 / 작업을 지운 상태
     let t = Instant::now();
     let n = requeue_pending_tx(&db.conn, NOW).unwrap();
-    println!("BENCH requeue(all have jobs): {n} in {:.1}ms", t.elapsed().as_secs_f64() * 1000.0);
-    db.conn.execute("DELETE FROM jobs WHERE kind = 'scene'", []).unwrap();
+    println!(
+        "BENCH requeue(all have jobs): {n} in {:.1}ms",
+        t.elapsed().as_secs_f64() * 1000.0
+    );
+    db.conn
+        .execute("DELETE FROM jobs WHERE kind = 'scene'", [])
+        .unwrap();
     let t = Instant::now();
     let tx = db.conn.unchecked_transaction().unwrap();
     let n = requeue_pending_tx(&tx, NOW).unwrap();
     tx.commit().unwrap();
-    println!("BENCH requeue(no jobs): {n} in {:.1}ms", t.elapsed().as_secs_f64() * 1000.0);
+    println!(
+        "BENCH requeue(no jobs): {n} in {:.1}ms",
+        t.elapsed().as_secs_f64() * 1000.0
+    );
     println!(
         "BENCH db size: {:.0} MB -> {:.0} MB (+{:.0} MB for {expected_targets} pending rows + jobs)",
         size_before,

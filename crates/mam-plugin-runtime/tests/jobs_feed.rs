@@ -19,12 +19,20 @@ fn scripted() -> Plugin {
 fn t_pjob_02_rewinding_the_cursor_and_refeeding_makes_no_duplicates_and_no_extra_invokes() {
     // Arrange: 한 번 완전히 처리한 자산 (사용자 편집 + 플러그인 자기 태그 이벤트가 outbox 에 있다)
     let env = Env::new();
-    env.install(Plugin::new(P, "ok_writer").provider("meta.extract", ProviderKind::Metadata, &[AssetKind::Image]));
+    env.install(Plugin::new(P, "ok_writer").provider(
+        "meta.extract",
+        ProviderKind::Metadata,
+        &[AssetKind::Image],
+    ));
     let asset = env.add_asset("image", "a.jpg");
     env.edit(asset);
     env.jobs.feed_tick();
     env.run(1);
-    let (rows, calls, before) = (env.task_rows(P), env.invoker.call_count(), env.task(P, "meta.extract", asset).unwrap());
+    let (rows, calls, before) = (
+        env.task_rows(P),
+        env.invoker.call_count(),
+        env.task(P, "meta.extract", asset).unwrap(),
+    );
 
     // Act: 커서를 처음으로 되감고 같은 구간을 다시 공급
     env.set_cursor(P, 0);
@@ -35,17 +43,25 @@ fn t_pjob_02_rewinding_the_cursor_and_refeeding_makes_no_duplicates_and_no_extra
     assert_eq!(env.cursor(P), Some(env.max_event()));
     assert_eq!((env.task_rows(P), env.invoker.call_count()), (rows, calls));
     let after = env.task(P, "meta.extract", asset).unwrap();
-    assert_eq!((after.status.as_str(), after.done, after.attempts), (before.status.as_str(), before.done, before.attempts));
-    assert_eq!(after.target, 3, "target only rises (the own tag event is folded in), never revives the row");
+    assert_eq!(
+        (after.status.as_str(), after.done, after.attempts),
+        (before.status.as_str(), before.done, before.attempts)
+    );
+    assert_eq!(
+        after.target, 3,
+        "target only rises (the own tag event is folded in), never revives the row"
+    );
     assert!(env.jobs_rows().is_empty());
 }
 
 #[test]
-fn t_pjob_05_events_of_inactive_or_vanished_assets_make_no_row_advance_the_cursor_and_do_not_break_the_tx() {
+fn t_pjob_05_events_of_inactive_or_vanished_assets_make_no_row_advance_the_cursor_and_do_not_break_the_tx()
+ {
     // Arrange: 활성 1 + 병합(superseded) + 삭제(deleted) + 행이 사라진(hard delete) 자산의 이벤트
     let env = Env::new();
     env.install(scripted());
-    let [active, merged, deleted, gone] = ["a.jpg", "b.jpg", "c.jpg", "d.jpg"].map(|n| env.add_asset("image", n));
+    let [active, merged, deleted, gone] =
+        ["a.jpg", "b.jpg", "c.jpg", "d.jpg"].map(|n| env.add_asset("image", n));
     for a in [active, merged, deleted, gone] {
         env.edit(a);
     }
@@ -61,7 +77,11 @@ fn t_pjob_05_events_of_inactive_or_vanished_assets_make_no_row_advance_the_curso
     assert_eq!(env.cursor(P), Some(env.max_event()));
     assert_eq!(env.task_rows(P), 1);
     assert!(env.task(P, "meta.run", active).is_some());
-    assert!([merged, deleted, gone].iter().all(|a| env.task(P, "meta.run", *a).is_none()));
+    assert!(
+        [merged, deleted, gone]
+            .iter()
+            .all(|a| env.task(P, "meta.run", *a).is_none())
+    );
     assert_eq!(env.jobs_rows().len(), 1);
 }
 
@@ -88,8 +108,14 @@ fn t_pjob_06_asset_kinds_filter_the_feed_and_export_providers_are_never_fed() {
 
     // Assert
     let has = |provider: &str, asset: i64| env.task(P, provider, asset).is_some();
-    assert!(has("meta.run", image) && !has("meta.run", video) && !has("meta.run", audio), "image-only metadata");
-    assert!(has("ana.c", image) && has("ana.c", video) && has("ana.c", audio), "empty assetKinds = all");
+    assert!(
+        has("meta.run", image) && !has("meta.run", video) && !has("meta.run", audio),
+        "image-only metadata"
+    );
+    assert!(
+        has("ana.c", image) && has("ana.c", video) && has("ana.c", audio),
+        "empty assetKinds = all"
+    );
     assert_eq!(env.count("SELECT COUNT(*) FROM plugin_tasks JOIN plugin_providers USING (provider_ref) WHERE name = 'exp.csv'"), 0, "export providers are never fed");
     assert_eq!(env.task_rows(P), 4);
     assert_eq!(env.jobs_rows().len(), 3, "one job per asset");
@@ -100,19 +126,32 @@ fn t_pjob_07_backpressure_stops_the_cursor_at_the_cap_then_resumes_after_drainin
     // Arrange: 상한 3, 한 틱에 이벤트 2건. 자산 10개 = 이벤트 10건
     let env = Env::new();
     env.install(scripted());
-    env.jobs.set_tuning(JobsTuning { pending_cap: 3, feed_batch: 2, ..JobsTuning::default() });
-    let assets: Vec<i64> = (0..10).map(|i| env.add_asset("image", &format!("{i}.jpg"))).collect();
+    env.jobs.set_tuning(JobsTuning {
+        pending_cap: 3,
+        feed_batch: 2,
+        ..JobsTuning::default()
+    });
+    let assets: Vec<i64> = (0..10)
+        .map(|i| env.add_asset("image", &format!("{i}.jpg")))
+        .collect();
     for a in &assets {
         env.edit(*a);
     }
 
     // Act 1: 상한(3)을 넘는 순간(4건) 커서가 멈춘다
-    let (t1, t2, t3) = (env.jobs.feed_tick(), env.jobs.feed_tick(), env.jobs.feed_tick());
+    let (t1, t2, t3) = (
+        env.jobs.feed_tick(),
+        env.jobs.feed_tick(),
+        env.jobs.feed_tick(),
+    );
 
     // Assert 1
     assert_eq!((t1, t2, t3), (true, true, false));
     assert_eq!((env.cursor(P), env.pending_tasks(P)), (Some(4), 4));
-    assert!(!env.jobs.feed_tick(), "still stalled until the backlog drains");
+    assert!(
+        !env.jobs.feed_tick(),
+        "still stalled until the backlog drains"
+    );
     assert_eq!(env.cursor(P), Some(4));
 
     // Act 2: 배출 -> 재개를 모든 이벤트가 처리될 때까지 반복
@@ -125,15 +164,21 @@ fn t_pjob_07_backpressure_stops_the_cursor_at_the_cap_then_resumes_after_drainin
     }
 
     // Assert 2: 모든 자산이 정확히 한 번 처리됨 (이벤트 누락·중복 없음)
-    assert!(assets.iter().all(|a| env.task(P, "meta.run", *a).is_some_and(|t| t.status == "done" && t.done == 2)));
+    assert!(assets.iter().all(|a| {
+        env.task(P, "meta.run", *a)
+            .is_some_and(|t| t.status == "done" && t.done == 2)
+    }));
     assert_eq!(env.invoker.call_count(), 10);
 }
 
 #[test]
-fn t_pjob_09_fresh_install_hook_puts_the_cursor_at_the_end_and_a_missing_cursor_is_initialized_lazily() {
+fn t_pjob_09_fresh_install_hook_puts_the_cursor_at_the_end_and_a_missing_cursor_is_initialized_lazily()
+ {
     // Arrange: 설치 이전의 이벤트 3건
     let env = Env::new();
-    let assets: Vec<i64> = (0..3).map(|i| env.add_asset("image", &format!("{i}.jpg"))).collect();
+    let assets: Vec<i64> = (0..3)
+        .map(|i| env.add_asset("image", &format!("{i}.jpg")))
+        .collect();
     for a in &assets {
         env.edit(*a);
     }
@@ -158,7 +203,13 @@ fn t_pjob_09_fresh_install_hook_puts_the_cursor_at_the_end_and_a_missing_cursor_
 
     // Act 3: 훅이 없었던 플러그인(커서 없음) — 첫 틱이 현재 끝으로 초기화하고 그 이전 이벤트는 건너뛴다
     let lazy = "com.example.lazy";
-    env.install(common_jobs::without_hook(Plugin::new(lazy, "scripted").provider("meta.run", ProviderKind::Metadata, &[AssetKind::Image])));
+    env.install(common_jobs::without_hook(
+        Plugin::new(lazy, "scripted").provider(
+            "meta.run",
+            ProviderKind::Metadata,
+            &[AssetKind::Image],
+        ),
+    ));
     assert_eq!(env.cursor(lazy), None);
     env.jobs.feed_tick();
     let initialized = (env.cursor(lazy), env.task_rows(lazy));

@@ -9,12 +9,25 @@ use std::fs::{File, OpenOptions};
 use std::io;
 use std::os::windows::io::{FromRawHandle, RawHandle};
 
-use windows::Win32::Foundation::{CloseHandle, ERROR_PIPE_CONNECTED, GetLastError, HANDLE, HLOCAL, INVALID_HANDLE_VALUE, LocalFree};
-use windows::Win32::Security::Authorization::{ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1};
+use windows::Win32::Foundation::{
+    CloseHandle, ERROR_PIPE_CONNECTED, GetLastError, HANDLE, HLOCAL, INVALID_HANDLE_VALUE,
+    LocalFree,
+};
+use windows::Win32::Security::Authorization::{
+    ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
+};
 use windows::Win32::Security::Cryptography::{BCRYPT_USE_SYSTEM_PREFERRED_RNG, BCryptGenRandom};
-use windows::Win32::Security::{GetTokenInformation, PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES, TOKEN_QUERY, TOKEN_USER, TokenUser};
-use windows::Win32::Storage::FileSystem::{FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAGS_AND_ATTRIBUTES, PIPE_ACCESS_INBOUND, PIPE_ACCESS_OUTBOUND};
-use windows::Win32::System::Pipes::{ConnectNamedPipe, CreateNamedPipeW, PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE, PIPE_WAIT};
+use windows::Win32::Security::{
+    GetTokenInformation, PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES, TOKEN_QUERY, TOKEN_USER,
+    TokenUser,
+};
+use windows::Win32::Storage::FileSystem::{
+    FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAGS_AND_ATTRIBUTES, PIPE_ACCESS_INBOUND,
+    PIPE_ACCESS_OUTBOUND,
+};
+use windows::Win32::System::Pipes::{
+    ConnectNamedPipe, CreateNamedPipeW, PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE, PIPE_WAIT,
+};
 use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 use windows::core::{HSTRING, PCWSTR, PWSTR};
 
@@ -26,7 +39,11 @@ fn full_name(name: &str, suffix: &str) -> String {
 
 /// 파이프 이름이 `mam-player-<32자리 소문자 hex>` 형식인가 — 경로 구분자·`..` 로 다른 파이프를 가리키지 못하게 한다
 pub fn is_valid_pipe_name(name: &str) -> bool {
-    name.strip_prefix(PREFIX).is_some_and(|h| h.len() == 32 && h.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)))
+    name.strip_prefix(PREFIX).is_some_and(|h| {
+        h.len() == 32
+            && h.bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    })
 }
 
 /// 128비트 난수 파이프 이름 (OS 난수 — 추측 불가)
@@ -35,9 +52,15 @@ pub fn random_pipe_name() -> io::Result<String> {
     // SAFETY: 길이가 맞는 버퍼, 시스템 기본 RNG 사용 (알고리즘 핸들 불필요)
     let st = unsafe { BCryptGenRandom(None, &mut buf, BCRYPT_USE_SYSTEM_PREFERRED_RNG) };
     if st.0 < 0 {
-        return Err(io::Error::other(format!("BCryptGenRandom failed: {:#x}", st.0)));
+        return Err(io::Error::other(format!(
+            "BCryptGenRandom failed: {:#x}",
+            st.0
+        )));
     }
-    Ok(format!("{PREFIX}{}", buf.iter().map(|b| format!("{b:02x}")).collect::<String>()))
+    Ok(format!(
+        "{PREFIX}{}",
+        buf.iter().map(|b| format!("{b:02x}")).collect::<String>()
+    ))
 }
 
 /// 현재 프로세스 토큰의 사용자 SID 문자열 (`S-1-5-21-...`)
@@ -45,7 +68,8 @@ pub fn current_user_sid() -> io::Result<String> {
     // SAFETY: 이 함수 안에서 연 토큰 핸들만 쓰고 닫는다. 버퍼는 GetTokenInformation 이 알려준 크기로 할당한다
     unsafe {
         let mut token = HANDLE::default();
-        OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token).map_err(|e| io::Error::other(e.to_string()))?;
+        OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token)
+            .map_err(|e| io::Error::other(e.to_string()))?;
         let result = (|| {
             let mut needed = 0u32;
             let _ = GetTokenInformation(token, TokenUser, None, 0, &mut needed);
@@ -53,10 +77,18 @@ pub fn current_user_sid() -> io::Result<String> {
                 return Err(io::Error::other("token user size unknown"));
             }
             let mut buf = vec![0u8; needed as usize];
-            GetTokenInformation(token, TokenUser, Some(buf.as_mut_ptr() as *mut c_void), needed, &mut needed).map_err(|e| io::Error::other(e.to_string()))?;
+            GetTokenInformation(
+                token,
+                TokenUser,
+                Some(buf.as_mut_ptr() as *mut c_void),
+                needed,
+                &mut needed,
+            )
+            .map_err(|e| io::Error::other(e.to_string()))?;
             let tu = &*(buf.as_ptr() as *const TOKEN_USER);
             let mut s = PWSTR::null();
-            ConvertSidToStringSidW(tu.User.Sid, &mut s).map_err(|e| io::Error::other(e.to_string()))?;
+            ConvertSidToStringSidW(tu.User.Sid, &mut s)
+                .map_err(|e| io::Error::other(e.to_string()))?;
             let out = s.to_string().map_err(|e| io::Error::other(e.to_string()));
             let _ = LocalFree(Some(HLOCAL(s.0 as *mut c_void)));
             out
@@ -81,12 +113,24 @@ impl OwnerOnly {
         let sddl = HSTRING::from(owner_only_sddl(&current_user_sid()?));
         let mut sd = PSECURITY_DESCRIPTOR::default();
         // SAFETY: 유효한 널 종료 SDDL, 출력 포인터는 LocalFree 로 해제한다
-        unsafe { ConvertStringSecurityDescriptorToSecurityDescriptorW(PCWSTR(sddl.as_ptr()), SDDL_REVISION_1, &mut sd, None) }.map_err(|e| io::Error::other(e.to_string()))?;
+        unsafe {
+            ConvertStringSecurityDescriptorToSecurityDescriptorW(
+                PCWSTR(sddl.as_ptr()),
+                SDDL_REVISION_1,
+                &mut sd,
+                None,
+            )
+        }
+        .map_err(|e| io::Error::other(e.to_string()))?;
         Ok(Self { sd })
     }
 
     fn attributes(&self) -> SECURITY_ATTRIBUTES {
-        SECURITY_ATTRIBUTES { nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32, lpSecurityDescriptor: self.sd.0, bInheritHandle: false.into() }
+        SECURITY_ATTRIBUTES {
+            nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+            lpSecurityDescriptor: self.sd.0,
+            bInheritHandle: false.into(),
+        }
     }
 }
 
@@ -100,7 +144,12 @@ impl Drop for OwnerOnly {
 }
 
 /// 파이프 1개를 만든다 (인스턴스 1개, 원격 거부, 첫 인스턴스, 현재 사용자 DACL)
-fn create(name: &str, suffix: &str, access: FILE_FLAGS_AND_ATTRIBUTES, dacl: &OwnerOnly) -> io::Result<File> {
+fn create(
+    name: &str,
+    suffix: &str,
+    access: FILE_FLAGS_AND_ATTRIBUTES,
+    dacl: &OwnerOnly,
+) -> io::Result<File> {
     let n = HSTRING::from(full_name(name, suffix));
     let sa = dacl.attributes();
     // SAFETY: sa 는 이 호출 동안 유효하다. 반환 핸들의 소유권은 File 로 넘긴다
@@ -132,10 +181,16 @@ impl ServerPipes {
     /// 이름 검증 → 두 파이프를 모두 먼저 만든다 (호스트가 어느 순서로 열어도 이름이 이미 있다)
     pub fn create(name: &str) -> io::Result<Self> {
         if !is_valid_pipe_name(name) {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid pipe name"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "invalid pipe name",
+            ));
         }
         let dacl = OwnerOnly::new()?;
-        Ok(Self { cmd: create(name, "cmd", PIPE_ACCESS_INBOUND, &dacl)?, evt: create(name, "evt", PIPE_ACCESS_OUTBOUND, &dacl)? })
+        Ok(Self {
+            cmd: create(name, "cmd", PIPE_ACCESS_INBOUND, &dacl)?,
+            evt: create(name, "evt", PIPE_ACCESS_OUTBOUND, &dacl)?,
+        })
     }
 
     /// 호스트가 둘 다 열 때까지 대기. 반환: (명령 읽기, 이벤트 쓰기)
@@ -167,9 +222,14 @@ fn connect(f: &File) -> io::Result<()> {
 /// 호스트(클라이언트) 쪽 열기. 파이프가 아직 없으면 NotFound. 반환: (명령 쓰기, 이벤트 읽기)
 pub fn open_client(name: &str) -> io::Result<(File, File)> {
     if !is_valid_pipe_name(name) {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid pipe name"));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "invalid pipe name",
+        ));
     }
-    let cmd = OpenOptions::new().write(true).open(full_name(name, "cmd"))?;
+    let cmd = OpenOptions::new()
+        .write(true)
+        .open(full_name(name, "cmd"))?;
     let evt = OpenOptions::new().read(true).open(full_name(name, "evt"))?;
     Ok((cmd, evt))
 }
@@ -210,13 +270,27 @@ mod tests {
         let (_cmd, evt) = open_client(&name).unwrap();
         t.join().unwrap();
         let mut line = String::new();
-        assert_eq!(BufReader::new(evt).read_line(&mut line).unwrap_or(0), 0, "EOF(또는 broken pipe)");
+        assert_eq!(
+            BufReader::new(evt).read_line(&mut line).unwrap_or(0),
+            0,
+            "EOF(또는 broken pipe)"
+        );
     }
 
     #[test]
     fn t_player_pipe_03_missing_or_malformed_names_are_errors() {
-        assert!(open_client(&random_pipe_name().unwrap()).is_err(), "없는 파이프");
-        for bad in ["", "mam-player-", "mam-player-xyz", r"mam-player-..\..\x", "other-00000000000000000000000000000000", "mam-player-0000000000000000000000000000000G"] {
+        assert!(
+            open_client(&random_pipe_name().unwrap()).is_err(),
+            "없는 파이프"
+        );
+        for bad in [
+            "",
+            "mam-player-",
+            "mam-player-xyz",
+            r"mam-player-..\..\x",
+            "other-00000000000000000000000000000000",
+            "mam-player-0000000000000000000000000000000G",
+        ] {
             assert!(!is_valid_pipe_name(bad), "{bad}");
             assert!(ServerPipes::create(bad).is_err(), "{bad}");
             assert!(open_client(bad).is_err(), "{bad}");
@@ -240,7 +314,9 @@ mod tests {
 
     #[test]
     fn t_player_pipe_06_dacl_allows_only_the_current_user() {
-        use windows::Win32::Security::Authorization::{ConvertSecurityDescriptorToStringSecurityDescriptorW, GetSecurityInfo, SE_KERNEL_OBJECT};
+        use windows::Win32::Security::Authorization::{
+            ConvertSecurityDescriptorToStringSecurityDescriptorW, GetSecurityInfo, SE_KERNEL_OBJECT,
+        };
         use windows::Win32::Security::{ACL, DACL_SECURITY_INFORMATION};
         // Arrange
         let name = random_pipe_name().unwrap();
@@ -250,9 +326,27 @@ mod tests {
         let mut sd = PSECURITY_DESCRIPTOR::default();
         let mut dacl: *mut ACL = std::ptr::null_mut();
         let sddl = unsafe {
-            GetSecurityInfo(server.cmd_handle(), SE_KERNEL_OBJECT, DACL_SECURITY_INFORMATION, None, None, Some(&mut dacl), None, Some(&mut sd)).ok().unwrap();
+            GetSecurityInfo(
+                server.cmd_handle(),
+                SE_KERNEL_OBJECT,
+                DACL_SECURITY_INFORMATION,
+                None,
+                None,
+                Some(&mut dacl),
+                None,
+                Some(&mut sd),
+            )
+            .ok()
+            .unwrap();
             let mut s = PWSTR::null();
-            ConvertSecurityDescriptorToStringSecurityDescriptorW(sd, SDDL_REVISION_1, DACL_SECURITY_INFORMATION, &mut s, None).unwrap();
+            ConvertSecurityDescriptorToStringSecurityDescriptorW(
+                sd,
+                SDDL_REVISION_1,
+                DACL_SECURITY_INFORMATION,
+                &mut s,
+                None,
+            )
+            .unwrap();
             let out = s.to_string().unwrap();
             let _ = LocalFree(Some(HLOCAL(s.0 as *mut c_void)));
             let _ = LocalFree(Some(HLOCAL(sd.0)));

@@ -13,8 +13,8 @@ mod locate;
 mod manage;
 
 pub(crate) use entry::{Entry, Pkg};
-pub(crate) use manage::parse_granted_perms;
 pub use locate::{WORKER_ENV, WORKER_EXE, locate_worker, locate_worker_default};
+pub(crate) use manage::parse_granted_perms;
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -27,7 +27,9 @@ use mam_plugin_gateway::{Gateway, GatewayConfig};
 use mam_plugin_host::HostConfig;
 use rusqlite::Connection;
 
-use crate::api::{ChangeReason, ChangeSink, InstallError, JobHooks, NoopHooks, PluginChanged, PluginId};
+use crate::api::{
+    ChangeReason, ChangeSink, InstallError, JobHooks, NoopHooks, PluginChanged, PluginId,
+};
 
 /// 사용자 작업·부팅의 DB 대기 상한
 const DB_WAIT: Duration = Duration::from_secs(30);
@@ -69,8 +71,15 @@ pub struct PluginRuntime {
 impl PluginRuntime {
     /// 앱 시작을 실패시키지 않는다 — 깨진 플러그인은 목록에 `broken` 으로 남는다
     pub fn boot(deps: RuntimeDeps) -> Arc<Self> {
-        let gateway = Arc::new(Gateway::new(Arc::clone(&deps.pool), Arc::clone(&deps.clock), deps.gateway.clone()));
-        let worker_available = deps.worker_exe.as_deref().is_some_and(std::path::Path::is_file);
+        let gateway = Arc::new(Gateway::new(
+            Arc::clone(&deps.pool),
+            Arc::clone(&deps.clock),
+            deps.gateway.clone(),
+        ));
+        let worker_available = deps
+            .worker_exe
+            .as_deref()
+            .is_some_and(std::path::Path::is_file);
         let rt = Arc::new(Self {
             deps,
             gateway,
@@ -106,7 +115,13 @@ impl PluginRuntime {
 
     /// 종료 시 JobRunner 정지 뒤에 부른다 — 모든 워커를 정리한다(진행 중 호출이 끝나길 기다린다)
     pub fn shutdown_all(&self) {
-        let hosts: Vec<_> = self.registry.read().unwrap_or_else(|p| p.into_inner()).values().filter_map(|e| e.host.clone()).collect();
+        let hosts: Vec<_> = self
+            .registry
+            .read()
+            .unwrap_or_else(|p| p.into_inner())
+            .values()
+            .filter_map(|e| e.host.clone())
+            .collect();
         for h in hosts {
             h.shutdown();
         }
@@ -115,19 +130,32 @@ impl PluginRuntime {
     // ---- 내부 도우미 ----
 
     pub(crate) fn entry(&self, id: &str) -> Option<Arc<Entry>> {
-        self.registry.read().unwrap_or_else(|p| p.into_inner()).get(id).cloned()
+        self.registry
+            .read()
+            .unwrap_or_else(|p| p.into_inner())
+            .get(id)
+            .cloned()
     }
 
     pub(crate) fn put_entry(&self, entry: Entry) -> Option<Arc<Entry>> {
-        self.registry.write().unwrap_or_else(|p| p.into_inner()).insert(entry.id.clone(), Arc::new(entry))
+        self.registry
+            .write()
+            .unwrap_or_else(|p| p.into_inner())
+            .insert(entry.id.clone(), Arc::new(entry))
     }
 
     pub(crate) fn take_entry(&self, id: &str) -> Option<Arc<Entry>> {
-        self.registry.write().unwrap_or_else(|p| p.into_inner()).remove(id)
+        self.registry
+            .write()
+            .unwrap_or_else(|p| p.into_inner())
+            .remove(id)
     }
 
     pub(crate) fn emit(&self, id: &str, reason: ChangeReason) {
-        (self.deps.on_change)(PluginChanged { plugin_id: id.to_owned(), reason });
+        (self.deps.on_change)(PluginChanged {
+            plugin_id: id.to_owned(),
+            reason,
+        });
     }
 
     pub(crate) fn current_hooks(&self) -> Arc<dyn JobHooks> {
@@ -147,16 +175,25 @@ impl PluginRuntime {
         T: Send + 'static,
         F: FnOnce(&mut Connection) -> Result<T, DbError> + Send + 'static,
     {
-        self.deps.pool.write_until(priority, Instant::now() + DB_WAIT, f)
+        self.deps
+            .pool
+            .write_until(priority, Instant::now() + DB_WAIT, f)
     }
 
-    pub(crate) fn db_read<T>(&self, f: impl FnOnce(&Connection) -> Result<T, DbError>) -> Result<T, PoolError> {
+    pub(crate) fn db_read<T>(
+        &self,
+        f: impl FnOnce(&Connection) -> Result<T, DbError>,
+    ) -> Result<T, PoolError> {
         self.deps.pool.read_until(Instant::now() + DB_WAIT, f)
     }
 
     /// 권한 레지스트리를 DB 기준으로 다시 채운다. 실패하면(닫힘 유지) 경고만 남긴다
     pub(crate) fn refresh_grants(&self, id: &PluginId) {
-        if let Err(e) = self.gateway.grants().refresh(&self.deps.pool, id, Instant::now() + DB_WAIT) {
+        if let Err(e) = self
+            .gateway
+            .grants()
+            .refresh(&self.deps.pool, id, Instant::now() + DB_WAIT)
+        {
             tracing::warn!(plugin = id.as_str(), error = %e, "grant refresh failed; plugin stays closed");
         }
     }

@@ -19,7 +19,9 @@ fn scripted() -> Plugin {
 
 /// 자산 `n` 개를 만들고 편집·피드까지 마친다 (작업 행은 자산 id 순으로 실행된다)
 fn queued(env: &Env, n: usize) -> Vec<i64> {
-    let assets: Vec<i64> = (0..n).map(|i| env.add_asset("image", &format!("{i}.jpg"))).collect();
+    let assets: Vec<i64> = (0..n)
+        .map(|i| env.add_asset("image", &format!("{i}.jpg")))
+        .collect();
     assets.iter().for_each(|a| {
         env.edit(*a);
     });
@@ -28,7 +30,10 @@ fn queued(env: &Env, n: usize) -> Vec<i64> {
 }
 
 fn busy(code: &str) -> InvokeError {
-    InvokeError::Plugin { code: code.into(), message: "m".into() }
+    InvokeError::Plugin {
+        code: code.into(),
+        message: "m".into(),
+    }
 }
 
 /// 영구 실패로 처리되는 호출 오류와 기대 코드 (InvokeError 는 Clone 이 아니라 호출할 때마다 만든다)
@@ -47,12 +52,21 @@ fn permanent() -> Vec<(InvokeError, &'static str)> {
 
 fn assert_failed(env: &Env, asset: i64, code: &str) {
     let t = env.task(P, "meta.run", asset).unwrap();
-    assert_eq!((t.status.as_str(), t.last_error.as_deref()), ("failed", Some(code)), "asset {asset}");
+    assert_eq!(
+        (t.status.as_str(), t.last_error.as_deref()),
+        ("failed", Some(code)),
+        "asset {asset}"
+    );
 }
 
 fn assert_nothing_written(env: &Env, assets: &[i64]) {
     assert_eq!(env.kv_rows(), 0);
-    assert!(assets.iter().all(|a| env.plugin_tags(*a).is_empty() && env.revision(*a) == 2), "no tag, no revision bump");
+    assert!(
+        assets
+            .iter()
+            .all(|a| env.plugin_tags(*a).is_empty() && env.revision(*a) == 2),
+        "no tag, no revision bump"
+    );
 }
 
 #[test]
@@ -77,8 +91,13 @@ fn t_pjob_14_invalid_outputs_fail_the_task_with_output_invalid_and_write_nothing
     let done = env.run(8);
 
     // Assert: 모두 failed(output_invalid) 이고 작업은 정상 종료, 아무것도 쓰이지 않았다
-    assert!(done.iter().all(|d| matches!(d.outcome, Ok(JobOutcome::Done))));
-    assets.iter().for_each(|a| assert_failed(&env, *a, "output_invalid"));
+    assert!(
+        done.iter()
+            .all(|d| matches!(d.outcome, Ok(JobOutcome::Done)))
+    );
+    assets
+        .iter()
+        .for_each(|a| assert_failed(&env, *a, "output_invalid"));
     assert_nothing_written(&env, &assets);
     assert_eq!(env.task(P, "meta.run", assets[0]).unwrap().attempts, 0);
 }
@@ -89,14 +108,20 @@ fn t_pjob_14_output_boundaries_32_keys_and_20_tags_are_accepted() {
     let env = Env::new();
     env.install(scripted());
     let twenty: Vec<String> = (0..20).map(|i| format!("t{i}")).collect();
-    env.invoker.script(vec![json!({"manyKeys": 32}), json!({"out": {"tags": twenty}})]);
+    env.invoker.script(vec![
+        json!({"manyKeys": 32}),
+        json!({"out": {"tags": twenty}}),
+    ]);
     let assets = queued(&env, 2);
 
     // Act
     env.run(2);
 
     // Assert
-    assert!(assets.iter().all(|a| env.task(P, "meta.run", *a).is_some_and(|t| t.status == "done")));
+    assert!(assets.iter().all(|a| {
+        env.task(P, "meta.run", *a)
+            .is_some_and(|t| t.status == "done")
+    }));
     assert_eq!(env.kv_rows(), 32);
     assert_eq!(env.plugin_tags(assets[1]).len(), 20);
 }
@@ -106,9 +131,15 @@ fn t_pjob_14_kv_output_with_kv_write_revoked_is_permission_denied_while_the_plug
     // Arrange: 게이트 ON — 플러그인은 활성이고 asset.read/tag.write 등 나머지 권한은 허용, kv.write 만 철회
     let env = Env::new();
     env.install(scripted());
-    let without_kv_write: Vec<Permission> = Permission::ALL.into_iter().filter(|p| *p != Permission::KvWrite).collect();
+    let without_kv_write: Vec<Permission> = Permission::ALL
+        .into_iter()
+        .filter(|p| *p != Permission::KvWrite)
+        .collect();
     env.set_granted(P, &without_kv_write);
-    env.invoker.script(vec![json!({"out": {"kv": {"a": 1}, "tags": ["x"]}}), json!({"out": {"tags": ["y"]}})]);
+    env.invoker.script(vec![
+        json!({"out": {"kv": {"a": 1}, "tags": ["x"]}}),
+        json!({"out": {"tags": ["y"]}}),
+    ]);
     let assets = queued(&env, 2);
 
     // Act
@@ -116,8 +147,14 @@ fn t_pjob_14_kv_output_with_kv_write_revoked_is_permission_denied_while_the_plug
 
     // Assert: kv 가 든 출력은 거부되고 같은 출력의 태그도 쓰이지 않았다(원자성). 태그만 있는 출력은 허용돼 완료
     assert_failed(&env, assets[0], "permission_denied");
-    assert_eq!((env.kv_rows(), env.plugin_tags(assets[0])), (0, Vec::<String>::new()));
-    assert!(env.task(P, "meta.run", assets[1]).is_some_and(|t| t.status == "done"));
+    assert_eq!(
+        (env.kv_rows(), env.plugin_tags(assets[0])),
+        (0, Vec::<String>::new())
+    );
+    assert!(
+        env.task(P, "meta.run", assets[1])
+            .is_some_and(|t| t.status == "done")
+    );
     assert_eq!(env.plugin_tags(assets[1]), vec!["y".to_owned()]);
 }
 
@@ -126,7 +163,10 @@ fn t_pjob_14_tag_output_with_tag_write_revoked_is_permission_denied() {
     // Arrange
     let env = Env::new();
     env.install(scripted());
-    let without_tag_write: Vec<Permission> = Permission::ALL.into_iter().filter(|p| *p != Permission::TagWrite).collect();
+    let without_tag_write: Vec<Permission> = Permission::ALL
+        .into_iter()
+        .filter(|p| *p != Permission::TagWrite)
+        .collect();
     env.set_granted(P, &without_tag_write);
     env.invoker.script(vec![json!({"out": {"tags": ["x"]}})]);
     let assets = queued(&env, 1);
@@ -144,16 +184,26 @@ fn t_pjob_14_kv_total_over_the_quota_fails_with_quota_exceeded_and_keeps_earlier
     // Arrange: 플러그인당 KV 총량 300 바이트 (행 비용 = 키 + 값 + 64)
     let env = Env::with(|cfg| cfg.kv_quota_bytes = 300);
     env.install(scripted());
-    env.invoker.script(vec![json!({"out": {"kv": {"a": 1}}}), json!({"bigKv": 1_000})]);
+    env.invoker.script(vec![
+        json!({"out": {"kv": {"a": 1}}}),
+        json!({"bigKv": 1_000}),
+    ]);
     let assets = queued(&env, 2);
 
     // Act
     env.run(2);
 
     // Assert
-    assert!(env.task(P, "meta.run", assets[0]).is_some_and(|t| t.status == "done"));
+    assert!(
+        env.task(P, "meta.run", assets[0])
+            .is_some_and(|t| t.status == "done")
+    );
     assert_failed(&env, assets[1], "quota_exceeded");
-    assert_eq!(env.kv_rows(), 1, "the earlier row stays, the oversized write left nothing");
+    assert_eq!(
+        env.kv_rows(),
+        1,
+        "the earlier row stays, the oversized write left nothing"
+    );
 }
 
 #[test]
@@ -161,7 +211,13 @@ fn t_pjob_14_transient_invoke_errors_stay_pending_and_permanent_ones_fail_with_a
     // Arrange: 호출 오류를 주입 (프로세스 없이) — 자산 순서대로 소비된다
     let env = Env::new();
     env.install(scripted());
-    let transient = vec![InvokeError::Timeout, InvokeError::Crashed, InvokeError::Start("io".into()), busy("busy"), busy("unavailable")];
+    let transient = vec![
+        InvokeError::Timeout,
+        InvokeError::Crashed,
+        InvokeError::Start("io".into()),
+        busy("busy"),
+        busy("unavailable"),
+    ];
     let codes: Vec<&str> = permanent().into_iter().map(|(_, c)| c).collect();
     let (n_t, n_p) = (transient.len(), codes.len());
     let mut all = transient;
@@ -176,11 +232,25 @@ fn t_pjob_14_transient_invoke_errors_stay_pending_and_permanent_ones_fail_with_a
     for (i, a) in assets.iter().enumerate() {
         let t = env.task(P, "meta.run", *a).unwrap();
         if i < n_t {
-            assert_eq!((t.status.as_str(), t.attempts), ("pending", 1), "transient #{i}");
-            assert!(done[i].outcome.as_ref().is_err_and(|e| e.retryable), "transient #{i}");
+            assert_eq!(
+                (t.status.as_str(), t.attempts),
+                ("pending", 1),
+                "transient #{i}"
+            );
+            assert!(
+                done[i].outcome.as_ref().is_err_and(|e| e.retryable),
+                "transient #{i}"
+            );
         } else {
-            assert_eq!((t.status.as_str(), t.last_error.as_deref(), t.attempts), ("failed", Some(codes[i - n_t]), 0), "permanent #{i}");
-            assert!(matches!(done[i].outcome, Ok(JobOutcome::Done)), "permanent #{i}");
+            assert_eq!(
+                (t.status.as_str(), t.last_error.as_deref(), t.attempts),
+                ("failed", Some(codes[i - n_t]), 0),
+                "permanent #{i}"
+            );
+            assert!(
+                matches!(done[i].outcome, Ok(JobOutcome::Done)),
+                "permanent #{i}"
+            );
         }
     }
     assert_eq!(env.kv_rows(), 0);

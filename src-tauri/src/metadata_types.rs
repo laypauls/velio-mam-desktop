@@ -3,7 +3,9 @@
 //! 값은 `{ kind, value }` 로 타입을 함께 실어 보낸다 — date 와 enum 이 모두 정수라 값만으로는 구분되지 않는다.
 //! date = `YYYYMMDD` 정수, number = f64, enum = optionId, multiEnum = optionId[], keyword = 문자열.
 
-use mam_core::userdata::{AssetFieldValue, FieldOption, FieldPatch, FieldValue, MetadataField, ValueType};
+use mam_core::userdata::{
+    AssetFieldValue, FieldOption, FieldPatch, FieldValue, MetadataField, ValueType,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -73,7 +75,11 @@ pub struct FieldOptionView {
 
 impl From<FieldOption> for FieldOptionView {
     fn from(o: FieldOption) -> Self {
-        Self { option_id: o.option_id, label: o.label, position: o.position }
+        Self {
+            option_id: o.option_id,
+            label: o.label,
+            position: o.position,
+        }
     }
 }
 
@@ -113,6 +119,9 @@ pub struct AssetFieldValueView {
 
 impl From<AssetFieldValue> for AssetFieldValueView {
     fn from(v: AssetFieldValue) -> Self {
-        Self { field_id: v.field_id, value: v.value.into() }
+        Self {
+            field_id: v.field_id,
+            value: v.value.into(),
+        }
     }
 }

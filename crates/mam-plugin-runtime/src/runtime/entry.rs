@@ -7,7 +7,9 @@ use mam_plugin_host::PluginHost;
 use mam_plugin_manifest::{LocaleBundle, Manifest};
 
 use super::l10n;
-use crate::api::{AssetKind, Permission, PluginId, PluginInfo, PluginStatus, ProviderKind, ProviderSpec};
+use crate::api::{
+    AssetKind, Permission, PluginId, PluginInfo, PluginStatus, ProviderKind, ProviderSpec,
+};
 
 /// 읽기 전용 패키지 내용 (Broken 항목에는 없다)
 pub(crate) struct Pkg {
@@ -56,21 +58,45 @@ impl Entry {
         let pkg = self.pkg.as_ref()?;
         let p = &pkg.manifest.contributes.providers;
         let plain = |list: &[mam_plugin_manifest::Provider], kind: ProviderKind| {
-            list.iter().find(|x| x.id.as_str() == provider).map(|x| (kind, x.asset_kinds.clone(), None))
+            list.iter()
+                .find(|x| x.id.as_str() == provider)
+                .map(|x| (kind, x.asset_kinds.clone(), None))
         };
-        let (kind, asset_kinds, file_extension): (ProviderKind, Vec<AssetKind>, Option<String>) = plain(&p.metadata, ProviderKind::Metadata)
-            .or_else(|| plain(&p.analysis, ProviderKind::Analysis))
-            .or_else(|| {
-                p.export.iter().find(|x| x.id.as_str() == provider).map(|x| (ProviderKind::Export, x.asset_kinds.clone(), Some(x.file_extension.clone())))
-            })?;
-        Some(ProviderSpec { plugin: pkg.manifest.id.clone(), provider: provider.to_owned(), kind, asset_kinds, file_extension })
+        let (kind, asset_kinds, file_extension): (ProviderKind, Vec<AssetKind>, Option<String>) =
+            plain(&p.metadata, ProviderKind::Metadata)
+                .or_else(|| plain(&p.analysis, ProviderKind::Analysis))
+                .or_else(|| {
+                    p.export
+                        .iter()
+                        .find(|x| x.id.as_str() == provider)
+                        .map(|x| {
+                            (
+                                ProviderKind::Export,
+                                x.asset_kinds.clone(),
+                                Some(x.file_extension.clone()),
+                            )
+                        })
+                })?;
+        Some(ProviderSpec {
+            plugin: pkg.manifest.id.clone(),
+            provider: provider.to_owned(),
+            kind,
+            asset_kinds,
+            file_extension,
+        })
     }
 
     /// 자동 실행 대상(metadata·analysis) provider 목록
     pub(crate) fn auto_specs(&self) -> Vec<ProviderSpec> {
-        let Some(pkg) = self.pkg.as_ref() else { return Vec::new() };
+        let Some(pkg) = self.pkg.as_ref() else {
+            return Vec::new();
+        };
         let p = &pkg.manifest.contributes.providers;
-        p.metadata.iter().chain(&p.analysis).filter_map(|x| self.provider_spec(x.id.as_str())).collect()
+        p.metadata
+            .iter()
+            .chain(&p.analysis)
+            .filter_map(|x| self.provider_spec(x.id.as_str()))
+            .collect()
     }
 
     pub(crate) fn info(&self, locale: &str, worker_available: bool) -> PluginInfo {

@@ -27,7 +27,9 @@ pub fn valid_db_path(p: &str) -> bool {
     p.starts_with('/')
         && !p.ends_with('/')
         && p.len() <= 512
-        && !p.chars().any(|c| c.is_control() || "'\"`$\\;&|<>(){}[]*?!#~^".contains(c))
+        && !p
+            .chars()
+            .any(|c| c.is_control() || "'\"`$\\;&|<>(){}[]*?!#~^".contains(c))
         && !p.split('/').any(|s| s == "..")
 }
 
@@ -56,7 +58,10 @@ pub(super) mod cmd {
 
     /// 접속 시험 — 행 수와 최대 id
     pub fn probe(db: &str) -> String {
-        wrap(db, "SELECT 'P', COUNT(*), COALESCE(MAX(id), 0) FROM events;")
+        wrap(
+            db,
+            "SELECT 'P', COUNT(*), COALESCE(MAX(id), 0) FROM events;",
+        )
     }
 }
 
@@ -102,12 +107,17 @@ fn unhex(s: &str) -> Option<String> {
     if !s.len().is_multiple_of(2) || !s.is_ascii() {
         return None;
     }
-    let bytes: Option<Vec<u8>> = (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).ok()).collect();
+    let bytes: Option<Vec<u8>> = (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).ok())
+        .collect();
     String::from_utf8(bytes?).ok()
 }
 
 fn parse_row(f: &[&str]) -> Option<Row> {
-    let [id, types, path, name, dir, is_dir] = f else { return None };
+    let [id, types, path, name, dir, is_dir] = f else {
+        return None;
+    };
     let (path, name, dir) = (unhex(path)?, unhex(name)?, unhex(dir)?);
     let path = if !path.is_empty() {
         path
@@ -119,7 +129,15 @@ fn parse_row(f: &[&str]) -> Option<Row> {
     if path.len() > MAX_PATH_BYTES {
         return None;
     }
-    Some(Row { id: id.parse().ok()?, types: unhex(types)?.split(',').map(|t| t.trim().to_string()).collect(), path, is_dir: *is_dir != "0" })
+    Some(Row {
+        id: id.parse().ok()?,
+        types: unhex(types)?
+            .split(',')
+            .map(|t| t.trim().to_string())
+            .collect(),
+        path,
+        is_dir: *is_dir != "0",
+    })
 }
 
 fn parse_page(out: &[u8]) -> Result<Page, RunError> {
@@ -128,10 +146,18 @@ fn parse_page(out: &[u8]) -> Result<Page, RunError> {
     for line in text.lines() {
         let f: Vec<&str> = line.trim_end_matches('\r').split('|').collect();
         match f.as_slice() {
-            ["M", m] => (p.max_id, got_max) = (m.parse().map_err(|_| RunError::Exec("unexpected sqlite3 output".into()))?, true),
+            ["M", m] => {
+                (p.max_id, got_max) = (
+                    m.parse()
+                        .map_err(|_| RunError::Exec("unexpected sqlite3 output".into()))?,
+                    true,
+                )
+            }
             ["C", c] => p.cursor_row = *c == "1",
             ["R", rest @ ..] => {
-                p.last_id = p.last_id.max(rest.first().and_then(|i| i.parse().ok()).unwrap_or(0));
+                p.last_id = p
+                    .last_id
+                    .max(rest.first().and_then(|i| i.parse().ok()).unwrap_or(0));
                 match parse_row(rest) {
                     Some(r) => p.rows.push(r),
                     None => p.bad += 1,
@@ -141,7 +167,11 @@ fn parse_page(out: &[u8]) -> Result<Page, RunError> {
         }
     }
     // `M` 은 행이 없어도 항상 한 줄 나온다 — 없으면 sqlite3 가 아닌 것이 답한 것이다
-    if got_max { Ok(p) } else { Err(RunError::Exec("unexpected sqlite3 output".into())) }
+    if got_max {
+        Ok(p)
+    } else {
+        Err(RunError::Exec("unexpected sqlite3 output".into()))
+    }
 }
 
 /// 접속 시험 결과 — 이벤트 수와 최대 id
@@ -156,9 +186,19 @@ pub fn probe(run: &mut dyn RemoteRunner, db: &str) -> Result<Probe, RunError> {
     let out = run.run(&cmd::probe(db))?;
     let text = String::from_utf8_lossy(&out);
     text.lines()
-        .find_map(|l| match l.trim_end_matches('\r').split('|').collect::<Vec<_>>().as_slice() {
-            ["P", n, m] => Some(Probe { rows: n.parse().ok()?, max_id: m.parse().ok()? }),
-            _ => None,
+        .find_map(|l| {
+            match l
+                .trim_end_matches('\r')
+                .split('|')
+                .collect::<Vec<_>>()
+                .as_slice()
+            {
+                ["P", n, m] => Some(Probe {
+                    rows: n.parse().ok()?,
+                    max_id: m.parse().ok()?,
+                }),
+                _ => None,
+            }
         })
         .ok_or_else(|| RunError::Exec("unexpected sqlite3 output".into()))
 }
@@ -183,7 +223,11 @@ pub struct SesFeed {
 
 impl SesFeed {
     pub fn new(db: &str, resumed: Option<Cursor>) -> Self {
-        Self { db: db.to_string(), cursor: resumed, limit: MAX_ROWS }
+        Self {
+            db: db.to_string(),
+            cursor: resumed,
+            limit: MAX_ROWS,
+        }
     }
 
     pub fn cursor(&self) -> Option<Cursor> {
@@ -211,7 +255,10 @@ impl SesFeed {
         };
         self.limit = (self.limit * 2).min(MAX_ROWS);
         let page = parse_page(&out)?;
-        let mut p = Polled { bad: page.bad, ..Polled::default() };
+        let mut p = Polled {
+            bad: page.bad,
+            ..Polled::default()
+        };
         let Some(cur) = self.cursor else {
             // 첫 폴링: 지금까지의 행은 읽지 않는다 (앱을 처음 켤 때 과거 전체가 "방금 바뀜" 으로 쏟아진다) — 공백은 재스캔이 맞춘다
             p.next = Some(Cursor { id: page.max_id });
@@ -227,7 +274,9 @@ impl SesFeed {
             p.gap = true;
             p.skipped_rows = (page.max_id - cur.id) as u64;
         } else {
-            p.next = Some(Cursor { id: page.last_id.max(cur.id) });
+            p.next = Some(Cursor {
+                id: page.last_id.max(cur.id),
+            });
             p.gap = cur.id > 0 && !page.cursor_row;
             p.rows = page.rows;
         }
@@ -242,7 +291,10 @@ pub fn classify(row: &Row) -> Option<bool> {
     if row.is_dir && (has("create") || has("moved_to")) {
         return Some(true);
     }
-    ["create", "close_write", "moved_to", "moved_from", "delete"].iter().any(|t| has(t)).then_some(false)
+    ["create", "close_write", "moved_to", "moved_from", "delete"]
+        .iter()
+        .any(|t| has(t))
+        .then_some(false)
 }
 
 #[cfg(test)]

@@ -3,7 +3,8 @@
 use rusqlite::{OptionalExtension, params};
 
 use super::{
-    MAX_MEMO_CHARS, MAX_TITLE_CHARS, UserData, bump_assets, clean_ids, json_ids, require_assets, returning_ids,
+    MAX_MEMO_CHARS, MAX_TITLE_CHARS, UserData, bump_assets, clean_ids, json_ids, require_assets,
+    returning_ids,
 };
 use crate::scan::IngestError;
 

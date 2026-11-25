@@ -32,10 +32,9 @@ fn make_doc(id: u64, rng: &mut Rng) -> AssetDoc {
         _ => format!("カメラ{}.jpg", rng.range(1, 999)),
     };
     // 촬영일 85% 존재, 2012~2025 균등 (유닉스 초) / 수정일 2010~2026 (ms)
-    let captured = rng.chance(0.85).then(|| {
-        civil_ms(2012, 1, 1, 0, 0, 0) / 1000
-            + rng.range(0, 14 * 365 * 86_400) as i64
-    });
+    let captured = rng
+        .chance(0.85)
+        .then(|| civil_ms(2012, 1, 1, 0, 0, 0) / 1000 + rng.range(0, 14 * 365 * 86_400) as i64);
     AssetDoc {
         asset_id: id,
         revision: 1,
@@ -127,7 +126,8 @@ fn main() {
             .expect("upsert");
     }
     index.commit().expect("commit");
-    let (_, timed_out) = common::wait_for_merges(&dir, Duration::from_secs(3), Duration::from_secs(1800));
+    let (_, timed_out) =
+        common::wait_for_merges(&dir, Duration::from_secs(3), Duration::from_secs(1800));
     let build_s = t_build.elapsed().as_secs_f64();
     let segments = common::segment_count(&dir);
     let bytes = common::dir_size(&dir);
@@ -146,7 +146,10 @@ fn main() {
         sysinfo::mb(rss_build)
     );
 
-    let total = handle.search(&req(SortField::Name, false, 1)).unwrap().total;
+    let total = handle
+        .search(&req(SortField::Name, false, 1))
+        .unwrap()
+        .total;
     assert_eq!(total, size, "every document is searchable");
     let positions: [(&str, u64); 5] = [
         ("0", 0),
@@ -156,7 +159,9 @@ fn main() {
         ("last page", total - limit as u64),
     ];
 
-    println!("\n| call | first ms | P50 ms | P95 ms | P99 ms | max ms |\n|---|---:|---:|---:|---:|---:|");
+    println!(
+        "\n| call | first ms | P50 ms | P95 ms | P99 ms | max ms |\n|---|---:|---:|---:|---:|---:|"
+    );
     let sorts = [
         ("capturedAt desc", SortField::CapturedAt, true),
         ("name asc", SortField::Name, false),
@@ -200,7 +205,9 @@ fn main() {
         row(&format!("{name} / backward cursor @50%"), f, &s);
     }
 
-    println!("\n| section_index | first ms | P50 ms | P95 ms | P99 ms | max ms |\n|---|---:|---:|---:|---:|---:|");
+    println!(
+        "\n| section_index | first ms | P50 ms | P95 ms | P99 ms | max ms |\n|---|---:|---:|---:|---:|---:|"
+    );
     for (name, field, desc) in [
         ("capturedAt (month)", SortField::CapturedAt, true),
         ("modifiedAt (month)", SortField::ModifiedAt, true),
@@ -212,7 +219,10 @@ fn main() {
         let (f, s) = measure(runs, || {
             let idx = handle.section_index(&r, &local_utc_offset_secs).unwrap();
             assert_eq!(idx.total, size);
-            shape = (idx.sections.len(), idx.sections.iter().map(|x| x.count).sum::<u64>() as usize);
+            shape = (
+                idx.sections.len(),
+                idx.sections.iter().map(|x| x.count).sum::<u64>() as usize,
+            );
         });
         row(&format!("{name} [{} sections]", shape.0), f, &s);
     }

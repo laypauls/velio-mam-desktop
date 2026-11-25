@@ -13,10 +13,10 @@ use std::sync::Arc;
 use mam_db::{DbPool, Priority};
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 
-pub(crate) use hydrate::{availability_of, file_name_of, media_kind_of};
 pub use hydrate::{
     MAX_DUPLICATES, NEWER_SQL, PAGE_SQL, PREVIOUS_SQL, RELATED_SQL, asset_detail, hydrate_page,
 };
+pub(crate) use hydrate::{availability_of, file_name_of, media_kind_of};
 pub use types::*;
 pub use user_field_filter::{MAX_USER_FIELD_FILTERS, UserFieldFilter, validate_user_field_filters};
 

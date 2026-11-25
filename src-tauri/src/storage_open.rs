@@ -39,9 +39,9 @@ pub async fn open_backup_dir(storage: State<'_, Arc<Storage>>) -> Result<(), Com
 #[cfg(test)]
 mod tests {
     // Categories: Happy (01 기본 위치, 02 사용자 지정) / Validation (03 폴더 없음, 04 파일) / External (05 실행 실패)
-    use std::sync::Mutex;
     use std::io;
     use std::path::{Path, PathBuf};
+    use std::sync::Mutex;
 
     use mam_core::storage::DataPaths;
     use mam_db::{Clock, DbPool, settings};

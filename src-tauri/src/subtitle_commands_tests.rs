@@ -5,7 +5,9 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use super::*;
-use crate::player_commands::tests::{canvas, code_of, fingerprint, fixture, no_engine, set_volume_offline};
+use crate::player_commands::tests::{
+    canvas, code_of, fingerprint, fixture, no_engine, set_volume_offline,
+};
 
 const KO: &str = "1\n00:00:01,000 --> 00:00:02,500\n안녕 &lt;b&gt;& 세계\n\n2\n00:00:03,000 --> 00:00:04,000\n둘째\n\n";
 const EN: &str = "1\n00:00:00,500 --> 00:00:01,500\nhello\n\n";
@@ -18,7 +20,10 @@ fn put(media: &Path, name: &str, body: &str) -> PathBuf {
 
 fn names(dir: &Path) -> BTreeSet<String> {
     std::fs::read_dir(dir)
-        .map(|rd| rd.map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect())
+        .map(|rd| {
+            rd.map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+                .collect()
+        })
         .unwrap_or_default()
 }
 
@@ -65,19 +70,49 @@ fn t_ipc_sub_02_validation_and_error_codes_without_paths() {
 
     // Act / Assert: trackId 검증 - 빈 문자열·513자는 invalid_input (자산 해석보다 먼저), 경계 512자는 통과해 not_found
     for bad in [String::new(), "x".repeat(513)] {
-        assert_eq!(code_of(&svc.cues(&fx.reuse, fx.wav_id, &bad).unwrap_err()), "invalid_input");
-        assert_eq!(code_of(&svc.cues(&fx.reuse, 9_999_999, &bad).unwrap_err()), "invalid_input");
+        assert_eq!(
+            code_of(&svc.cues(&fx.reuse, fx.wav_id, &bad).unwrap_err()),
+            "invalid_input"
+        );
+        assert_eq!(
+            code_of(&svc.cues(&fx.reuse, 9_999_999, &bad).unwrap_err()),
+            "invalid_input"
+        );
     }
-    assert_eq!(code_of(&svc.cues(&fx.reuse, fx.wav_id, &"x".repeat(512)).unwrap_err()), "not_found");
-    assert_eq!(code_of(&svc.cues(&fx.reuse, fx.wav_id, &"한".repeat(512)).unwrap_err()), "not_found");
-    assert_eq!(code_of(&svc.cues(&fx.reuse, fx.wav_id, "nope.srt").unwrap_err()), "not_found");
+    assert_eq!(
+        code_of(
+            &svc.cues(&fx.reuse, fx.wav_id, &"x".repeat(512))
+                .unwrap_err()
+        ),
+        "not_found"
+    );
+    assert_eq!(
+        code_of(
+            &svc.cues(&fx.reuse, fx.wav_id, &"한".repeat(512))
+                .unwrap_err()
+        ),
+        "not_found"
+    );
+    assert_eq!(
+        code_of(&svc.cues(&fx.reuse, fx.wav_id, "nope.srt").unwrap_err()),
+        "not_found"
+    );
     // 알 수 없는 자산 -> asset_offline
-    assert_eq!(code_of(&svc.tracks(&fx.reuse, 9_999_999).unwrap_err()), "asset_offline");
-    assert_eq!(code_of(&svc.cues(&fx.reuse, 9_999_999, "clip.ko.srt").unwrap_err()), "asset_offline");
+    assert_eq!(
+        code_of(&svc.tracks(&fx.reuse, 9_999_999).unwrap_err()),
+        "asset_offline"
+    );
+    assert_eq!(
+        code_of(&svc.cues(&fx.reuse, 9_999_999, "clip.ko.srt").unwrap_err()),
+        "asset_offline"
+    );
     // 원본이 사라짐 -> asset_offline
     let (original, backup) = (fx.media.join("clip.wav"), fx.media.join("clip.bak"));
     std::fs::rename(&original, &backup).unwrap();
-    assert_eq!(code_of(&svc.tracks(&fx.reuse, fx.wav_id).unwrap_err()), "asset_offline");
+    assert_eq!(
+        code_of(&svc.tracks(&fx.reuse, fx.wav_id).unwrap_err()),
+        "asset_offline"
+    );
     std::fs::rename(&backup, &original).unwrap();
     // 볼륨 오프라인 -> asset_offline, 메시지에 경로를 싣지 않는다
     let fresh = SubtitleService::default(); // 캐시가 없어야 자산 해석을 거친다
@@ -85,11 +120,16 @@ fn t_ipc_sub_02_validation_and_error_codes_without_paths() {
     let err = fresh.cues(&fx.reuse, fx.wav_id, "clip.ko.srt").unwrap_err();
     assert_eq!(code_of(&err), "asset_offline");
     assert!(!serde_json::to_string(&err).unwrap().contains("clip"));
-    assert_eq!(code_of(&fresh.tracks(&fx.reuse, fx.wav_id).unwrap_err()), "asset_offline");
+    assert_eq!(
+        code_of(&fresh.tracks(&fx.reuse, fx.wav_id).unwrap_err()),
+        "asset_offline"
+    );
 
     // 열린 세션이 없으면 선택·끄기 모두 Ok (엔진 없음 포함), 끄기는 자산을 조회하지 않는다
     player.set_subtitle(fx.wav_id, None).unwrap();
-    player.set_subtitle(1, Some(("clip.ko.srt".into(), Vec::new()))).unwrap();
+    player
+        .set_subtitle(1, Some(("clip.ko.srt".into(), Vec::new())))
+        .unwrap();
 }
 
 #[test]
@@ -102,7 +142,8 @@ fn t_ipc_sub_03_temp_srt_lives_only_in_the_cache_dir_and_originals_are_untouched
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("stale.srt"), "x").unwrap();
     let before_media = names(&fx.media);
-    let before = [fx.media.join("clip.wav"), ko.clone(), en.clone()].map(|p| (p.clone(), fingerprint(&p)));
+    let before =
+        [fx.media.join("clip.wav"), ko.clone(), en.clone()].map(|p| (p.clone(), fingerprint(&p)));
     let (player, _events) = no_engine(&fx);
     let subs = SubtitleService::default();
     let cues = |id: &str| subs.cues(&fx.reuse, fx.wav_id, id).unwrap();
@@ -111,12 +152,25 @@ fn t_ipc_sub_03_temp_srt_lives_only_in_the_cache_dir_and_originals_are_untouched
     assert!(names(&dir).is_empty(), "stale temp file survived startup");
 
     // Act: 선택 -> 임시 SRT 는 캐시 폴더에만, 같은 트랙은 재사용, 다른 트랙은 새 파일
-    player.set_subtitle(fx.wav_id, Some(("clip.ko.srt".into(), cues("clip.ko.srt")))).unwrap();
+    player
+        .set_subtitle(fx.wav_id, Some(("clip.ko.srt".into(), cues("clip.ko.srt"))))
+        .unwrap();
     let first = names(&dir);
     assert_eq!(first.len(), 1);
-    player.set_subtitle(fx.wav_id, Some(("clip.ko.srt".into(), cues("clip.ko.srt")))).unwrap();
-    assert_eq!(names(&dir), first, "the same (asset, track) must reuse its file");
-    player.set_subtitle(fx.wav_id, Some(("clip.eng.srt".into(), cues("clip.eng.srt")))).unwrap();
+    player
+        .set_subtitle(fx.wav_id, Some(("clip.ko.srt".into(), cues("clip.ko.srt"))))
+        .unwrap();
+    assert_eq!(
+        names(&dir),
+        first,
+        "the same (asset, track) must reuse its file"
+    );
+    player
+        .set_subtitle(
+            fx.wav_id,
+            Some(("clip.eng.srt".into(), cues("clip.eng.srt"))),
+        )
+        .unwrap();
     assert_eq!(names(&dir).len(), 2);
     for n in names(&dir) {
         assert!(n.starts_with("sub-") && n.ends_with(".srt"), "{n}");
@@ -132,12 +186,23 @@ fn t_ipc_sub_03_temp_srt_lives_only_in_the_cache_dir_and_originals_are_untouched
     player.close().unwrap();
     assert!(names(&dir).is_empty(), "close left temp files");
     // 열기는 (엔진 없음으로) 실패해도 지운다
-    player.set_subtitle(fx.wav_id, Some(("clip.ko.srt".into(), cues("clip.ko.srt")))).unwrap();
+    player
+        .set_subtitle(fx.wav_id, Some(("clip.ko.srt".into(), cues("clip.ko.srt"))))
+        .unwrap();
     assert_eq!(names(&dir).len(), 1);
-    assert_eq!(code_of(&player.open(&fx.reuse, fx.wav_id, canvas(), true, None, None, None).unwrap_err()), "player_unavailable");
+    assert_eq!(
+        code_of(
+            &player
+                .open(&fx.reuse, fx.wav_id, canvas(), true, None, None, None)
+                .unwrap_err()
+        ),
+        "player_unavailable"
+    );
     assert!(names(&dir).is_empty(), "a failed open left temp files");
     // 종료 -> 폴더째 삭제
-    player.set_subtitle(fx.wav_id, Some(("clip.ko.srt".into(), cues("clip.ko.srt")))).unwrap();
+    player
+        .set_subtitle(fx.wav_id, Some(("clip.ko.srt".into(), cues("clip.ko.srt"))))
+        .unwrap();
     player.shutdown();
     assert!(!dir.exists());
 
@@ -160,7 +225,12 @@ fn t_ipc_sub_04_concurrent_calls_agree_and_the_cache_keeps_four_assets() {
     let results: Vec<_> = (0..4)
         .map(|_| {
             let (svc, reuse, id) = (Arc::clone(&svc), Arc::clone(&fx.reuse), fx.wav_id);
-            std::thread::spawn(move || (svc.tracks(&reuse, id).unwrap(), svc.cues(&reuse, id, "clip.ko.srt").unwrap()))
+            std::thread::spawn(move || {
+                (
+                    svc.tracks(&reuse, id).unwrap(),
+                    svc.cues(&reuse, id, "clip.ko.srt").unwrap(),
+                )
+            })
         })
         .collect::<Vec<_>>()
         .into_iter()
@@ -193,7 +263,8 @@ fn t_ipc_sub_04_concurrent_calls_agree_and_the_cache_keeps_four_assets() {
 impl SubtitleService {
     /// 시험 전용: 자산 해석 없이 캐시 조회만 한다 (캐시 적중이면 경로 클로저는 불리지 않는다)
     fn cues_cached_for_test(&self, asset_id: i64) {
-        self.cached_or_scan(asset_id, || panic!("cache miss")).unwrap();
+        self.cached_or_scan(asset_id, || panic!("cache miss"))
+            .unwrap();
     }
 }
 
@@ -208,15 +279,35 @@ fn t_ipc_sub_05_request_for_another_open_asset_skips_discovery_and_temp_files() 
     player.set_current_asset_for_test(Some(fx.wav_id + 1000));
 
     // Act / Assert: 다른 자산 -> Ok, 탐색(캐시)도 임시 파일도 없다
-    set_subtitle_for(&player, &subs, &fx.reuse, fx.wav_id, Some("clip.ko.srt".into())).unwrap();
+    set_subtitle_for(
+        &player,
+        &subs,
+        &fx.reuse,
+        fx.wav_id,
+        Some("clip.ko.srt".into()),
+    )
+    .unwrap();
     assert!(subs.cached_assets().is_empty());
     assert!(names(&dir).is_empty());
     // 인자 검증은 그래도 먼저다
-    assert_eq!(code_of(&set_subtitle_for(&player, &subs, &fx.reuse, fx.wav_id, Some(String::new())).unwrap_err()), "invalid_input");
+    assert_eq!(
+        code_of(
+            &set_subtitle_for(&player, &subs, &fx.reuse, fx.wav_id, Some(String::new()))
+                .unwrap_err()
+        ),
+        "invalid_input"
+    );
     // 같은 자산이거나 열린 자산을 모르면 평소대로 처리한다 (탐색 + 임시 파일)
     for current in [Some(fx.wav_id), None] {
         player.set_current_asset_for_test(current);
-        set_subtitle_for(&player, &subs, &fx.reuse, fx.wav_id, Some("clip.ko.srt".into())).unwrap();
+        set_subtitle_for(
+            &player,
+            &subs,
+            &fx.reuse,
+            fx.wav_id,
+            Some("clip.ko.srt".into()),
+        )
+        .unwrap();
         assert_eq!(subs.cached_assets(), vec![fx.wav_id]);
         assert_eq!(names(&dir).len(), 1);
         player.close().unwrap();

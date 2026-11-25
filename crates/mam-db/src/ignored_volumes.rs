@@ -57,7 +57,9 @@ pub fn add_ignored_volume(conn: &Connection, entry: &IgnoredVolume) -> Result<()
     match list.iter_mut().find(|v| v.volume_key == entry.volume_key) {
         Some(existing) => {
             existing.label.clone_from(&entry.label);
-            existing.last_mount_point.clone_from(&entry.last_mount_point);
+            existing
+                .last_mount_point
+                .clone_from(&entry.last_mount_point);
         }
         None => list.push(entry.clone()),
     }

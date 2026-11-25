@@ -110,8 +110,7 @@ fn build(raw: RawManifest, api_version: u32) -> Result<Manifest, ManifestError> 
 
     let contributes = build_contributes(raw.contributes)?;
     let activation_events = build_activation(raw.activation_events, &contributes)?;
-    if !contributes.providers.export.is_empty() && !permissions.contains(&Permission::ExportWrite)
-    {
+    if !contributes.providers.export.is_empty() && !permissions.contains(&Permission::ExportWrite) {
         return Err(ManifestError::MissingPermissionFor {
             path: "contributes.providers.export".to_owned(),
             permission: Permission::ExportWrite,

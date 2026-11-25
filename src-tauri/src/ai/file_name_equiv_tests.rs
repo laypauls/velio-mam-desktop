@@ -21,11 +21,18 @@ fn t_pgw_11b_file_name_sanitizer_matches_sanitized_meta() {
     ];
     for raw in cases {
         let want = SanitizedMeta::new(raw, None, MediaType::Image, None).file_name;
-        assert_eq!(sanitize_file_name(raw).as_deref(), Some(want.as_str()), "{raw:?}");
+        assert_eq!(
+            sanitize_file_name(raw).as_deref(),
+            Some(want.as_str()),
+            "{raw:?}"
+        );
     }
     // 빈 이름: SanitizedMeta 는 "unknown", 플러그인 쪽은 None
     for raw in ["", "dir/", "d/\u{1}\u{2}"] {
-        assert_eq!(SanitizedMeta::new(raw, None, MediaType::Image, None).file_name, "unknown");
+        assert_eq!(
+            SanitizedMeta::new(raw, None, MediaType::Image, None).file_name,
+            "unknown"
+        );
         assert_eq!(sanitize_file_name(raw), None, "{raw:?}");
     }
 }

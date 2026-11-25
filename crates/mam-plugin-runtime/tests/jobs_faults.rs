@@ -16,8 +16,15 @@ use serde_json::json;
 const P: &str = "com.example.faults";
 
 fn scripted() -> Plugin {
-    let mut p = Plugin::new(P, "scripted").provider("meta.run", ProviderKind::Metadata, &[AssetKind::Image]);
-    p.breaker = Some(BreakerConfig { max_faults: 100, window: Duration::from_secs(600) });
+    let mut p = Plugin::new(P, "scripted").provider(
+        "meta.run",
+        ProviderKind::Metadata,
+        &[AssetKind::Image],
+    );
+    p.breaker = Some(BreakerConfig {
+        max_faults: 100,
+        window: Duration::from_secs(600),
+    });
     p
 }
 
@@ -33,7 +40,10 @@ fn t_pjob_13_worker_killed_by_pid_mid_task_is_retried_with_backoff_and_then_succ
     // Arrange: 첫 시도는 워커가 자기 PID 로 종료당하고, 재시도는 정상 출력
     let env = Env::new();
     env.install(scripted());
-    env.invoker.script(vec![json!({"kill": true}), json!({"out": {"kv": {"ok": 1}}})]);
+    env.invoker.script(vec![
+        json!({"kill": true}),
+        json!({"out": {"kv": {"ok": 1}}}),
+    ]);
     let asset = queued_asset(&env);
     let pid = env.invoker.arm_kill(P);
 
@@ -44,7 +54,10 @@ fn t_pjob_13_worker_killed_by_pid_mid_task_is_retried_with_backoff_and_then_succ
     assert!(first[0].outcome.as_ref().is_err_and(|e| e.retryable));
     assert!(!pid_alive(pid), "the worker was killed by its PID");
     let task = env.task(P, "meta.run", asset).unwrap();
-    assert_eq!((task.status.as_str(), task.attempts, env.kv_rows()), ("pending", 1, 0));
+    assert_eq!(
+        (task.status.as_str(), task.attempts, env.kv_rows()),
+        ("pending", 1, 0)
+    );
     let rows = env.jobs_rows();
     assert_eq!((rows[0].status.as_str(), rows[0].attempts), ("pending", 1));
     assert!(rows[0].not_before > common_jobs::T0, "backoff applied");
@@ -59,7 +72,10 @@ fn t_pjob_13_worker_killed_by_pid_mid_task_is_retried_with_backoff_and_then_succ
     assert_eq!((task.status.as_str(), task.attempts), ("done", 0));
     assert_eq!(env.kv(P, asset, "ok").as_deref(), Some("1"));
     assert!(env.jobs_rows().is_empty());
-    assert_eq!((env.invoker.call_count(), env.invoker.host(P).starts()), (2, 2));
+    assert_eq!(
+        (env.invoker.call_count(), env.invoker.host(P).starts()),
+        (2, 2)
+    );
 }
 
 #[test]
@@ -76,16 +92,29 @@ fn t_pjob_13_after_max_attempts_of_worker_crashes_the_task_is_failed_and_the_job
         pids.push(env.invoker.arm_kill(P));
         let done = env.run(1);
         if attempt < MAX_ATTEMPTS {
-            assert!(done[0].outcome.as_ref().is_err_and(|e| e.retryable), "attempt {attempt} is retried");
+            assert!(
+                done[0].outcome.as_ref().is_err_and(|e| e.retryable),
+                "attempt {attempt} is retried"
+            );
             env.skip_backoff();
         } else {
-            assert!(matches!(done[0].outcome, Ok(JobOutcome::Done)), "the last attempt closes the job");
+            assert!(
+                matches!(done[0].outcome, Ok(JobOutcome::Done)),
+                "the last attempt closes the job"
+            );
         }
     }
 
     // Assert: 작업은 failed(crashed), 대기 작업 없음, 호출은 정확히 MAX_ATTEMPTS 번
     let task = env.task(P, "meta.run", asset).unwrap();
-    assert_eq!((task.status.as_str(), task.last_error.as_deref(), task.attempts), ("failed", Some("crashed"), MAX_ATTEMPTS));
+    assert_eq!(
+        (
+            task.status.as_str(),
+            task.last_error.as_deref(),
+            task.attempts
+        ),
+        ("failed", Some("crashed"), MAX_ATTEMPTS)
+    );
     assert_eq!(env.invoker.call_count(), MAX_ATTEMPTS as usize);
     assert!(env.jobs_rows().is_empty());
     assert!(pids.iter().all(|p| !pid_alive(*p)));
@@ -108,7 +137,10 @@ fn t_pjob_14_timeout_is_retried_and_the_worker_is_discarded() {
     // Assert: 재시도 가능 — 대기 유지, 시도 1
     assert!(done[0].outcome.as_ref().is_err_and(|e| e.retryable));
     let task = env.task(P, "meta.run", asset).unwrap();
-    assert_eq!((task.status.as_str(), task.attempts, env.kv_rows()), ("pending", 1, 0));
+    assert_eq!(
+        (task.status.as_str(), task.attempts, env.kv_rows()),
+        ("pending", 1, 0)
+    );
     assert_eq!(env.jobs_rows()[0].attempts, 1);
 }
 
@@ -126,7 +158,14 @@ fn t_pjob_14_js_exception_fails_the_task_permanently_without_retry() {
     // Assert: failed(script_error), 작업은 정상 종료(Done) — 재시도 없음
     assert!(matches!(done[0].outcome, Ok(JobOutcome::Done)));
     let task = env.task(P, "meta.run", asset).unwrap();
-    assert_eq!((task.status.as_str(), task.last_error.as_deref(), task.attempts), ("failed", Some("script_error"), 0));
+    assert_eq!(
+        (
+            task.status.as_str(),
+            task.last_error.as_deref(),
+            task.attempts
+        ),
+        ("failed", Some("script_error"), 0)
+    );
     assert!(env.jobs_rows().is_empty());
     assert_eq!(env.invoker.call_count(), 1);
 }

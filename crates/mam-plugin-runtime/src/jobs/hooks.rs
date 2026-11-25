@@ -14,7 +14,9 @@ impl JobHooks for PluginJobs {
             return;
         }
         let id = plugin.as_str().to_owned();
-        let res = self.core.write_installed(plugin.as_str(), move |tx, _| init_feed_cursor(tx, &id).map_err(put_err));
+        let res = self.core.write_installed(plugin.as_str(), move |tx, _| {
+            init_feed_cursor(tx, &id).map_err(put_err)
+        });
         if let Err(e) = res {
             tracing::warn!(plugin = plugin.as_str(), error = %e, "cannot initialize the plugin feed cursor (lazy init at the next tick)");
         }
@@ -43,10 +45,14 @@ fn requeue_pending(core: &Core, plugin: &str) {
         let mut assets: Vec<i64> = page.iter().map(|&(_, a)| a).collect();
         assets.sort_unstable();
         assets.dedup();
-        match core.write_installed(plugin, move |tx, now| Ok(enqueue_jobs_tx(tx, &assets, priority, now)?)) {
+        match core.write_installed(plugin, move |tx, now| {
+            Ok(enqueue_jobs_tx(tx, &assets, priority, now)?)
+        }) {
             Ok(Some(_)) => {}
             Ok(None) => return, // 그 사이 제거됨
-            Err(e) => return tracing::warn!(plugin, error = %e, "cannot re-queue pending plugin tasks"),
+            Err(e) => {
+                return tracing::warn!(plugin, error = %e, "cannot re-queue pending plugin tasks");
+            }
         }
         after = last;
         if !full {

@@ -30,7 +30,13 @@ pub enum SurfaceError {
 pub trait FrameSurface: Send + Sync {
     /// 버퍼 3개를 만들어 JS 에 게시하고 워커로 핸들을 복제한다. **감독자 스레드에서 호출**되며, 구현은 UI 스레드에 일을 넘기고
     /// 그 스레드를 막는다 (2초 제한). UI 스레드 자신에서 부르지 않는다
-    fn create_bank(&self, epoch: u64, w: u32, h: u32, worker_process: RawProcessHandle) -> Result<BankAttach, SurfaceError>;
+    fn create_bank(
+        &self,
+        epoch: u64,
+        w: u32,
+        h: u32,
+        worker_process: RawProcessHandle,
+    ) -> Result<BankAttach, SurfaceError>;
     /// 호스트가 쥔 버퍼 참조를 닫는다 (비차단). JS·워커가 쥔 뷰는 각자 해제될 때까지 유효하다
     fn retire_bank(&self, epoch: u64);
     /// 프레임 알림을 JS 로 보낸다 (비차단 — UI 스레드로 넘기고 즉시 반환)

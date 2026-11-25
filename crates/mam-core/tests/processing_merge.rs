@@ -267,7 +267,10 @@ fn tag(env: &Env, asset_id: i64) {
 fn legacy_detach_folder(env: &Env, folder: i64) {
     env.pool
         .write(mam_db::Priority::High, move |c| {
-            c.execute("UPDATE file_locations SET detached_at = 1 WHERE detached_at IS NULL", [])?;
+            c.execute(
+                "UPDATE file_locations SET detached_at = 1 WHERE detached_at IS NULL",
+                [],
+            )?;
             c.execute("DELETE FROM managed_folders WHERE folder_id = ?1", [folder])?;
             Ok(())
         })
@@ -275,7 +278,8 @@ fn legacy_detach_folder(env: &Env, folder: i64) {
 }
 
 #[test]
-fn t_proc_14_re_adding_a_folder_with_legacy_detached_locations_reattaches_assets_with_their_user_data() {
+fn t_proc_14_re_adding_a_folder_with_legacy_detached_locations_reattaches_assets_with_their_user_data()
+ {
     // Arrange: 스캔 -> 태그 -> 폴더 제거(위치 detach, 자산 보존)
     let env = Env::new();
     env.write("lib/a.jpg", 1);
@@ -450,7 +454,11 @@ fn t_rating_merge_01_rating_only_asset_is_kept_and_an_unrated_row_still_merges()
             m.new_id
         ))
     };
-    assert_eq!(status(&rated), 1, "rating-only asset must survive the merge");
+    assert_eq!(
+        status(&rated),
+        1,
+        "rating-only asset must survive the merge"
+    );
     assert_eq!(
         rated.p.env.count(&format!(
             "SELECT rating FROM asset_user_data WHERE asset_id = {}",
@@ -458,5 +466,9 @@ fn t_rating_merge_01_rating_only_asset_is_kept_and_an_unrated_row_still_merges()
         )),
         5
     );
-    assert_eq!(status(&unrated), 0, "rating 0 is not user data -> merged away");
+    assert_eq!(
+        status(&unrated),
+        0,
+        "rating 0 is not user data -> merged away"
+    );
 }

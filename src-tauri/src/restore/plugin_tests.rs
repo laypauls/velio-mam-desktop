@@ -19,8 +19,21 @@ fn set(items: &[&str]) -> BTreeSet<String> {
     items.iter().map(|s| (*s).to_owned()).collect()
 }
 
-fn state(c: &Connection, id: &str, version: &str, enabled: bool, granted: &[&str], cursor: Option<i64>) {
-    put(c, INSTALLED, id, &format!("{{\"version\":\"{version}\",\"installedAt\":1}}")).unwrap();
+fn state(
+    c: &Connection,
+    id: &str,
+    version: &str,
+    enabled: bool,
+    granted: &[&str],
+    cursor: Option<i64>,
+) {
+    put(
+        c,
+        INSTALLED,
+        id,
+        &format!("{{\"version\":\"{version}\",\"installedAt\":1}}"),
+    )
+    .unwrap();
     put(c, ENABLED, id, &enabled.to_string()).unwrap();
     put(c, GRANTED, id, &granted_to_raw(&set(granted))).unwrap();
     if let Some(n) = cursor {
@@ -29,7 +42,11 @@ fn state(c: &Connection, id: &str, version: &str, enabled: bool, granted: &[&str
 }
 
 fn wipe_plugin_settings(c: &Connection) {
-    c.execute("DELETE FROM settings WHERE key LIKE 'plugin\\_%' ESCAPE '\\'", []).unwrap();
+    c.execute(
+        "DELETE FROM settings WHERE key LIKE 'plugin\\_%' ESCAPE '\\'",
+        [],
+    )
+    .unwrap();
 }
 
 fn plugin_data(c: &Connection, plugin: &str, assets: &[i64]) {
@@ -55,7 +72,15 @@ fn plugin_data(c: &Connection, plugin: &str, assets: &[i64]) {
 }
 
 fn backup_now(paths: &DataPaths) -> BackupInfo {
-    create_backup(&paths.db(), &paths.backups(), BackupKind::Auto, 7, &[], &TestClock::new()).unwrap()
+    create_backup(
+        &paths.db(),
+        &paths.backups(),
+        BackupKind::Auto,
+        7,
+        &[],
+        &TestClock::new(),
+    )
+    .unwrap()
 }
 
 /// 현재 값을 읽어 표지를 쓰고 기동 경로로 복원을 적용한다
@@ -105,7 +130,10 @@ fn t_restore_plugin_01_settings_merge_follows_the_most_restrictive_side() {
 
     // Assert: installed = 현재 값, enabled = 현재 && 백업, granted = 현재 ∩ 백업, cursor = 백업 값
     let installed = raw(&paths, INSTALLED);
-    assert_eq!(installed.keys().cloned().collect::<Vec<_>>(), ["ff", "ft", "newer", "tf", "tt"]);
+    assert_eq!(
+        installed.keys().cloned().collect::<Vec<_>>(),
+        ["ff", "ft", "newer", "tf", "tt"]
+    );
     assert!(installed["tt"].contains("2.0.0") && installed["newer"].contains("1.0.0"));
     let enabled: BTreeMap<_, _> = raw(&paths, ENABLED).into_iter().collect();
     assert_eq!(
@@ -127,7 +155,11 @@ fn t_restore_plugin_01_settings_merge_follows_the_most_restrictive_side() {
     assert_eq!(cursors.get("tt").map(String::as_str), Some("42"));
     assert_eq!(cursors.get("tf").map(String::as_str), Some("7"));
     assert!(!cursors.contains_key("old") && !cursors.contains_key("newer"));
-    assert!(!installed.contains_key("old") && !enabled.contains_key("old") && !granted.contains_key("old"));
+    assert!(
+        !installed.contains_key("old")
+            && !enabled.contains_key("old")
+            && !granted.contains_key("old")
+    );
 }
 
 #[test]
@@ -155,11 +187,37 @@ fn t_restore_plugin_02_rows_of_plugins_that_are_not_installed_now_are_deleted_af
 
     // Assert: old 는 두 표에서 모두 사라지고 tt 는 그대로
     for table in ["plugin_kv", "plugin_tasks"] {
-        assert_eq!(count(&paths, &format!("SELECT COUNT(*) FROM {table} JOIN plugins USING (plugin_ref) WHERE plugin_id = 'old'")), 0, "{table}");
+        assert_eq!(
+            count(
+                &paths,
+                &format!(
+                    "SELECT COUNT(*) FROM {table} JOIN plugins USING (plugin_ref) WHERE plugin_id = 'old'"
+                )
+            ),
+            0,
+            "{table}"
+        );
     }
-    assert_eq!(count(&paths, "SELECT COUNT(*) FROM plugin_kv JOIN plugins USING (plugin_ref) WHERE plugin_id = 'tt'"), 3, "2 asset rows + 1 global");
-    assert_eq!(count(&paths, "SELECT COUNT(*) FROM plugin_tasks JOIN plugins USING (plugin_ref) WHERE plugin_id = 'tt'"), 2);
-    assert_eq!(count(&paths, "SELECT COUNT(*) FROM media_assets"), 3, "assets are never touched");
+    assert_eq!(
+        count(
+            &paths,
+            "SELECT COUNT(*) FROM plugin_kv JOIN plugins USING (plugin_ref) WHERE plugin_id = 'tt'"
+        ),
+        3,
+        "2 asset rows + 1 global"
+    );
+    assert_eq!(
+        count(
+            &paths,
+            "SELECT COUNT(*) FROM plugin_tasks JOIN plugins USING (plugin_ref) WHERE plugin_id = 'tt'"
+        ),
+        2
+    );
+    assert_eq!(
+        count(&paths, "SELECT COUNT(*) FROM media_assets"),
+        3,
+        "assets are never touched"
+    );
 }
 
 #[test]
@@ -173,7 +231,9 @@ fn t_restore_plugin_03_old_markers_without_plugins_still_deserialize_and_debug_h
     // Assert: 설치 없음 -> 복원 시 모든 플러그인 데이터가 정리 대상이다 (fail closed)
     assert!(kept.plugins.installed.is_empty() && kept.plugins.enabled.is_empty());
     let mut with = kept.clone();
-    with.plugins.installed.insert("p".into(), "{\"version\":\"SECRET-1.2.3\"}".into());
+    with.plugins
+        .installed
+        .insert("p".into(), "{\"version\":\"SECRET-1.2.3\"}".into());
     let shown = format!("{with:?}");
     assert!(!shown.contains("SECRET-1.2.3"), "{shown}");
     // 직렬화 왕복
@@ -197,9 +257,16 @@ fn t_restore_plugin_04_auto_recovery_disables_every_plugin_and_clears_grants_kee
     assert_eq!(run_boot(&paths, &TestClock::new()), Boot::Run);
 
     // Assert
-    assert_eq!(raw(&paths, ENABLED), BTreeMap::from([("a".into(), "false".into()), ("b".into(), "false".into())]));
+    assert_eq!(
+        raw(&paths, ENABLED),
+        BTreeMap::from([("a".into(), "false".into()), ("b".into(), "false".into())])
+    );
     assert!(raw(&paths, GRANTED).is_empty());
-    assert_eq!(raw(&paths, INSTALLED).len(), 2, "installs and cursors stay; the user re-enables and re-grants");
+    assert_eq!(
+        raw(&paths, INSTALLED).len(),
+        2,
+        "installs and cursors stay; the user re-enables and re-grants"
+    );
     assert_eq!(raw(&paths, FEED_CURSOR).len(), 1);
 }
 
@@ -233,8 +300,15 @@ fn t_restore_plugin_05_backup_from_before_the_plugin_tables_restores_without_err
 
     // Assert
     assert_eq!(applied, StartupRestore::Applied(info.file_name));
-    assert_eq!(raw(&paths, INSTALLED).keys().cloned().collect::<Vec<_>>(), ["p"]);
-    assert_eq!(raw(&paths, ENABLED).get("p").map(String::as_str), Some("false"), "not enabled in the backup");
+    assert_eq!(
+        raw(&paths, INSTALLED).keys().cloned().collect::<Vec<_>>(),
+        ["p"]
+    );
+    assert_eq!(
+        raw(&paths, ENABLED).get("p").map(String::as_str),
+        Some("false"),
+        "not enabled in the backup"
+    );
 }
 
 #[test]
@@ -266,17 +340,29 @@ fn t_restore_plugin_06_applying_the_same_marker_twice_gives_the_same_result() {
     // Act: 두 번 적용 (중단 후 재시도 흉내) — 두 번째는 이미 복원된 DB 위에 후처리만 다시
     write_marker(&paths, &marker).unwrap();
     apply_pending(&paths).unwrap();
-    let first = (raw(&paths, GRANTED), raw(&paths, ENABLED), raw(&paths, FEED_CURSOR));
+    let first = (
+        raw(&paths, GRANTED),
+        raw(&paths, ENABLED),
+        raw(&paths, FEED_CURSOR),
+    );
     super::post::finish_user_restore(&paths, &kept).unwrap();
 
     // Assert
-    assert_eq!((raw(&paths, GRANTED), raw(&paths, ENABLED), raw(&paths, FEED_CURSOR)), first);
+    assert_eq!(
+        (
+            raw(&paths, GRANTED),
+            raw(&paths, ENABLED),
+            raw(&paths, FEED_CURSOR)
+        ),
+        first
+    );
     assert_eq!(first.0["tt"], "[\"b\"]");
     assert_eq!(count(&paths, "SELECT COUNT(*) FROM plugin_kv"), 0);
 }
 
 #[test]
-fn t_pref_08_restore_uses_the_backups_own_registry_even_when_the_integer_refs_differ_from_the_current_db() {
+fn t_pref_08_restore_uses_the_backups_own_registry_even_when_the_integer_refs_differ_from_the_current_db()
+ {
     // Arrange: 백업 레지스트리 B=1, A=2 (둘 다 데이터 있음). 현재 DB 는 A=1, B=2 로 다시 만든 상태 — 현재 설치: A 만
     let (_d, paths) = data_dir();
     {
@@ -287,8 +373,14 @@ fn t_pref_08_restore_uses_the_backups_own_registry_even_when_the_integer_refs_di
             mam_db::plugin_kv::upsert(&c, id, None, "marker", "\"backup\"", 0).unwrap();
         }
         state(&c, "com.a", "1.0.0", true, &[], None);
-        assert_eq!(mam_db::plugin_registry::lookup(&c, "com.b").unwrap(), Some(1));
-        assert_eq!(mam_db::plugin_registry::lookup(&c, "com.a").unwrap(), Some(2));
+        assert_eq!(
+            mam_db::plugin_registry::lookup(&c, "com.b").unwrap(),
+            Some(1)
+        );
+        assert_eq!(
+            mam_db::plugin_registry::lookup(&c, "com.a").unwrap(),
+            Some(2)
+        );
     }
     let info = backup_now(&paths);
     let kept = {
@@ -297,7 +389,10 @@ fn t_pref_08_restore_uses_the_backups_own_registry_even_when_the_integer_refs_di
         for id in ["com.a", "com.b"] {
             mam_db::plugin_kv::upsert(&c, id, None, "marker", "\"current\"", 0).unwrap();
         }
-        assert_eq!(mam_db::plugin_registry::lookup(&c, "com.a").unwrap(), Some(1));
+        assert_eq!(
+            mam_db::plugin_registry::lookup(&c, "com.a").unwrap(),
+            Some(1)
+        );
         wipe_plugin_settings(&c);
         state(&c, "com.a", "1.0.0", true, &[], None);
         read_kept(&c).unwrap()
@@ -308,16 +403,35 @@ fn t_pref_08_restore_uses_the_backups_own_registry_even_when_the_integer_refs_di
 
     // Assert: A 는 백업 데이터(문자열 API 로 읽는다), B 는 지워지고, 레지스트리 행은 남으며, FK 위반 없음
     let c = conn(&paths);
-    assert_eq!(mam_db::plugin_kv::get(&c, "com.a", None, "marker").unwrap().as_deref(), Some("\"backup\""));
-    assert_eq!(mam_db::plugin_kv::get(&c, "com.b", None, "marker").unwrap(), None);
-    assert_eq!(mam_db::plugin_registry::lookup(&c, "com.a").unwrap(), Some(2), "백업 DB 의 정수 키 그대로");
-    assert_eq!(mam_db::plugin_data::data_plugin_ids(&c).unwrap(), set(&["com.a"]));
+    assert_eq!(
+        mam_db::plugin_kv::get(&c, "com.a", None, "marker")
+            .unwrap()
+            .as_deref(),
+        Some("\"backup\"")
+    );
+    assert_eq!(
+        mam_db::plugin_kv::get(&c, "com.b", None, "marker").unwrap(),
+        None
+    );
+    assert_eq!(
+        mam_db::plugin_registry::lookup(&c, "com.a").unwrap(),
+        Some(2),
+        "백업 DB 의 정수 키 그대로"
+    );
+    assert_eq!(
+        mam_db::plugin_data::data_plugin_ids(&c).unwrap(),
+        set(&["com.a"])
+    );
     assert_eq!(count(&paths, "SELECT COUNT(*) FROM plugin_tasks"), 1);
-    assert_eq!(count(&paths, "SELECT COUNT(*) FROM pragma_foreign_key_check"), 0);
+    assert_eq!(
+        count(&paths, "SELECT COUNT(*) FROM pragma_foreign_key_check"),
+        0
+    );
 }
 
 #[test]
-fn t_pref_09_a_plugin_installed_now_but_absent_from_the_backup_registry_gets_a_fresh_ref_on_first_write() {
+fn t_pref_09_a_plugin_installed_now_but_absent_from_the_backup_registry_gets_a_fresh_ref_on_first_write()
+ {
     // Arrange: 백업에는 레지스트리 행이 없다 (플러그인 데이터 없음). 현재는 `new` 가 설치돼 있다
     let (_d, paths) = data_dir();
     let info = backup_now(&paths);
@@ -330,10 +444,22 @@ fn t_pref_09_a_plugin_installed_now_but_absent_from_the_backup_registry_gets_a_f
 
     // Act: 복원 뒤 첫 쓰기 (게이트웨이 `kv.set` 과 같은 함수)
     let c = conn(&paths);
-    assert_eq!(mam_db::plugin_registry::lookup(&c, "new").unwrap(), None, "읽기만으로는 행이 생기지 않는다");
+    assert_eq!(
+        mam_db::plugin_registry::lookup(&c, "new").unwrap(),
+        None,
+        "읽기만으로는 행이 생기지 않는다"
+    );
     mam_db::plugin_kv::upsert(&c, "new", None, "k", "1", 0).unwrap();
 
     // Assert
-    assert_eq!(mam_db::plugin_kv::get(&c, "new", None, "k").unwrap().as_deref(), Some("1"));
-    assert_eq!(count(&paths, "SELECT COUNT(*) FROM pragma_foreign_key_check"), 0);
+    assert_eq!(
+        mam_db::plugin_kv::get(&c, "new", None, "k")
+            .unwrap()
+            .as_deref(),
+        Some("1")
+    );
+    assert_eq!(
+        count(&paths, "SELECT COUNT(*) FROM pragma_foreign_key_check"),
+        0
+    );
 }

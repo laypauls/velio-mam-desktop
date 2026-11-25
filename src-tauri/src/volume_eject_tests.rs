@@ -68,14 +68,22 @@ fn fixture() -> Fx {
             ..IngestConfig::default()
         },
     );
-    Fx { _dir: dir, media, ingest }
+    Fx {
+        _dir: dir,
+        media,
+        ingest,
+    }
 }
 
 #[test]
 fn t_ipc_eject_01_prepare_and_resume_round_trip_with_the_contract_shapes() {
     // Arrange: 실제 볼륨 API 로 폴더 등록
     let fx = fixture();
-    let id = fx.ingest.add_folder(fx.media.to_str().unwrap()).unwrap().folder_id;
+    let id = fx
+        .ingest
+        .add_folder(fx.media.to_str().unwrap())
+        .unwrap()
+        .folder_id;
 
     // Act
     let prepared = fx.ingest.prepare_volume_eject(id).unwrap();
@@ -89,7 +97,10 @@ fn t_ipc_eject_01_prepare_and_resume_round_trip_with_the_contract_shapes() {
     keys.sort();
     assert_eq!(keys, ["folderIds", "mountPoint"]);
     assert_eq!(v["folderIds"], serde_json::json!([id]));
-    assert!(v["mountPoint"].as_str().unwrap().contains(':'), "user-facing mount point such as C:");
+    assert!(
+        v["mountPoint"].as_str().unwrap().contains(':'),
+        "user-facing mount point such as C:"
+    );
     assert_eq!(after_prepare[0]["ejectPrepared"], true);
     assert_eq!(after_prepare[0]["availability"], "offline");
     assert_eq!(after_resume[0]["ejectPrepared"], false);
@@ -100,7 +111,11 @@ fn t_ipc_eject_01_prepare_and_resume_round_trip_with_the_contract_shapes() {
 fn t_ipc_eject_02_errors_map_to_the_contract_codes_without_paths() {
     // Arrange: 네트워크 / 오프라인 / 없는 폴더 / 대기 시간 초과
     let cases = [
-        (IngestError::InvalidInput("network volume"), ErrorCode::InvalidInput, "invalid_input"),
+        (
+            IngestError::InvalidInput("network volume"),
+            ErrorCode::InvalidInput,
+            "invalid_input",
+        ),
         (IngestError::Offline, ErrorCode::Offline, "offline"),
         (IngestError::NotFound, ErrorCode::NotFound, "not_found"),
         (IngestError::Busy, ErrorCode::Busy, "busy"),
@@ -112,7 +127,12 @@ fn t_ipc_eject_02_errors_map_to_the_contract_codes_without_paths() {
         assert_eq!(cmd.code(), code);
         let v = serde_json::to_value(&cmd).unwrap();
         assert_eq!(v["code"], text);
-        assert!(!v["message"].as_str().unwrap().contains(std::path::MAIN_SEPARATOR));
+        assert!(
+            !v["message"]
+                .as_str()
+                .unwrap()
+                .contains(std::path::MAIN_SEPARATOR)
+        );
     }
 }
 
@@ -120,7 +140,11 @@ fn t_ipc_eject_02_errors_map_to_the_contract_codes_without_paths() {
 fn t_ipc_eject_03_unknown_folder_and_unprepared_resume_follow_the_contract() {
     // Arrange
     let fx = fixture();
-    let id = fx.ingest.add_folder(fx.media.to_str().unwrap()).unwrap().folder_id;
+    let id = fx
+        .ingest
+        .add_folder(fx.media.to_str().unwrap())
+        .unwrap()
+        .folder_id;
 
     // Act / Assert: 준비 안 된 상태의 resume 은 성공, 없는 폴더는 not_found
     assert!(fx.ingest.resume_volume_watch(id).is_ok());

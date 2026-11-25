@@ -98,8 +98,16 @@ pub fn register_folder_row(conn: &mut rusqlite::Connection, dir: &Path) -> (i64,
     let volume_id = register_volume(conn, &SystemClock, &info).expect("register volume");
     let display = mam_core::volume::strip_verbatim(&canonical.to_string_lossy());
     let now = mam_db::Clock::now_ms(&SystemClock);
-    let folder_id =
-        add_folder_row(conn, now, volume_id, &rel_root, &key, &display, Default::default()).expect("folder row");
+    let folder_id = add_folder_row(
+        conn,
+        now,
+        volume_id,
+        &rel_root,
+        &key,
+        &display,
+        Default::default(),
+    )
+    .expect("folder row");
     // 합성 라이브러리는 "방금 전체 스캔을 마친" 상태 — 주기 재스캔 대상이 아니다
     conn.execute(
         "UPDATE managed_folders SET last_full_scan_at = ?1 WHERE folder_id = ?2",

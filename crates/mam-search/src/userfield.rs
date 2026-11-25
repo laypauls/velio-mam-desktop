@@ -112,7 +112,10 @@ mod tests {
     }
 
     fn kw(field_id: u64, s: &str) -> UserFieldValue {
-        UserFieldValue { field_id, value: UserValue::Keyword(s.into()) }
+        UserFieldValue {
+            field_id,
+            value: UserValue::Keyword(s.into()),
+        }
     }
 
     #[test]
@@ -134,10 +137,22 @@ mod tests {
         let (_, f) = build_schema();
         let values = [
             kw(1, "Alpha"),
-            UserFieldValue { field_id: 2, value: UserValue::Number(3.0) },
-            UserFieldValue { field_id: 3, value: UserValue::Int(20261120) },
-            UserFieldValue { field_id: 4, value: UserValue::Int(7) },
-            UserFieldValue { field_id: 4, value: UserValue::Int(9) },
+            UserFieldValue {
+                field_id: 2,
+                value: UserValue::Number(3.0),
+            },
+            UserFieldValue {
+                field_id: 3,
+                value: UserValue::Int(20261120),
+            },
+            UserFieldValue {
+                field_id: 4,
+                value: UserValue::Int(7),
+            },
+            UserFieldValue {
+                field_id: 4,
+                value: UserValue::Int(9),
+            },
         ];
         let mut d = TantivyDocument::default();
 
@@ -161,8 +176,14 @@ mod tests {
             &f,
             &[
                 kw(1, "   "),
-                UserFieldValue { field_id: 2, value: UserValue::Number(f64::NAN) },
-                UserFieldValue { field_id: 3, value: UserValue::Number(f64::INFINITY) },
+                UserFieldValue {
+                    field_id: 2,
+                    value: UserValue::Number(f64::NAN),
+                },
+                UserFieldValue {
+                    field_id: 3,
+                    value: UserValue::Number(f64::INFINITY),
+                },
             ],
         );
         assert_eq!(d.get_all(f.umeta).count(), 0);

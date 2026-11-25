@@ -6,18 +6,21 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use mam_core::jobs::JobKind;
+use mam_db::Priority;
 use mam_db::plugin_settings::{self, INSTALLED};
 use mam_db::plugin_tasks::{RUN_ALL_BATCH, enqueue_jobs_tx, run_all_batch, with_immediate_tx};
-use mam_db::Priority;
 
 use crate::env::{Env, PLUGIN_A, PLUGIN_B, PROVIDER};
-use crate::util::{Lat, Load, db_files_bytes, mib, report_pair, say};
 use crate::synth;
+use crate::util::{Lat, Load, db_files_bytes, mib, report_pair, say};
 
 const OBJECTS: [(&str, &str); 11] = [
     ("plugin_tasks", "table"),
     ("uq_plugin_tasks_key", "index"),
-    ("idx_plugin_tasks_pending", "index (partial status='pending')"),
+    (
+        "idx_plugin_tasks_pending",
+        "index (partial status='pending')",
+    ),
     ("idx_plugin_tasks_asset", "index"),
     ("idx_plugin_tasks_failed", "index (partial status='failed')"),
     ("jobs", "table"),
@@ -46,10 +49,17 @@ fn dbstat(env: &Env) -> Vec<(&'static str, &'static str, u64, u64)> {
 
 fn print_sizes(env: &Env, label: &str, rows: u64, providers: u64) {
     env.checkpoint();
-    say(format!("  [{label}] after wal_checkpoint(TRUNCATE): db+wal+shm files {:.1} MiB", mib(db_files_bytes(&env.root.join("mam.sqlite")))));
+    say(format!(
+        "  [{label}] after wal_checkpoint(TRUNCATE): db+wal+shm files {:.1} MiB",
+        mib(db_files_bytes(&env.root.join("mam.sqlite")))
+    ));
     let (mut tasks_total, mut jobs_total) = (0u64, 0u64);
     for (name, kind, pg, payload) in dbstat(env) {
-        say(format!("    {name:<26} {kind:<34} {:>9.2} MiB (payload {:>8.2} MiB)", mib(pg), mib(payload)));
+        say(format!(
+            "    {name:<26} {kind:<34} {:>9.2} MiB (payload {:>8.2} MiB)",
+            mib(pg),
+            mib(payload)
+        ));
         if name.contains("plugin_tasks") {
             tasks_total += pg;
         } else if name.contains("jobs") {
@@ -63,13 +73,20 @@ fn print_sizes(env: &Env, label: &str, rows: u64, providers: u64) {
         tasks_total as f64 / (rows * providers) as f64,
         mib(per_provider as u64) * 1_000_000.0 / rows as f64
     ));
-    say(format!("    jobs table+indexes         = {:.2} MiB ({:.1} B/row over {rows} rows)", mib(jobs_total), jobs_total as f64 / rows as f64));
+    say(format!(
+        "    jobs table+indexes         = {:.2} MiB ({:.1} B/row over {rows} rows)",
+        mib(jobs_total),
+        jobs_total as f64 / rows as f64
+    ));
 }
 
 fn wait_tasks(env: &Env, at_least: i64) -> Duration {
     let t = Instant::now();
     while env.count("SELECT COALESCE(MAX(task_id), 0) FROM plugin_tasks") < at_least {
-        assert!(t.elapsed() < Duration::from_secs(3600), "run-all did not finish");
+        assert!(
+            t.elapsed() < Duration::from_secs(3600),
+            "run-all did not finish"
+        );
         std::thread::sleep(Duration::from_millis(50));
     }
     t.elapsed()
@@ -90,8 +107,20 @@ fn manual_run_all(env: &Env, plugin: &str) -> (Duration, Lat, Lat) {
                         return Ok((None, 0, started.elapsed()));
                     }
                     let kinds: &[&str] = &["image"];
-                    let page = run_all_batch(tx, &id, &[(PROVIDER, kinds)], after, RUN_ALL_BATCH, 1_700_000_000_000)?;
-                    enqueue_jobs_tx(tx, &page.pending, JobKind::Plugin.default_priority(), 1_700_000_000_000)?;
+                    let page = run_all_batch(
+                        tx,
+                        &id,
+                        &[(PROVIDER, kinds)],
+                        after,
+                        RUN_ALL_BATCH,
+                        1_700_000_000_000,
+                    )?;
+                    enqueue_jobs_tx(
+                        tx,
+                        &page.pending,
+                        JobKind::Plugin.default_priority(),
+                        1_700_000_000_000,
+                    )?;
                     Ok((page.last, page.scanned, started.elapsed()))
                 })
             })
@@ -113,39 +142,78 @@ pub fn run(scratch: &Path, assets: u64) {
     let root = base.join("MAMData");
     let t = Instant::now();
     synth::build(&root, assets, true, 0);
-    say(format!("M1 dataset: {assets} active image assets + {assets} active locations, built in {:.1}s; db {:.1} MiB", t.elapsed().as_secs_f64(), mib(db_files_bytes(&root.join("mam.sqlite")))));
+    say(format!(
+        "M1 dataset: {assets} active image assets + {assets} active locations, built in {:.1}s; db {:.1} MiB",
+        t.elapsed().as_secs_f64(),
+        mib(db_files_bytes(&root.join("mam.sqlite")))
+    ));
     let env = Env::open(&root, None, None);
     env.install(PLUGIN_A);
     env.install(PLUGIN_B);
     let n = i64::try_from(assets).unwrap_or(i64::MAX);
 
     // 기준선: run-all 없음
-    let (r, w) = (Load::spawn(Duration::from_millis(20), env.reader(assets, 1)), Load::spawn(Duration::from_millis(20), env.editor(assets, 2)));
+    let (r, w) = (
+        Load::spawn(Duration::from_millis(20), env.reader(assets, 1)),
+        Load::spawn(Duration::from_millis(20), env.editor(assets, 2)),
+    );
     std::thread::sleep(Duration::from_secs(8));
     report_pair("idle baseline 8s", r, w);
 
     // 1차: 실제 PluginJobs::run_all (플러그인 A)
-    let (r, w) = (Load::spawn(Duration::from_millis(20), env.reader(assets, 3)), Load::spawn(Duration::from_millis(20), env.editor(assets, 4)));
+    let (r, w) = (
+        Load::spawn(Duration::from_millis(20), env.reader(assets, 3)),
+        Load::spawn(Duration::from_millis(20), env.editor(assets, 4)),
+    );
     let t = Instant::now();
-    assert!(env.jobs.run_all(PLUGIN_A, PROVIDER).expect("run_all").started);
+    assert!(
+        env.jobs
+            .run_all(PLUGIN_A, PROVIDER)
+            .expect("run_all")
+            .started
+    );
     wait_tasks(&env, n);
     let wall_real = t.elapsed();
     report_pair("during REAL PluginJobs::run_all", r, w);
-    say(format!("  REAL run_all wall (call -> last batch visible, 50 ms polling) = {:.1}s for {assets} assets ({:.0} assets/s)", wall_real.as_secs_f64(), assets as f64 / wall_real.as_secs_f64()));
-    say(format!("  rows: plugin_tasks={} jobs(plugin,pending)={}", env.count("SELECT COUNT(*) FROM plugin_tasks"), env.count("SELECT COUNT(*) FROM jobs WHERE kind='plugin' AND status='pending'")));
+    say(format!(
+        "  REAL run_all wall (call -> last batch visible, 50 ms polling) = {:.1}s for {assets} assets ({:.0} assets/s)",
+        wall_real.as_secs_f64(),
+        assets as f64 / wall_real.as_secs_f64()
+    ));
+    say(format!(
+        "  rows: plugin_tasks={} jobs(plugin,pending)={}",
+        env.count("SELECT COUNT(*) FROM plugin_tasks"),
+        env.count("SELECT COUNT(*) FROM jobs WHERE kind='plugin' AND status='pending'")
+    ));
     print_sizes(&env, "1 provider", assets, 1);
 
     // 2차: 배치 루프 (플러그인 B) — 배치 시간
-    let (r, w) = (Load::spawn(Duration::from_millis(20), env.reader(assets, 5)), Load::spawn(Duration::from_millis(20), env.editor(assets, 6)));
+    let (r, w) = (
+        Load::spawn(Duration::from_millis(20), env.reader(assets, 5)),
+        Load::spawn(Duration::from_millis(20), env.editor(assets, 6)),
+    );
     let (wall, outer, inner) = manual_run_all(&env, PLUGIN_B);
     report_pair("during manual batch loop (2nd provider)", r, w);
-    say(format!("  manual loop wall = {:.1}s (incl. 50 ms yield x {} batches)", wall.as_secs_f64(), outer.0.len()));
+    say(format!(
+        "  manual loop wall = {:.1}s (incl. 50 ms yield x {} batches)",
+        wall.as_secs_f64(),
+        outer.0.len()
+    ));
     say(outer.line("  per-batch Low write incl. queue wait (5,000 rows)"));
     say(inner.line("  per-batch tx body only"));
-    say(format!("  writer occupancy by run-all batches = {:.1}% of wall", 100.0 * inner.sum_ms() / (wall.as_secs_f64() * 1000.0)));
-    say(format!("  rows: plugin_tasks={} jobs(plugin)={}", env.count("SELECT COUNT(*) FROM plugin_tasks"), env.count("SELECT COUNT(*) FROM jobs WHERE kind='plugin'")));
+    say(format!(
+        "  writer occupancy by run-all batches = {:.1}% of wall",
+        100.0 * inner.sum_ms() / (wall.as_secs_f64() * 1000.0)
+    ));
+    say(format!(
+        "  rows: plugin_tasks={} jobs(plugin)={}",
+        env.count("SELECT COUNT(*) FROM plugin_tasks"),
+        env.count("SELECT COUNT(*) FROM jobs WHERE kind='plugin'")
+    ));
     print_sizes(&env, "2 providers", assets, 2);
-    say("  (projection for 3 providers: see report; each extra provider adds the plugin_tasks delta between 1 and 2 providers; jobs rows are shared, one per asset)");
+    say(
+        "  (projection for 3 providers: see report; each extra provider adds the plugin_tasks delta between 1 and 2 providers; jobs rows are shared, one per asset)",
+    );
 
     env.shutdown();
     drop(env);

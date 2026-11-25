@@ -85,7 +85,11 @@ fn t_newvol_01_volume_appearing_after_start_becomes_pending_with_one_event() {
     assert_eq!(pending[0].total_bytes, Some(62_000_000_000));
     assert_eq!(pending[0].label.as_deref(), Some("usb"));
     assert_eq!(events.lock().unwrap().as_slice(), [pending]);
-    assert_eq!(volume_rows(&env), 0, "pending disks never enter the volumes table");
+    assert_eq!(
+        volume_rows(&env),
+        0,
+        "pending disks never enter the volumes table"
+    );
 }
 
 #[test]
@@ -224,7 +228,10 @@ fn t_newvol_07_two_partitions_plugged_together_are_one_event_with_two_cards() {
     assert_eq!(ev.len(), 2);
     assert_eq!(ev[0].len(), 2);
     assert_eq!(
-        ev[1].iter().map(|p| p.volume_key.as_str()).collect::<Vec<_>>(),
+        ev[1]
+            .iter()
+            .map(|p| p.volume_key.as_str())
+            .collect::<Vec<_>>(),
         ["p2"]
     );
 }
@@ -452,7 +459,9 @@ fn t_newvol_15_device_notification_wakes_the_supervisor_long_before_the_periodic
     }
 
     // Assert: 1시간 주기를 기다리지 않고 대기 목록 이벤트가 온다
-    let pending = rx.recv_timeout(WAIT).expect("woken supervise reported the disk");
+    let pending = rx
+        .recv_timeout(WAIT)
+        .expect("woken supervise reported the disk");
     assert_eq!(pending.len(), 1);
     assert_eq!(pending[0].volume_key, "usb");
     env.ingest.shutdown();

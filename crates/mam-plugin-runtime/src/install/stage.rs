@@ -17,7 +17,11 @@ pub(crate) const TRASH_DIR: &str = ".trash";
 static COUNTER: AtomicU64 = AtomicU64::new(0);
 
 fn unique(prefix: &str) -> String {
-    format!("{prefix}-{}-{}", std::process::id(), COUNTER.fetch_add(1, Ordering::Relaxed))
+    format!(
+        "{prefix}-{}-{}",
+        std::process::id(),
+        COUNTER.fetch_add(1, Ordering::Relaxed)
+    )
 }
 
 /// 설치 후 설정 커밋 전까지 되돌릴 수 있게 들고 있는 상태
@@ -27,7 +31,11 @@ pub(crate) struct Promoted {
 }
 
 /// 검증한 내용(plugin.json·l10n/*.json·main)만 스테이징 폴더에 쓴다. 실패하면 스테이징을 지운다
-pub(crate) fn write_staging(plugins_dir: &Path, id: &str, pkg: &Package) -> Result<PathBuf, InstallError> {
+pub(crate) fn write_staging(
+    plugins_dir: &Path,
+    id: &str,
+    pkg: &Package,
+) -> Result<PathBuf, InstallError> {
     let staging_root = plugins_dir.join(STAGING_DIR);
     fs::create_dir_all(&staging_root)?;
     let dir = staging_root.join(unique(id));
@@ -56,7 +64,12 @@ fn write_files(dir: &Path, pkg: &Package) -> std::io::Result<()> {
 }
 
 /// 스테이징 -> `plugins/<id>/<version>`. 같은 버전이 이미 있으면 `.trash` 로 옮겨 둔다
-pub(crate) fn promote(plugins_dir: &Path, id: &str, version: &str, staged: &Path) -> Result<Promoted, InstallError> {
+pub(crate) fn promote(
+    plugins_dir: &Path,
+    id: &str,
+    version: &str,
+    staged: &Path,
+) -> Result<Promoted, InstallError> {
     let result = promote_inner(plugins_dir, id, version, staged);
     if result.is_err() {
         let _ = remove_confined(plugins_dir, staged);
@@ -64,7 +77,12 @@ pub(crate) fn promote(plugins_dir: &Path, id: &str, version: &str, staged: &Path
     result
 }
 
-fn promote_inner(plugins_dir: &Path, id: &str, version: &str, staged: &Path) -> Result<Promoted, InstallError> {
+fn promote_inner(
+    plugins_dir: &Path,
+    id: &str,
+    version: &str,
+    staged: &Path,
+) -> Result<Promoted, InstallError> {
     let parent = plugins_dir.join(id);
     fs::create_dir_all(&parent)?;
     let final_dir = parent.join(version);

@@ -4,8 +4,8 @@
 use std::sync::Arc;
 
 use mam_core::ingest::{
-    EjectPrepared, FolderRemovalProgress, Ingest, KnownVolume, PENDING_CHANGED_EVENT, PendingChangedPayload, PendingVolume,
-    REMOVAL_PROGRESS_EVENT,
+    EjectPrepared, FolderRemovalProgress, Ingest, KnownVolume, PENDING_CHANGED_EVENT,
+    PendingChangedPayload, PendingVolume, REMOVAL_PROGRESS_EVENT,
 };
 use mam_db::ignored_volumes::IgnoredVolume;
 use tauri::State;
@@ -28,17 +28,19 @@ pub fn wire_pending_events(ingest: &Ingest, sink: Arc<dyn EventSink>) {
 /// 폴더 제거 진행(`folders://removal-progress { folderId, done, total, finished, error }`)을 이벤트로 내보내도록 연결한다.
 /// `Ingest::start` 전에 호출한다 (시작 때 이어서 하는 제거도 알려야 하므로).
 pub fn wire_removal_events(ingest: &Ingest, sink: Arc<dyn EventSink>) {
-    ingest.set_removal_listener(Arc::new(move |p: FolderRemovalProgress| {
-        match serde_json::to_value(p) {
+    ingest.set_removal_listener(Arc::new(
+        move |p: FolderRemovalProgress| match serde_json::to_value(p) {
             Ok(v) => sink.emit(REMOVAL_PROGRESS_EVENT, v),
             Err(e) => tracing::debug!(%e, "cannot serialize removal progress event"),
-        }
-    }));
+        },
+    ));
 }
 
 /// 앱 초기 로드 때 조회하는 현재 대기 목록.
 #[tauri::command]
-pub async fn list_pending_new_volumes(ingest: Shared<'_>) -> Result<Vec<PendingVolume>, CommandError> {
+pub async fn list_pending_new_volumes(
+    ingest: Shared<'_>,
+) -> Result<Vec<PendingVolume>, CommandError> {
     Ok(ingest.pending_volumes())
 }
 
@@ -78,7 +80,10 @@ pub async fn list_known_volumes(ingest: Shared<'_>) -> Result<Vec<KnownVolume>, 
 /// 정리되지 않은 옛 보관 자산을 지워야 하는데 사전 백업이 실패하면 `backup_failed`. 모르는 키는 아무 일 없이 성공.
 /// 원본 파일과 라이브러리 정보는 바뀌지 않는다.
 #[tauri::command]
-pub async fn forget_volume_record(ingest: Shared<'_>, volume_key: String) -> Result<(), CommandError> {
+pub async fn forget_volume_record(
+    ingest: Shared<'_>,
+    volume_key: String,
+) -> Result<(), CommandError> {
     let ingest = Arc::clone(&ingest);
     run(move || ingest.forget_volume_record(&volume_key)).await
 }
@@ -87,7 +92,10 @@ pub async fn forget_volume_record(ingest: Shared<'_>, volume_key: String) -> Res
 /// `availability = offline`) - 모두 끝낸 뒤 반환한다. 네트워크 폴더는 `invalid_input`, 이미 오프라인이면 `offline`,
 /// 이미 준비 상태면 같은 결과로 성공(멱등), 제한 시간 안에 파일을 놓지 않으면 `busy`.
 #[tauri::command]
-pub async fn prepare_volume_eject(ingest: Shared<'_>, folder_id: i64) -> Result<EjectPrepared, CommandError> {
+pub async fn prepare_volume_eject(
+    ingest: Shared<'_>,
+    folder_id: i64,
+) -> Result<EjectPrepared, CommandError> {
     let ingest = Arc::clone(&ingest);
     run(move || ingest.prepare_volume_eject(folder_id)).await
 }

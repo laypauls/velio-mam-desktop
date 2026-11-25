@@ -15,8 +15,8 @@ use crate::identity::modified_ms;
 use crate::ingest::Ingest;
 use crate::ingest::stop::Tick;
 use crate::scan::{
-    Fail, Guarded, IngestError, PathAction, ScanEnv, UNRESPONSIVE_CODE, UNRESPONSIVE_MESSAGE, apply_path_settled,
-    load_folder, record_error,
+    Fail, Guarded, IngestError, PathAction, ScanEnv, UNRESPONSIVE_CODE, UNRESPONSIVE_MESSAGE,
+    apply_path_settled, load_folder, record_error,
 };
 use crate::volume::{VolumeKind, strip_verbatim};
 use crate::watch::exclusive_open_check_of;
@@ -328,12 +328,22 @@ impl Ingest {
                 .read(|c| Ok(load_folder(c, *folder_id)))
                 .ok()
                 .and_then(Result::ok)
-                .map_or_else(|| abs.clone(), |f| rel_for_error(&f.root_path(), Path::new(abs)));
+                .map_or_else(
+                    || abs.clone(),
+                    |f| rel_for_error(&f.root_path(), Path::new(abs)),
+                );
             rels.push((*folder_id, rel));
         }
         if let Err(e) = self.env.write(Priority::Low, move |c| {
             for (folder_id, rel) in &rels {
-                record_error(c, *folder_id, rel, UNRESPONSIVE_CODE, UNRESPONSIVE_MESSAGE, now)?;
+                record_error(
+                    c,
+                    *folder_id,
+                    rel,
+                    UNRESPONSIVE_CODE,
+                    UNRESPONSIVE_MESSAGE,
+                    now,
+                )?;
             }
             Ok(())
         }) {

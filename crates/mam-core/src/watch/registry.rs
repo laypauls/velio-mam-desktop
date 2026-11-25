@@ -76,7 +76,10 @@ impl DetectorRegistry {
         }
         let mut auto: Vec<&'static str> = Vec::new();
         for id in auto_order.iter().filter(|id| **id != "scan_only") {
-            assert!(seen.contains(id), "auto order names an unregistered detector: {id}");
+            assert!(
+                seen.contains(id),
+                "auto order names an unregistered detector: {id}"
+            );
             assert!(!auto.contains(id), "duplicate detector in auto order: {id}");
             auto.push(id);
         }
@@ -104,14 +107,24 @@ impl DetectorRegistry {
             // polling 은 등록만 하고 자동 순서에는 넣지 않는다 — NAS 실측 전이라 사용자가 고른 폴더에서만 쓴다 (계획 §2, 0단계 결과)
             use super::detectors::{OsEvents, Polling};
             Self::new(
-                vec![Arc::new(OsEvents), Arc::new(Polling::new()), Arc::new(ScanOnly)],
+                vec![
+                    Arc::new(OsEvents),
+                    Arc::new(Polling::new()),
+                    Arc::new(ScanOnly),
+                ],
                 &["os_events", "scan_only"],
             )
         }
         #[cfg(not(windows))]
         {
             // 다른 OS 용 감지기(inotify/FSEvents)는 범위 밖 — `device_watch.rs` 처럼 설계 메모만 둔다 (watch/mod.rs)
-            Self::new(vec![Arc::new(ScanOnly), Arc::new(super::detectors::Polling::new())], &["scan_only"])
+            Self::new(
+                vec![
+                    Arc::new(ScanOnly),
+                    Arc::new(super::detectors::Polling::new()),
+                ],
+                &["scan_only"],
+            )
         }
     }
 
@@ -120,7 +133,10 @@ impl DetectorRegistry {
     pub fn platform_default_with(extra: Vec<Arc<dyn ChangeDetector>>) -> Self {
         let Self { mut all, auto, .. } = Self::platform_default();
         // 최종 폴백 `scan_only` 는 목록의 맨 끝에 둔다
-        let at = all.iter().position(|d| d.id() == "scan_only").unwrap_or(all.len());
+        let at = all
+            .iter()
+            .position(|d| d.id() == "scan_only")
+            .unwrap_or(all.len());
         all.splice(at..at, extra);
         Self::new(all, &auto)
     }
@@ -135,7 +151,12 @@ impl DetectorRegistry {
 
     /// 후보 목록(시도 순서)과 폴백 사유를 정한다.
     /// `mode` = 저장된 방식 ID (None = 자동), `raw_options` = 저장된 옵션 JSON 텍스트.
-    pub fn plan(&self, target: &WatchTarget, mode: Option<&str>, raw_options: Option<&str>) -> Plan<'_> {
+    pub fn plan(
+        &self,
+        target: &WatchTarget,
+        mode: Option<&str>,
+        raw_options: Option<&str>,
+    ) -> Plan<'_> {
         let mut reason = None;
         let mut first: Option<Candidate<'_>> = None;
         if let Some(id) = mode {
@@ -151,11 +172,19 @@ impl DetectorRegistry {
                     };
                     match parsed {
                         None => {
-                            tracing::warn!(mode = id, "invalid watch options; using automatic detection");
+                            tracing::warn!(
+                                mode = id,
+                                "invalid watch options; using automatic detection"
+                            );
                             reason = Some(FallbackReason::InvalidOptions);
                         }
                         Some(options) => match d.probe_with(target, &options) {
-                            ProbeResult::Available => first = Some(Candidate { detector: d, options }),
+                            ProbeResult::Available => {
+                                first = Some(Candidate {
+                                    detector: d,
+                                    options,
+                                })
+                            }
                             ProbeResult::Unavailable { reason_key } => {
                                 reason = Some(FallbackReason::Unavailable(reason_key));
                             }
@@ -175,7 +204,10 @@ impl DetectorRegistry {
                 continue;
             }
             if let Ok(options) = d.parse_options(None) {
-                candidates.push(Candidate { detector: d, options });
+                candidates.push(Candidate {
+                    detector: d,
+                    options,
+                });
             }
         }
         Plan { candidates, reason }

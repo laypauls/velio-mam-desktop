@@ -82,7 +82,10 @@ fn t_ioguard_02_a_blocked_call_times_out_and_its_thread_is_released_when_it_fina
     assert!(started.elapsed() < Duration::from_secs(5));
     assert_eq!(io.live_checks(1), 1);
     gate.open();
-    assert!(eventually(|| io.live_checks(1) == 0), "thread count recovers");
+    assert!(
+        eventually(|| io.live_checks(1) == 0),
+        "thread count recovers"
+    );
 }
 
 #[test]
@@ -168,16 +171,26 @@ fn t_ioguard_05_a_volume_at_its_cap_is_unresponsive_and_new_checks_return_withou
 
     // Assert
     assert_eq!(third, Guarded::TimedOut);
-    assert!(started.elapsed() < Duration::from_secs(2), "returns immediately, not after the timeout");
+    assert!(
+        started.elapsed() < Duration::from_secs(2),
+        "returns immediately, not after the timeout"
+    );
     assert!(eventually(|| runs.load(Ordering::SeqCst) == 2));
     std::thread::sleep(Duration::from_millis(50));
-    assert_eq!(runs.load(Ordering::SeqCst), 2, "the third call never started");
+    assert_eq!(
+        runs.load(Ordering::SeqCst),
+        2,
+        "the third call never started"
+    );
     // 다른 볼륨은 영향이 없다
     assert_eq!(io.guarded("x", 8, LONG, || 5), Guarded::Done(5));
     assert!(!io.is_unresponsive(8));
     // 막힌 호출이 풀리면 회복한다
     gate.open();
-    assert!(eventually(|| !io.is_unresponsive(7)), "recovers once blocked calls return");
+    assert!(
+        eventually(|| !io.is_unresponsive(7)),
+        "recovers once blocked calls return"
+    );
     assert_eq!(io.guarded("d", 7, LONG, || 9), Guarded::Done(9));
 }
 
@@ -203,9 +216,16 @@ fn t_ioguard_06_hammering_a_dead_volume_never_piles_up_threads_past_the_cap() {
 
     // Assert
     assert!(peak <= cap, "peak {peak} > cap {cap}");
-    assert!(eventually(|| started.load(Ordering::SeqCst) == cap), "exactly `cap` calls were started");
+    assert!(
+        eventually(|| started.load(Ordering::SeqCst) == cap),
+        "exactly `cap` calls were started"
+    );
     std::thread::sleep(Duration::from_millis(50));
-    assert_eq!(started.load(Ordering::SeqCst), cap, "no call beyond the cap ever starts");
+    assert_eq!(
+        started.load(Ordering::SeqCst),
+        cap,
+        "no call beyond the cap ever starts"
+    );
     gate.open();
     assert!(eventually(|| io.live_checks(1) == 0));
 }
@@ -250,16 +270,28 @@ fn t_ioguard_15_back_to_back_healthy_calls_on_a_cap_one_volume_never_time_out() 
 
     // Act / Assert: 결과를 받자마자 곧바로 다음 검사를 건다 (키가 다른 경우와 같은 경우)
     for n in 0..500 {
-        assert_eq!(io.guarded(&format!("k{n}"), 1, LONG, move || n), Guarded::Done(n), "distinct key, iteration {n}");
+        assert_eq!(
+            io.guarded(&format!("k{n}"), 1, LONG, move || n),
+            Guarded::Done(n),
+            "distinct key, iteration {n}"
+        );
     }
     for n in 0..500 {
-        assert_eq!(io.guarded("same", 1, LONG, move || n), Guarded::Done(n), "same key, iteration {n}");
+        assert_eq!(
+            io.guarded("same", 1, LONG, move || n),
+            Guarded::Done(n),
+            "same key, iteration {n}"
+        );
     }
     // 패닉한 호출의 뒤에도 자리는 이미 비어 있다 (결과 통지 전에 반납)
     for n in 0..30 {
         let r: Guarded<i32> = io.guarded("boom", 1, LONG, || panic!("simulated fs panic"));
         assert_eq!(r, Guarded::TimedOut);
-        assert_eq!(io.guarded("after", 1, LONG, || 1), Guarded::Done(1), "after panic, iteration {n}");
+        assert_eq!(
+            io.guarded("after", 1, LONG, || 1),
+            Guarded::Done(1),
+            "after panic, iteration {n}"
+        );
     }
     // 정상 호출은 막힘으로 세지 않는다 — 시간 초과 누계는 패닉 30건뿐
     assert_eq!(io.timeout_count(), 30);

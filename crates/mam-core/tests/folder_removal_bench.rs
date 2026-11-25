@@ -6,8 +6,8 @@
 
 mod common;
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use common::env::Env;
@@ -55,12 +55,21 @@ fn first_page(env: &Env, from: i64) -> f64 {
 #[test]
 #[ignore = "manual measurement"]
 fn t_rmv_bench_01_removal_of_a_large_folder_and_read_latency_during_it() {
-    let n: usize = std::env::var("MAM_BENCH_N").ok().and_then(|v| v.parse().ok()).unwrap_or(100_000);
+    let n: usize = std::env::var("MAM_BENCH_N")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(100_000);
     let env = Arc::new(Env::new());
     std::fs::create_dir_all(env.path("big")).unwrap();
     std::fs::create_dir_all(env.path("keep")).unwrap();
-    let big = env.ingest.add_folder(env.path("big").to_str().unwrap()).unwrap().folder_id;
-    env.ingest.add_folder(env.path("keep").to_str().unwrap()).unwrap();
+    let big = env
+        .ingest
+        .add_folder(env.path("big").to_str().unwrap())
+        .unwrap()
+        .folder_id;
+    env.ingest
+        .add_folder(env.path("keep").to_str().unwrap())
+        .unwrap();
 
     // 자산 N 개(big) + 남는 폴더 5,000 개(keep). 읽기 질의는 남는 폴더 구간(첫 화면)을 읽는다
     let t = Instant::now();
@@ -68,7 +77,10 @@ fn t_rmv_bench_01_removal_of_a_large_folder_and_read_latency_during_it() {
     let keep = insert_assets(&env, "vol-a", "keep", 5_000, "image");
     // 연결 데이터: 모든 big 자산에 전 테이블 한 행 이상 (집합 단위 삽입)
     let (lo, hi) = (ids[0], *ids.last().unwrap());
-    exec(&env, "INSERT OR IGNORE INTO tags (name, name_key) VALUES ('t', 't'); INSERT OR IGNORE INTO collections (name, name_key, created_at) VALUES ('c', 'c', 1);");
+    exec(
+        &env,
+        "INSERT OR IGNORE INTO tags (name, name_key) VALUES ('t', 't'); INSERT OR IGNORE INTO collections (name, name_key, created_at) VALUES ('c', 'c', 1);",
+    );
     exec(&env, &format!(
         "INSERT INTO asset_tags SELECT asset_id, (SELECT tag_id FROM tags LIMIT 1), 1 FROM media_assets WHERE asset_id BETWEEN {lo} AND {hi};
          INSERT INTO collection_assets (collection_id, asset_id, added_at) SELECT (SELECT collection_id FROM collections LIMIT 1), asset_id, 1 FROM media_assets WHERE asset_id BETWEEN {lo} AND {hi};
@@ -84,7 +96,10 @@ fn t_rmv_bench_01_removal_of_a_large_folder_and_read_latency_during_it() {
          INSERT INTO jobs (kind, asset_id, created_at, updated_at) SELECT 'ai', asset_id, 1, 1 FROM media_assets WHERE asset_id BETWEEN {lo} AND {hi};"
     ));
     exec(&env, "ANALYZE");
-    eprintln!("seeded {n} assets + linked rows in {:.1}s", t.elapsed().as_secs_f64());
+    eprintln!(
+        "seeded {n} assets + linked rows in {:.1}s",
+        t.elapsed().as_secs_f64()
+    );
 
     let from = keep[0];
     // 대조: 제거 없이 읽기만
@@ -110,10 +125,20 @@ fn t_rmv_bench_01_removal_of_a_large_folder_and_read_latency_during_it() {
     let took = t.elapsed();
     stop.store(true, Ordering::Relaxed);
     let samples = reader.join().unwrap();
-    eprintln!("removal of {n} assets: {:.1}s ({:.0} assets/s)", took.as_secs_f64(), n as f64 / took.as_secs_f64());
+    eprintln!(
+        "removal of {n} assets: {:.1}s ({:.0} assets/s)",
+        took.as_secs_f64(),
+        n as f64 / took.as_secs_f64()
+    );
     summarize("read latency, during removal", samples);
 
     assert_eq!(env.count(&format!("SELECT COUNT(*) FROM media_assets WHERE status = 'deleted' AND asset_id BETWEEN {lo} AND {hi}")), n as i64);
     assert_eq!(env.count("SELECT COUNT(*) FROM asset_tags"), 0);
-    assert_eq!(env.count(&format!("SELECT COUNT(*) FROM media_assets WHERE status = 'active' AND asset_id >= {}", keep[0])), 5_000);
+    assert_eq!(
+        env.count(&format!(
+            "SELECT COUNT(*) FROM media_assets WHERE status = 'active' AND asset_id >= {}",
+            keep[0]
+        )),
+        5_000
+    );
 }

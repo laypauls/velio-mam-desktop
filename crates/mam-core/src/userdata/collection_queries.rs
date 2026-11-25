@@ -74,8 +74,10 @@ impl<'a> ReadBoost<'a> {
 
 fn set_mmap(conn: &rusqlite::Connection, bytes: i64) -> rusqlite::Result<()> {
     // `PRAGMA mmap_size = N` 은 결과 행을 돌려준다
-    conn.query_row(&format!("PRAGMA mmap_size = {bytes}"), [], |r| r.get::<_, i64>(0))
-        .map(|_| ())
+    conn.query_row(&format!("PRAGMA mmap_size = {bytes}"), [], |r| {
+        r.get::<_, i64>(0)
+    })
+    .map(|_| ())
 }
 
 impl Drop for ReadBoost<'_> {

@@ -4,7 +4,9 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use mam_core::jobs::{ExecutorRegistry, Job, JobContext, JobError, JobExecutor, JobKind, JobOutcome, JobRunner};
+use mam_core::jobs::{
+    ExecutorRegistry, Job, JobContext, JobError, JobExecutor, JobKind, JobOutcome, JobRunner,
+};
 
 use super::Env;
 
@@ -25,7 +27,12 @@ struct Probe {
 impl JobExecutor for Probe {
     fn execute(&self, job: &Job, ctx: &JobContext<'_>) -> Result<JobOutcome, JobError> {
         let outcome = self.inner.execute(job, ctx);
-        let _ = self.tx.lock().unwrap().send(Done { job_id: job.job_id, asset: job.asset_id, attempts: job.attempts, outcome: outcome.clone() });
+        let _ = self.tx.lock().unwrap().send(Done {
+            job_id: job.job_id,
+            asset: job.asset_id,
+            attempts: job.attempts,
+            outcome: outcome.clone(),
+        });
         outcome
     }
 }
@@ -40,7 +47,10 @@ impl Env {
             return;
         }
         let mut reg = ExecutorRegistry::new();
-        let probe = Probe { inner: self.jobs.executor(), tx: Mutex::new(self.done_tx.clone()) };
+        let probe = Probe {
+            inner: self.jobs.executor(),
+            tx: Mutex::new(self.done_tx.clone()),
+        };
         reg.register(JobKind::Plugin, Arc::new(probe));
         *slot = Some(JobRunner::start(Arc::clone(&self.queue), reg).unwrap());
     }
@@ -60,7 +70,11 @@ impl Env {
     }
 
     pub fn next_done(&self) -> Done {
-        self.done_rx.lock().unwrap().recv_timeout(Duration::from_secs(60)).expect("a plugin job should finish within 60s")
+        self.done_rx
+            .lock()
+            .unwrap()
+            .recv_timeout(Duration::from_secs(60))
+            .expect("a plugin job should finish within 60s")
     }
 
     /// 실행 중 플러그인 작업이 없어질 때까지 (= `finish` 의 DB 쓰기 완료) 큐의 condvar 로 기다린다
@@ -80,7 +94,11 @@ impl Env {
 
     /// 지금 대기 중인 `jobs` 를 모두 끝낸다 (재등록되는 작업은 세지 않는다)
     pub fn run_pending_jobs(&self) -> usize {
-        let n = self.jobs_rows().iter().filter(|j| j.status == "pending").count();
+        let n = self
+            .jobs_rows()
+            .iter()
+            .filter(|j| j.status == "pending")
+            .count();
         if n > 0 {
             self.run(n);
         }

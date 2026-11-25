@@ -55,8 +55,26 @@ pub struct PlayerEvent {
 }
 
 impl PlayerEvent {
-    pub fn new(session_id: u64, asset_id: i64, state: EventState, time_ms: i64, length_ms: Option<i64>, fps: Option<f64>) -> Self {
-        Self { session_id, asset_id, state, time_ms, length_ms, fps, buffering: false, error: None, error_code: None, restart: None }
+    pub fn new(
+        session_id: u64,
+        asset_id: i64,
+        state: EventState,
+        time_ms: i64,
+        length_ms: Option<i64>,
+        fps: Option<f64>,
+    ) -> Self {
+        Self {
+            session_id,
+            asset_id,
+            state,
+            time_ms,
+            length_ms,
+            fps,
+            buffering: false,
+            error: None,
+            error_code: None,
+            restart: None,
+        }
     }
 }
 
@@ -86,7 +104,13 @@ pub struct EventBridge {
 
 impl EventBridge {
     pub fn new(sink: EventSink) -> Self {
-        Self { sink, last: None, last_time_at: None, last_completion_at: None, trailing: None }
+        Self {
+            sink,
+            last: None,
+            last_time_at: None,
+            last_completion_at: None,
+            trailing: None,
+        }
     }
 
     /// 새 세션·닫기 — 대기 중인 trailing 과 중복 기준을 버린다 (닫은 뒤에는 이전 세션 이벤트가 나가지 않는다)
@@ -122,14 +146,19 @@ impl EventBridge {
             }
             Emit::Time => {
                 let changed = self.last.as_ref().is_none_or(|l| l.time_ms != ev.time_ms);
-                let due = self.last_time_at.is_none_or(|t| now.saturating_duration_since(t) >= TIME_INTERVAL);
+                let due = self
+                    .last_time_at
+                    .is_none_or(|t| now.saturating_duration_since(t) >= TIME_INTERVAL);
                 if ev.state == EventState::Playing && changed && due {
                     self.last_time_at = Some(now);
                     self.send(ev);
                 }
             }
             Emit::Completion => {
-                if self.last_completion_at.is_none_or(|t| now.saturating_duration_since(t) >= COMPLETION_INTERVAL) {
+                if self
+                    .last_completion_at
+                    .is_none_or(|t| now.saturating_duration_since(t) >= COMPLETION_INTERVAL)
+                {
                     self.last_completion_at = Some(now);
                     self.trailing = None;
                     self.send(ev);
@@ -155,7 +184,10 @@ impl EventBridge {
 
     /// trailing 이 있으면 보낼 시각 (루프의 대기 상한 계산용)
     pub fn next_due(&self) -> Option<Instant> {
-        self.trailing.as_ref().and(self.last_completion_at).map(|t| t + COMPLETION_INTERVAL)
+        self.trailing
+            .as_ref()
+            .and(self.last_completion_at)
+            .map(|t| t + COMPLETION_INTERVAL)
     }
 }
 
@@ -169,7 +201,10 @@ mod tests {
     fn bridge() -> (EventBridge, Arc<Mutex<Vec<PlayerEvent>>>) {
         let got: Arc<Mutex<Vec<PlayerEvent>>> = Arc::default();
         let g = Arc::clone(&got);
-        (EventBridge::new(Arc::new(move |e| g.lock().unwrap().push(e))), got)
+        (
+            EventBridge::new(Arc::new(move |e| g.lock().unwrap().push(e))),
+            got,
+        )
     }
 
     fn ev(state: EventState, t: i64) -> PlayerEvent {
@@ -181,7 +216,8 @@ mod tests {
     }
 
     fn fixture() -> serde_json::Value {
-        let raw = include_str!("../../../../src/test/fixtures/player-wire.json").replace("\r\n", "\n");
+        let raw =
+            include_str!("../../../../src/test/fixtures/player-wire.json").replace("\r\n", "\n");
         serde_json::from_str(&raw).expect("fixture")
     }
 
@@ -192,7 +228,11 @@ mod tests {
         let playing = ev(EventState::Playing, 1500);
         assert_eq!(serde_json::to_value(&playing).unwrap(), se["playing"]);
         let mut unknown = PlayerEvent::new(5, 7, EventState::Paused, 0, None, None);
-        assert_eq!(serde_json::to_value(&unknown).unwrap(), se["pausedUnknownFps"], "null 도 직렬화");
+        assert_eq!(
+            serde_json::to_value(&unknown).unwrap(),
+            se["pausedUnknownFps"],
+            "null 도 직렬화"
+        );
         let mut b = ev(EventState::Playing, 61_000);
         b.buffering = true;
         assert_eq!(serde_json::to_value(&b).unwrap(), se["buffering"]);
@@ -209,7 +249,12 @@ mod tests {
         e.error_code = Some(PlayerErrorCode::OpenFailed);
         assert_eq!(serde_json::to_value(&e).unwrap(), se["error"]);
         unknown.buffering = false; // 필드가 false 면 생략
-        assert!(serde_json::to_value(&unknown).unwrap().get("buffering").is_none());
+        assert!(
+            serde_json::to_value(&unknown)
+                .unwrap()
+                .get("buffering")
+                .is_none()
+        );
     }
 
     #[test]
@@ -220,7 +265,14 @@ mod tests {
         b.emit(ev(EventState::Playing, 0), Emit::Transition, t0);
         b.emit(ev(EventState::Paused, 0), Emit::Transition, t0);
         b.emit(ev(EventState::Playing, 0), Emit::Transition, t0);
-        assert_eq!(got.lock().unwrap().iter().map(|e| e.state).collect::<Vec<_>>(), vec![EventState::Playing, EventState::Paused, EventState::Playing]);
+        assert_eq!(
+            got.lock()
+                .unwrap()
+                .iter()
+                .map(|e| e.state)
+                .collect::<Vec<_>>(),
+            vec![EventState::Playing, EventState::Paused, EventState::Playing]
+        );
     }
 
     #[test]
@@ -230,10 +282,23 @@ mod tests {
         b.emit(ev(EventState::Playing, 0), Emit::Transition, t0);
         // 100ms 간격 10개 → 5Hz 로 솎아낸다
         for i in 1..=10u64 {
-            b.emit(ev(EventState::Playing, i as i64 * 100), Emit::Time, t0 + ms(i * 100));
+            b.emit(
+                ev(EventState::Playing, i as i64 * 100),
+                Emit::Time,
+                t0 + ms(i * 100),
+            );
         }
         let n = got.lock().unwrap().len();
-        assert_eq!(n, 1 + 5, "{:?}", got.lock().unwrap().iter().map(|e| e.time_ms).collect::<Vec<_>>());
+        assert_eq!(
+            n,
+            1 + 5,
+            "{:?}",
+            got.lock()
+                .unwrap()
+                .iter()
+                .map(|e| e.time_ms)
+                .collect::<Vec<_>>()
+        );
         // 값이 같으면 보내지 않고, 정지 중에는 주기 이벤트가 없다
         let last_t = got.lock().unwrap().last().unwrap().time_ms;
         b.emit(ev(EventState::Playing, last_t), Emit::Time, t0 + ms(5000));
@@ -259,14 +324,22 @@ mod tests {
     }
 
     #[test]
-    fn t_player_host_ev_04_a_transition_supersedes_a_pending_trailing_completion_and_reset_drops_it() {
+    fn t_player_host_ev_04_a_transition_supersedes_a_pending_trailing_completion_and_reset_drops_it()
+     {
         let (mut b, got) = bridge();
         let t0 = Instant::now();
         b.emit(ev(EventState::Paused, 100), Emit::Completion, t0);
         b.emit(ev(EventState::Paused, 133), Emit::Completion, t0 + ms(5));
         b.emit(ev(EventState::Playing, 133), Emit::Transition, t0 + ms(6));
         b.poll(t0 + ms(100));
-        assert_eq!(got.lock().unwrap().iter().map(|e| (e.state, e.time_ms)).collect::<Vec<_>>(), vec![(EventState::Paused, 100), (EventState::Playing, 133)]);
+        assert_eq!(
+            got.lock()
+                .unwrap()
+                .iter()
+                .map(|e| (e.state, e.time_ms))
+                .collect::<Vec<_>>(),
+            vec![(EventState::Paused, 100), (EventState::Playing, 133)]
+        );
         // reset(닫기·새 세션) 뒤에는 이전 세션의 trailing 이 나가지 않는다
         b.emit(ev(EventState::Playing, 140), Emit::Completion, t0 + ms(110));
         b.emit(ev(EventState::Playing, 150), Emit::Completion, t0 + ms(115));

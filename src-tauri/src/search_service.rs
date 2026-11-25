@@ -16,8 +16,8 @@ use std::time::{Duration, Instant};
 use mam_core::SharedClock;
 use mam_core::query::{
     FolderScope, IndexKind, IndexSection, MediaKind, PageDirection, QueryService, SearchFilters,
-    SearchIndex, SearchIndexRequest, SearchMode, SearchPage, SearchRequest,
-    SortDirection, SortField as ApiSortField,
+    SearchIndex, SearchIndexRequest, SearchMode, SearchPage, SearchRequest, SortDirection,
+    SortField as ApiSortField,
 };
 use mam_core::scan::IngestError;
 use mam_db::{DbPool, PoolError, Priority};

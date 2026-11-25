@@ -4,7 +4,9 @@
 //! 장면전환점은 검색 색인 대상이 아니라 `revision`·`search_outbox` 를 건드리지 않는다. 원본 파일은 읽지도 쓰지도 않는다.
 
 use mam_db::SceneSensitivity;
-use mam_db::scene_cuts::{self, CutSource as DbCutSource, SceneError, SceneRow, SceneState as DbState};
+use mam_db::scene_cuts::{
+    self, CutSource as DbCutSource, SceneError, SceneRow, SceneState as DbState,
+};
 use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
@@ -97,8 +99,14 @@ impl SceneCuts {
         let mut cuts: Vec<SceneCut> = r
             .auto
             .iter()
-            .map(|&ms| SceneCut { ms, source: CutSource::Auto })
-            .chain(r.user.iter().map(|&ms| SceneCut { ms, source: CutSource::User }))
+            .map(|&ms| SceneCut {
+                ms,
+                source: CutSource::Auto,
+            })
+            .chain(r.user.iter().map(|&ms| SceneCut {
+                ms,
+                source: CutSource::User,
+            }))
             .collect();
         // 같은 ms 면 자동이 먼저 (안정 정렬)
         cuts.sort_by_key(|c| c.ms);
@@ -110,7 +118,10 @@ impl SceneCuts {
                 DbState::Failed => SceneStateView::Failed,
                 DbState::Unsupported => SceneStateView::Unsupported,
             },
-            sensitivity: r.sensitivity.as_deref().and_then(SceneSensitivity::parse_str),
+            sensitivity: r
+                .sensitivity
+                .as_deref()
+                .and_then(SceneSensitivity::parse_str),
             error: r.error.as_deref().map(SceneFailure::from_code),
             cuts,
             suppressed_count: u32::try_from(r.suppressed.len()).unwrap_or(u32::MAX),
@@ -183,7 +194,10 @@ impl UserData {
         self.write(move |tx, now| {
             let t = require_active_video(tx, asset_id)?;
             scene_cuts::add_user_tx(tx, asset_id, ms, t.fps, t.duration_ms, now)?;
-            Ok(SceneCuts::from_row(asset_id, scene_cuts::get(tx, asset_id)?))
+            Ok(SceneCuts::from_row(
+                asset_id,
+                scene_cuts::get(tx, asset_id)?,
+            ))
         })
     }
 
@@ -197,7 +211,10 @@ impl UserData {
         self.write(move |tx, now| {
             let t = require_active_video(tx, asset_id)?;
             scene_cuts::remove_tx(tx, asset_id, ms, source.into(), t.fps, now)?;
-            Ok(SceneCuts::from_row(asset_id, scene_cuts::get(tx, asset_id)?))
+            Ok(SceneCuts::from_row(
+                asset_id,
+                scene_cuts::get(tx, asset_id)?,
+            ))
         })
     }
 
@@ -206,7 +223,10 @@ impl UserData {
         self.write(move |tx, now| {
             require_active_video(tx, asset_id)?;
             scene_cuts::clear_auto_tx(tx, asset_id, now)?;
-            Ok(SceneCuts::from_row(asset_id, scene_cuts::get(tx, asset_id)?))
+            Ok(SceneCuts::from_row(
+                asset_id,
+                scene_cuts::get(tx, asset_id)?,
+            ))
         })
     }
 }

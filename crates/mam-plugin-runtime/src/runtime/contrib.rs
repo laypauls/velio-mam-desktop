@@ -8,12 +8,20 @@ use crate::api::{ExportProviderInfo, MenuItemInfo, PluginContributions, PluginIn
 
 impl PluginRuntime {
     fn snapshot(&self) -> Vec<Arc<Entry>> {
-        self.registry.read().unwrap_or_else(|p| p.into_inner()).values().cloned().collect()
+        self.registry
+            .read()
+            .unwrap_or_else(|p| p.into_inner())
+            .values()
+            .cloned()
+            .collect()
     }
 
     /// 깨진·호환 안 되는 플러그인도 포함한다 (id 순)
     pub fn list(&self, locale: &str) -> Vec<PluginInfo> {
-        self.snapshot().iter().map(|e| e.info(locale, self.worker_available)).collect()
+        self.snapshot()
+            .iter()
+            .map(|e| e.info(locale, self.worker_available))
+            .collect()
     }
 
     pub(crate) fn info_of(&self, entry: &Entry, locale: &str) -> PluginInfo {
@@ -24,7 +32,9 @@ impl PluginRuntime {
     pub fn contributions(&self, locale: &str) -> PluginContributions {
         let mut out = PluginContributions::default();
         for entry in self.snapshot().iter().filter(|e| e.runnable()) {
-            let Some(pkg) = entry.pkg.as_ref() else { continue };
+            let Some(pkg) = entry.pkg.as_ref() else {
+                continue;
+            };
             let (m, b) = (&pkg.manifest, &pkg.locales);
             for item in &m.contributes.menus.asset_context {
                 let title = m
@@ -32,7 +42,10 @@ impl PluginRuntime {
                     .commands
                     .iter()
                     .find(|c| c.id == item.command)
-                    .map_or_else(|| item.command.to_string(), |c| tr(b, &c.title, locale, c.id.as_str()));
+                    .map_or_else(
+                        || item.command.to_string(),
+                        |c| tr(b, &c.title, locale, c.id.as_str()),
+                    );
                 out.menu_items.push(MenuItemInfo {
                     plugin_id: entry.id.clone(),
                     command_id: item.command.to_string(),

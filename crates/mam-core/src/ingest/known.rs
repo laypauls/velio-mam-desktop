@@ -64,15 +64,20 @@ fn sort_key(v: &KnownVolume) -> (u8, std::cmp::Reverse<i64>, String) {
         Some(Availability::Offline) => 1,
         None => 2,
     };
-    (rank, std::cmp::Reverse(v.last_seen_at.unwrap_or(0)), v.volume_key.clone())
+    (
+        rank,
+        std::cmp::Reverse(v.last_seen_at.unwrap_or(0)),
+        v.volume_key.clone(),
+    )
 }
 
 impl Ingest {
     /// 앱이 기억하는 디스크 목록 (`volumes` 행 + 묻지 않음 항목, `volume_key` 당 1행).
     pub fn list_known_volumes(&self) -> Result<Vec<KnownVolume>, IngestError> {
-        let (mut list, ignored) = self.env.pool.read(|c| {
-            Ok((volume_rows(c)?, load_ignored_volumes(c)?))
-        })?;
+        let (mut list, ignored) = self
+            .env
+            .pool
+            .read(|c| Ok((volume_rows(c)?, load_ignored_volumes(c)?)))?;
         let mut index: HashMap<String, usize> = list
             .iter()
             .enumerate()
@@ -114,9 +119,12 @@ impl Ingest {
     fn forget_locked(&self, volume_key: &str) -> Result<(), IngestError> {
         let key = volume_key.to_owned();
         let volume_id: Option<i64> = self.env.pool.read(move |c| {
-            Ok(c
-                .query_row("SELECT volume_id FROM volumes WHERE volume_key = ?1", [&key], |r| r.get(0))
-                .optional()?)
+            Ok(c.query_row(
+                "SELECT volume_id FROM volumes WHERE volume_key = ?1",
+                [&key],
+                |r| r.get(0),
+            )
+            .optional()?)
         })?;
         if let Some(volume_id) = volume_id {
             let (folders, active_rows) = self.env.pool.read(move |c| {

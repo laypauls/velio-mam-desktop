@@ -31,12 +31,21 @@ pub(crate) struct Req {
 
 pub(crate) enum ReqKind {
     Open(OpenRequest),
-    SetRanges { asset_id: i64, ranges: Option<Vec<RangeMs>> },
-    SetSubtitle { asset_id: i64, path: Option<std::path::PathBuf> },
+    SetRanges {
+        asset_id: i64,
+        ranges: Option<Vec<RangeMs>>,
+    },
+    SetSubtitle {
+        asset_id: i64,
+        path: Option<std::path::PathBuf>,
+    },
     Control(ControlAction),
     Seek(i64),
     SetRate(f64),
-    SetVolume { volume: u8, muted: bool },
+    SetVolume {
+        volume: u8,
+        muted: bool,
+    },
     SetRenderSize(u32, u32),
     SetRenderActive(bool),
     Restart,
@@ -53,7 +62,11 @@ pub(crate) enum Done {
     /// 호출자에게 알린다
     Reply,
     /// `Attach` 응답 — 성공하면 `old` epoch 의 버퍼를 닫는다
-    Attach { new: u64, old: u64, purpose: AttachFor },
+    Attach {
+        new: u64,
+        old: u64,
+        purpose: AttachFor,
+    },
     /// `Open` 접수 응답 (실패면 열기 실패)
     OpenAck,
     CloseAck,
@@ -103,7 +116,9 @@ pub(crate) enum Phase {
     Active,
     Restoring(Box<RestoreWait>),
     /// 재시작 전 백오프
-    Backoff { until: Instant },
+    Backoff {
+        until: Instant,
+    },
     /// 연속 실패로 포기 — 열기/재시작/닫기만 받는다
     Failed,
 }
@@ -206,7 +221,8 @@ impl Core {
         if let Phase::Backoff { until } = &self.phase {
             consider(*until);
         }
-        due.saturating_duration_since(now).max(Duration::from_millis(1))
+        due.saturating_duration_since(now)
+            .max(Duration::from_millis(1))
     }
 
     // ---------- 이벤트 ----------
@@ -219,7 +235,14 @@ impl Core {
         } else {
             EventState::Playing
         };
-        let mut e = PlayerEvent::new(self.rem.session_id, self.rem.asset_id, state, self.rem.pos_ms, self.rem.length_ms, self.rem.fps);
+        let mut e = PlayerEvent::new(
+            self.rem.session_id,
+            self.rem.asset_id,
+            state,
+            self.rem.pos_ms,
+            self.rem.length_ms,
+            self.rem.fps,
+        );
         e.buffering = self.rem.buffering;
         e
     }
@@ -242,7 +265,13 @@ impl Core {
             return;
         };
         match &msg {
-            Message::Reply { id, ok, code, error, .. } => {
+            Message::Reply {
+                id,
+                ok,
+                code,
+                error,
+                ..
+            } => {
                 self.on_reply(*id, *ok, *code, error.clone());
                 return;
             }
@@ -256,7 +285,9 @@ impl Core {
             Phase::Opening(ow) => {
                 match &msg {
                     Message::FileLoaded { .. } => ow.loaded = true,
-                    Message::PlaybackRestart { time_ms } if ow.loaded => ow.restart = Some((*time_ms, Instant::now())),
+                    Message::PlaybackRestart { time_ms } if ow.loaded => {
+                        ow.restart = Some((*time_ms, Instant::now()))
+                    }
                     _ => {}
                 }
                 self.rem.on_message(&msg);
@@ -265,7 +296,10 @@ impl Core {
                 if let Message::PlaybackRestart { .. } = &msg {
                     rw.restart_at = Some(Instant::now());
                 }
-                if let Message::FileLoaded { fps, duration_ms, .. } = &msg {
+                if let Message::FileLoaded {
+                    fps, duration_ms, ..
+                } = &msg
+                {
                     self.rem.fps = *fps;
                     self.rem.length_ms = *duration_ms;
                 }
@@ -325,11 +359,21 @@ impl Core {
         }
     }
 
-    fn on_reply(&mut self, id: u64, ok: bool, code: Option<WorkerErrorCode>, error: Option<String>) {
-        let Some(pos) = self.pending.iter().position(|p| p.id == id) else { return };
+    fn on_reply(
+        &mut self,
+        id: u64,
+        ok: bool,
+        code: Option<WorkerErrorCode>,
+        error: Option<String>,
+    ) {
+        let Some(pos) = self.pending.iter().position(|p| p.id == id) else {
+            return;
+        };
         let p = self.pending.remove(pos);
         let err = || {
-            let m = error.clone().unwrap_or_else(|| "worker rejected the command".into());
+            let m = error
+                .clone()
+                .unwrap_or_else(|| "worker rejected the command".into());
             match code {
                 Some(WorkerErrorCode::InvalidArgument) => PlayerError::InvalidArgument(m),
                 Some(WorkerErrorCode::NoMedia) => PlayerError::NoMedia,
@@ -340,7 +384,11 @@ impl Core {
         match p.done {
             Done::Reply | Done::CloseAck => {
                 if let Some(r) = p.reply {
-                    let _ = r.send(if ok || p.done == Done::CloseAck { Ok(Reply::Unit) } else { Err(err()) });
+                    let _ = r.send(if ok || p.done == Done::CloseAck {
+                        Ok(Reply::Unit)
+                    } else {
+                        Err(err())
+                    });
                 }
             }
             Done::Ignore => {}
@@ -373,7 +421,12 @@ impl Core {
         // 열기 취소·마감·프레임 유예
         let mut open_failure = None;
         if let Phase::Opening(ow) = &self.phase {
-            if self.shared.close_gen.load(std::sync::atomic::Ordering::Acquire) != ow.close_gen {
+            if self
+                .shared
+                .close_gen
+                .load(std::sync::atomic::Ordering::Acquire)
+                != ow.close_gen
+            {
                 open_failure = Some((PlayerError::Cancelled, false));
             } else if now >= ow.deadline {
                 open_failure = Some((PlayerError::Timeout, true));
@@ -398,20 +451,33 @@ impl Core {
         {
             self.begin_restore();
         }
-        if self.inc.is_some() && !matches!(self.phase, Phase::Idle | Phase::Failed) && self.shared.silence() > self.cfg.timeouts.silence {
+        if self.inc.is_some()
+            && !matches!(self.phase, Phase::Idle | Phase::Failed)
+            && self.shared.silence() > self.cfg.timeouts.silence
+        {
             self.worker_failed("silence");
         }
         self.apply_queued_resize(now);
     }
 
     fn expire_pending(&mut self, now: Instant) {
-        let due: Vec<usize> = self.pending.iter().enumerate().filter(|(_, p)| now >= p.deadline).map(|(i, _)| i).collect();
+        let due: Vec<usize> = self
+            .pending
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| now >= p.deadline)
+            .map(|(i, _)| i)
+            .collect();
         let mut kill = false;
         for i in due.into_iter().rev() {
             let mut p = self.pending.remove(i);
             if p.retry {
                 // 멱등 명령은 새 id 로 한 번 더 보낸다
-                if let Some(id) = self.inc.as_mut().and_then(|inc| inc.send(p.cmd.clone(), true)) {
+                if let Some(id) = self
+                    .inc
+                    .as_mut()
+                    .and_then(|inc| inc.send(p.cmd.clone(), true))
+                {
                     p.id = id;
                     p.retry = false;
                     p.deadline = now + p.timeout;
@@ -421,10 +487,16 @@ impl Core {
             }
             if let Some(r) = p.reply.take() {
                 // 닫기는 응답이 없어도 파일을 놓은 것으로 본다 (워커를 죽이므로) — 항상 Ok
-                let _ = r.send(if p.done == Done::CloseAck { Ok(Reply::Unit) } else { Err(PlayerError::Timeout) });
+                let _ = r.send(if p.done == Done::CloseAck {
+                    Ok(Reply::Unit)
+                } else {
+                    Err(PlayerError::Timeout)
+                });
             }
             match p.done {
-                Done::Attach { new, old, purpose } => self.on_attach_failed(new, old, purpose, PlayerError::Timeout),
+                Done::Attach { new, old, purpose } => {
+                    self.on_attach_failed(new, old, purpose, PlayerError::Timeout)
+                }
                 Done::OpenAck => self.fail_open(PlayerError::Timeout),
                 _ => {}
             }

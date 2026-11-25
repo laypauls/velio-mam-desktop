@@ -6,9 +6,9 @@ use std::collections::HashMap;
 
 use rusqlite::Connection;
 
+use super::FieldValue;
 use super::defs::load_fields;
 use super::values::load_asset_values;
-use super::FieldValue;
 use crate::scan::IngestError;
 
 /// 자산 하나의 사용자 필드를 외부 전송용 문자열로 만든다. 쿼리는 값 1회 + 필드·선택지 2회(고정).
@@ -22,17 +22,29 @@ pub fn load_external_user_fields(
         return Ok(Vec::new());
     }
     let fields = load_fields(c)?;
-    let by_id: HashMap<i64, &super::MetadataField> = fields.iter().map(|f| (f.field_id, f)).collect();
+    let by_id: HashMap<i64, &super::MetadataField> =
+        fields.iter().map(|f| (f.field_id, f)).collect();
     let mut out = Vec::with_capacity(values.len());
     for v in &values {
         let Some(field) = by_id.get(&v.field_id) else {
             continue;
         };
-        let label = |id: i64| field.options.iter().find(|o| o.option_id == id).map(|o| o.label.clone());
+        let label = |id: i64| {
+            field
+                .options
+                .iter()
+                .find(|o| o.option_id == id)
+                .map(|o| o.label.clone())
+        };
         let text = match &v.value {
             FieldValue::Keyword(s) => s.clone(),
             FieldValue::Number(n) => n.to_string(),
-            FieldValue::Date(ymd) => format!("{:04}-{:02}-{:02}", ymd / 10_000, ymd / 100 % 100, ymd % 100),
+            FieldValue::Date(ymd) => format!(
+                "{:04}-{:02}-{:02}",
+                ymd / 10_000,
+                ymd / 100 % 100,
+                ymd % 100
+            ),
             FieldValue::Boolean(b) => b.to_string(),
             FieldValue::Enum(id) => match label(*id) {
                 Some(l) => l,

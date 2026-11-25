@@ -26,12 +26,19 @@ pub(crate) fn commands_info(m: &Manifest, b: &LocaleBundle, locale: &str) -> Vec
     m.contributes
         .commands
         .iter()
-        .map(|c| CommandInfo { id: c.id.to_string(), title: tr(b, &c.title, locale, c.id.as_str()) })
+        .map(|c| CommandInfo {
+            id: c.id.to_string(),
+            title: tr(b, &c.title, locale, c.id.as_str()),
+        })
         .collect()
 }
 
 /// metadata -> analysis -> export 순서 (manifest 선언 순서 유지)
-pub(crate) fn providers_info(m: &Manifest, b: &LocaleBundle, locale: &str) -> Vec<PluginProviderInfo> {
+pub(crate) fn providers_info(
+    m: &Manifest,
+    b: &LocaleBundle,
+    locale: &str,
+) -> Vec<PluginProviderInfo> {
     let p = &m.contributes.providers;
     let plain = |kind: ProviderKind, list: &[mam_plugin_manifest::Provider]| {
         list.iter()
@@ -70,18 +77,27 @@ mod tests {
 
     fn bundle(v: &serde_json::Value) -> LocaleBundle {
         let mut b = LocaleBundle::default();
-        b.insert("en", parse_locale_file(&v.to_string()).unwrap()).unwrap();
+        b.insert("en", parse_locale_file(&v.to_string()).unwrap())
+            .unwrap();
         b
     }
 
     #[test]
     fn t_pinst_l10n_01_display_strings_drop_bidi_overrides_and_control_chars() {
         let m = manifest();
-        let b = bundle(&serde_json::json!({ "name": "Safe\u{202E}gpj.exe\u{200B}\u{2028}Name", "blank": "\u{202E}\u{200B}" }));
+        let b = bundle(
+            &serde_json::json!({ "name": "Safe\u{202E}gpj.exe\u{200B}\u{2028}Name", "blank": "\u{202E}\u{200B}" }),
+        );
         assert_eq!(display_name(&m, &b, "en"), "Safegpj.exe Name");
-        assert_eq!(description(&m, &b, "en"), None, "only invisible chars means no translation");
+        assert_eq!(
+            description(&m, &b, "en"),
+            None,
+            "only invisible chars means no translation"
+        );
         // 번역이 없으면 id 로 대체
-        assert_eq!(display_name(&m, &LocaleBundle::default(), "en"), "com.example.l10n");
+        assert_eq!(
+            display_name(&m, &LocaleBundle::default(), "en"),
+            "com.example.l10n"
+        );
     }
 }
-

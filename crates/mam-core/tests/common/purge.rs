@@ -15,7 +15,9 @@ pub fn exec(env: &Env, sql: &str) {
 }
 
 pub fn volume_id(env: &Env, key: &str) -> i64 {
-    env.count(&format!("SELECT volume_id FROM volumes WHERE volume_key = '{key}'"))
+    env.count(&format!(
+        "SELECT volume_id FROM volumes WHERE volume_key = '{key}'"
+    ))
 }
 
 pub fn ids_sql(ids: &[i64]) -> String {
@@ -122,7 +124,9 @@ pub fn linked_rows(env: &Env, ids: &[i64]) -> Vec<(String, i64)> {
     let mut out: Vec<(String, i64)> = tables
         .into_iter()
         .map(|t| {
-            let n = env.count(&format!("SELECT COUNT(*) FROM {t} WHERE asset_id IN ({list})"));
+            let n = env.count(&format!(
+                "SELECT COUNT(*) FROM {t} WHERE asset_id IN ({list})"
+            ));
             (t, n)
         })
         .collect();

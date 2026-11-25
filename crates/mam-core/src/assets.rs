@@ -89,7 +89,11 @@ pub const MAX_FILE_NAME_CHARS: usize = 200;
 /// 경로 구분자(`/`·`\`)로 나눈 마지막 구성요소에서 제어 문자를 지우고 [`MAX_FILE_NAME_CHARS`] 글자로 자른다. 비면 `None`.
 pub fn sanitize_file_name(name_or_path: &str) -> Option<String> {
     let base = name_or_path.rsplit(['/', '\\']).next().unwrap_or("");
-    let cleaned: String = base.chars().filter(|c| !c.is_control()).take(MAX_FILE_NAME_CHARS).collect();
+    let cleaned: String = base
+        .chars()
+        .filter(|c| !c.is_control())
+        .take(MAX_FILE_NAME_CHARS)
+        .collect();
     (!cleaned.is_empty()).then_some(cleaned)
 }
 

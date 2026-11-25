@@ -29,7 +29,10 @@ pub(crate) struct Handlers {
 /// (MAMData·관리 폴더가 아니다). 워커는 `MAM_*` 등 어떤 환경변수도 읽지 않는다. 표준 입출력 외 상속 핸들은 std 가 만들지 않는다
 fn harden(cmd: &mut Command) -> std::io::Result<()> {
     let dir = sandbox_dir()?;
-    cmd.env_clear().current_dir(&dir).env("TEMP", &dir).env("TMP", &dir);
+    cmd.env_clear()
+        .current_dir(&dir)
+        .env("TEMP", &dir)
+        .env("TMP", &dir);
     if let Some(root) = std::env::var_os("SystemRoot") {
         cmd.env("SystemRoot", root);
     }
@@ -61,11 +64,16 @@ impl WorkerProc {
     pub fn spawn(exe: &Path, max_line: usize, quickjs_memory_bytes: u64) -> std::io::Result<Self> {
         // 경로가 없으면(워커를 못 찾음) 아무것도 띄우지 않는다 — 빈 경로가 PATH·작업 폴더 탐색으로 번지지 않게 한다
         if exe.as_os_str().is_empty() {
-            return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "worker executable not configured"));
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "worker executable not configured",
+            ));
         }
         let mut cmd = Command::new(exe);
         harden(&mut cmd)?;
-        cmd.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null());
+        cmd.stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null());
         let mut child = cmd.spawn()?;
         // 띄운 직후 Job 에 넣는다 — 호스트가 크래시해도 워커가 고아로 남지 않는다
         let job = KillOnClose::attach(&child, process_memory_cap(quickjs_memory_bytes));
@@ -76,8 +84,16 @@ impl WorkerProc {
         };
         let (tx, rx) = sync_channel(CHANNEL_CAP);
         // 파이프가 닫히면(워커 종료·kill) 읽기가 끝나 스레드도 끝난다
-        std::thread::Builder::new().name("mam-plugin-reader".into()).spawn(move || pump_lines(stdout, max_line, &tx))?;
-        Ok(Self { child, _job: job, stdin, rx, handlers: Handlers::default() })
+        std::thread::Builder::new()
+            .name("mam-plugin-reader".into())
+            .spawn(move || pump_lines(stdout, max_line, &tx))?;
+        Ok(Self {
+            child,
+            _job: job,
+            stdin,
+            rx,
+            handlers: Handlers::default(),
+        })
     }
 
     pub fn pid(&self) -> u32 {
@@ -127,9 +143,19 @@ mod tests {
         // Act
         let dump = run_hardened(&["/D", "/C", "set"]);
         // Assert
-        let mut names: Vec<String> = dump.lines().filter_map(|l| l.split_once('=').map(|(k, _)| k.to_ascii_uppercase())).collect();
+        let mut names: Vec<String> = dump
+            .lines()
+            .filter_map(|l| l.split_once('=').map(|(k, _)| k.to_ascii_uppercase()))
+            .collect();
         names.sort();
-        assert!(names.iter().all(|n| ["SYSTEMROOT", "TEMP", "TMP", "PROMPT", "PATHEXT", "COMSPEC"].contains(&n.as_str()) || n.starts_with('=')), "unexpected env: {names:?}");
+        assert!(
+            names.iter().all(
+                |n| ["SYSTEMROOT", "TEMP", "TMP", "PROMPT", "PATHEXT", "COMSPEC"]
+                    .contains(&n.as_str())
+                    || n.starts_with('=')
+            ),
+            "unexpected env: {names:?}"
+        );
         assert!(!names.iter().any(|n| ["USERPROFILE", "PATH", "APPDATA", "OPENAI_API_KEY"].contains(&n.as_str())), "leaked: {names:?}");
         assert!(names.contains(&"SYSTEMROOT".to_owned()));
     }
@@ -139,8 +165,25 @@ mod tests {
     fn t_phost_env_02_cwd_is_the_empty_sandbox_dir_not_the_app_cwd() {
         let dump = run_hardened(&["/D", "/C", "cd"]);
         let want = sandbox_dir().expect("dir");
-        assert_eq!(std::path::Path::new(dump.trim()).canonicalize().expect("cwd"), want.canonicalize().expect("want"));
-        assert_ne!(std::path::Path::new(dump.trim()).canonicalize().expect("cwd"), std::env::current_dir().expect("app cwd").canonicalize().expect("c"));
-        assert_eq!(std::fs::read_dir(&want).expect("read").count(), 0, "sandbox dir must stay empty");
+        assert_eq!(
+            std::path::Path::new(dump.trim())
+                .canonicalize()
+                .expect("cwd"),
+            want.canonicalize().expect("want")
+        );
+        assert_ne!(
+            std::path::Path::new(dump.trim())
+                .canonicalize()
+                .expect("cwd"),
+            std::env::current_dir()
+                .expect("app cwd")
+                .canonicalize()
+                .expect("c")
+        );
+        assert_eq!(
+            std::fs::read_dir(&want).expect("read").count(),
+            0,
+            "sandbox dir must stay empty"
+        );
     }
 }

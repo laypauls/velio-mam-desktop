@@ -74,7 +74,8 @@ fn option_ids(c: &Connection, field_id: i64, vt: ValueType) -> Result<HashSet<i6
     if !vt.has_options() {
         return Ok(HashSet::new());
     }
-    let mut stmt = c.prepare_cached("SELECT option_id FROM metadata_field_options WHERE field_id = ?1 AND deleting_at IS NULL",
+    let mut stmt = c.prepare_cached(
+        "SELECT option_id FROM metadata_field_options WHERE field_id = ?1 AND deleting_at IS NULL",
     )?;
     let rows = stmt.query_map([field_id], |r| r.get::<_, i64>(0))?;
     Ok(rows.collect::<Result<_, _>>()?)
@@ -98,7 +99,12 @@ fn apply_field(
         let rows = stmt.query_map(params![field_id, json_ids(ids)], |r| {
             Ok((
                 r.get::<_, i64>(0)?,
-                Row { ord: r.get(1)?, text: r.get(2)?, int: r.get(3)?, real: r.get(4)? },
+                Row {
+                    ord: r.get(1)?,
+                    text: r.get(2)?,
+                    int: r.get(3)?,
+                    real: r.get(4)?,
+                },
             ))
         })?;
         for row in rows {
@@ -120,7 +126,9 @@ fn apply_field(
         }
         delete.execute(params![field_id, asset_id])?;
         for r in target {
-            insert.execute(params![asset_id, field_id, r.ord, r.text, r.int, r.real, now])?;
+            insert.execute(params![
+                asset_id, field_id, r.ord, r.text, r.int, r.real, now
+            ])?;
         }
         changed.insert(asset_id);
     }
@@ -129,7 +137,10 @@ fn apply_field(
 
 /// 자산 하나의 값을 타입과 함께 읽는다 (필드 표시 순서, 값 없는 필드 제외). 검색 색인 문서 구성에도 쓴다.
 /// 저장된 값이 타입과 맞지 않으면(손상) `invalid_input`.
-pub fn load_asset_values(c: &Connection, asset_id: i64) -> Result<Vec<AssetFieldValue>, IngestError> {
+pub fn load_asset_values(
+    c: &Connection,
+    asset_id: i64,
+) -> Result<Vec<AssetFieldValue>, IngestError> {
     let mut stmt = c.prepare_cached(
         "SELECT v.field_id, f.value_type, v.ord, v.value_text, v.value_int, v.value_real
          FROM asset_metadata_values v JOIN metadata_fields f ON f.field_id = v.field_id
@@ -150,7 +161,8 @@ pub fn load_asset_values(c: &Connection, asset_id: i64) -> Result<Vec<AssetField
     let mut out: Vec<AssetFieldValue> = Vec::new();
     for row in rows {
         let (field_id, vt, text, int, real) = row?;
-        let value_type = ValueType::parse(&vt).ok_or(IngestError::InvalidInput("stored value type"))?;
+        let value_type =
+            ValueType::parse(&vt).ok_or(IngestError::InvalidInput("stored value type"))?;
         let value = match value_type {
             ValueType::Keyword => FieldValue::Keyword(text.ok_or_else(corrupt)?),
             ValueType::Number => FieldValue::Number(real.ok_or_else(corrupt)?),
@@ -168,7 +180,11 @@ pub fn load_asset_values(c: &Connection, asset_id: i64) -> Result<Vec<AssetField
                 FieldValue::MultiEnum(vec![id])
             }
         };
-        out.push(AssetFieldValue { field_id, value_type, value });
+        out.push(AssetFieldValue {
+            field_id,
+            value_type,
+            value,
+        });
     }
     Ok(out)
 }

@@ -24,7 +24,10 @@ where
 
 /// 자산의 마지막 재생 위치 (없으면 `null`).
 #[tauri::command]
-pub async fn resume_get(svc: Shared<'_>, asset_id: i64) -> Result<Option<ResumePosition>, CommandError> {
+pub async fn resume_get(
+    svc: Shared<'_>,
+    asset_id: i64,
+) -> Result<Option<ResumePosition>, CommandError> {
     blocking(&svc, move |u| u.resume_get(asset_id)).await
 }
 
@@ -36,18 +39,27 @@ pub async fn resume_save(
     position_ms: i64,
     duration_ms: Option<i64>,
 ) -> Result<ResumeSaveOutcome, CommandError> {
-    blocking(&svc, move |u| u.resume_save(asset_id, position_ms, duration_ms)).await
+    blocking(&svc, move |u| {
+        u.resume_save(asset_id, position_ms, duration_ms)
+    })
+    .await
 }
 
 /// 선택한 자산 중 기록이 있는 수.
 #[tauri::command]
-pub async fn resume_count_assets(svc: Shared<'_>, asset_ids: Vec<i64>) -> Result<i64, CommandError> {
+pub async fn resume_count_assets(
+    svc: Shared<'_>,
+    asset_ids: Vec<i64>,
+) -> Result<i64, CommandError> {
     blocking(&svc, move |u| u.resume_count_assets(&asset_ids)).await
 }
 
 /// 선택한 자산의 기록 삭제 — 삭제 건수.
 #[tauri::command]
-pub async fn resume_clear_assets(svc: Shared<'_>, asset_ids: Vec<i64>) -> Result<i64, CommandError> {
+pub async fn resume_clear_assets(
+    svc: Shared<'_>,
+    asset_ids: Vec<i64>,
+) -> Result<i64, CommandError> {
     blocking(&svc, move |u| u.resume_clear_assets(&asset_ids)).await
 }
 
@@ -65,8 +77,15 @@ pub async fn resume_clear_all(svc: Shared<'_>) -> Result<i64, CommandError> {
 
 /// 관리 폴더별 이어보기 사용 여부 설정 (기록은 유지). 없는·등록 해제 중인 폴더는 `not_found`.
 #[tauri::command]
-pub async fn resume_set_folder_enabled(svc: Shared<'_>, folder_id: i64, enabled: bool) -> Result<(), CommandError> {
-    blocking(&svc, move |u| u.resume_set_folder_enabled(folder_id, enabled)).await
+pub async fn resume_set_folder_enabled(
+    svc: Shared<'_>,
+    folder_id: i64,
+    enabled: bool,
+) -> Result<(), CommandError> {
+    blocking(&svc, move |u| {
+        u.resume_set_folder_enabled(folder_id, enabled)
+    })
+    .await
 }
 
 /// 관리 폴더별 기록 수(0건 포함) + 전체 행 수.

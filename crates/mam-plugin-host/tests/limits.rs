@@ -12,16 +12,28 @@ fn t_phost_lim_01_timeout_kills_worker_and_next_call_restarts() {
     // Arrange: CPU 한도를 끄고(0) 호스트 타임아웃만으로 끊는다
     let (host, _, _) = new_host(PLUGIN, |c| c.limits.cpu_ms = 0);
     ok_echo(&host);
-    let HostState::Running { pid: old } = host.state() else { panic!("worker should be running") };
+    let HostState::Running { pid: old } = host.state() else {
+        panic!("worker should be running")
+    };
     // Act
     let t = Instant::now();
-    let e = host.invoke_with_timeout(mam_plugin_host::InvokeKind::Command, "spin", json!(null), mam_plugin_host::InvokeScope::empty(), Duration::from_millis(500)).unwrap_err();
+    let e = host
+        .invoke_with_timeout(
+            mam_plugin_host::InvokeKind::Command,
+            "spin",
+            json!(null),
+            mam_plugin_host::InvokeScope::empty(),
+            Duration::from_millis(500),
+        )
+        .unwrap_err();
     // Assert: 타임아웃 후 종료, 다음 호출은 새 워커(다른 PID)로 성공
     assert_eq!(e, InvokeError::Timeout);
     assert!(t.elapsed() < Duration::from_secs(5), "{:?}", t.elapsed());
     assert_eq!(host.state(), HostState::Idle);
     ok_echo(&host);
-    let HostState::Running { pid: new } = host.state() else { panic!("restarted") };
+    let HostState::Running { pid: new } = host.state() else {
+        panic!("restarted")
+    };
     assert_ne!(old, new);
     assert_eq!(host.starts(), 2);
 }
@@ -34,7 +46,10 @@ fn t_phost_lim_02_cpu_interrupt_stops_infinite_loop_before_the_call_timeout() {
     let t = Instant::now();
     let e = run(&host, "spin", json!(null)).unwrap_err();
     // Assert: 워커 자신이 interrupt 로 멈추고 `Limit` 로 보고 — 호스트 타임아웃(10 s)보다 훨씬 빠르다
-    assert!(matches!(&e, InvokeError::Limit(m) if m.contains("cpu")), "{e:?}");
+    assert!(
+        matches!(&e, InvokeError::Limit(m) if m.contains("cpu")),
+        "{e:?}"
+    );
     assert!(t.elapsed() < Duration::from_secs(5), "{:?}", t.elapsed());
     ok_echo(&host);
     assert_eq!(host.starts(), 2, "한도 위반 워커는 버리고 새로 시작");
@@ -45,9 +60,22 @@ fn t_phost_lim_03_cpu_limit_excludes_time_blocked_in_host_calls() {
     // Arrange: 3 라운드 x (호스트 대기 400 ms + JS 100 ms) = 벽시계 1.5 s, CPU 0.3 s. 한도 500 ms
     let (host, _, _) = new_host(PLUGIN, |c| c.limits.cpu_ms = 500);
     // Act / Assert: 대기 시간이 CPU 로 세어지지 않으므로 성공
-    assert_eq!(run(&host, "busy_with_calls", json!({"rounds": 3, "sleepMs": 400, "busyMs": 100})).unwrap(), json!("done"));
+    assert_eq!(
+        run(
+            &host,
+            "busy_with_calls",
+            json!({"rounds": 3, "sleepMs": 400, "busyMs": 100})
+        )
+        .unwrap(),
+        json!("done")
+    );
     // 같은 형태에서 JS 구간 합이 한도를 넘으면(8 x 100 ms > 500 ms) 중단된다 — 호스트 호출 사이에도 interrupt 가 동작
-    let e = run(&host, "busy_with_calls", json!({"rounds": 8, "sleepMs": 1, "busyMs": 100})).unwrap_err();
+    let e = run(
+        &host,
+        "busy_with_calls",
+        json!({"rounds": 8, "sleepMs": 1, "busyMs": 100}),
+    )
+    .unwrap_err();
     assert!(matches!(e, InvokeError::Limit(_)), "{e:?}");
 }
 
@@ -58,7 +86,10 @@ fn t_phost_lim_04_memory_bomb_is_a_limit_error_host_survives() {
     // Act
     let e = run(&host, "bomb", json!(null)).unwrap_err();
     // Assert
-    assert!(matches!(&e, InvokeError::Limit(m) if m.contains("memory")), "{e:?}");
+    assert!(
+        matches!(&e, InvokeError::Limit(m) if m.contains("memory")),
+        "{e:?}"
+    );
     ok_echo(&host);
     assert_eq!(host.starts(), 2);
 }
@@ -86,7 +117,10 @@ fn t_phost_lim_06_infinite_host_call_loop_is_stopped_by_message_cap_or_timeout()
         c.limits.cpu_ms = 120_000;
     });
     let e = run(&host, "loop", json!(null)).unwrap_err();
-    assert!(matches!(e, InvokeError::Flood | InvokeError::Timeout), "{e:?}");
+    assert!(
+        matches!(e, InvokeError::Flood | InvokeError::Timeout),
+        "{e:?}"
+    );
 }
 
 // 분류: Boundary(줄 상한) / Validation(too_large)
@@ -114,7 +148,10 @@ fn t_phost_lim_13_oversize_result_is_too_large_and_worker_survives() {
     // Act
     let e = run(&host, "bigresult", json!(null)).unwrap_err();
     // Assert
-    assert!(matches!(&e, InvokeError::Plugin { code, .. } if code == "too_large"), "{e:?}");
+    assert!(
+        matches!(&e, InvokeError::Plugin { code, .. } if code == "too_large"),
+        "{e:?}"
+    );
     ok_echo(&host);
     assert_eq!(host.starts(), 1);
 }
@@ -129,7 +166,10 @@ fn t_phost_lim_14_process_memory_cap_stops_runaway_worker_without_hanging() {
     let t = Instant::now();
     let e = run(&host, "bomb", json!(null)).unwrap_err();
     // Assert: 걸리지 않고 한도/크래시로 보고되며 호스트는 산다
-    assert!(matches!(e, InvokeError::Limit(_) | InvokeError::Crashed), "{e:?}");
+    assert!(
+        matches!(e, InvokeError::Limit(_) | InvokeError::Crashed),
+        "{e:?}"
+    );
     assert!(t.elapsed() < Duration::from_secs(20), "{:?}", t.elapsed());
     ok_echo(&host);
 }

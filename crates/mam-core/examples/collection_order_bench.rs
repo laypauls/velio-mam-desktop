@@ -88,14 +88,22 @@ fn doc(id: u64) -> AssetDoc {
     AssetDoc {
         asset_id: id,
         revision: 1,
-        file_name: format!("{}_{id}.{}", WORDS[(id % 8) as usize], if video { "mp4" } else { "jpg" }),
+        file_name: format!(
+            "{}_{id}.{}",
+            WORDS[(id % 8) as usize],
+            if video { "mp4" } else { "jpg" }
+        ),
         user_tags: vec![],
         ai_keywords: vec![],
         ai_description: String::new(),
         user_memo: String::new(),
         title: String::new(),
         transcript: String::new(),
-        media_type: if video { MediaType::Video } else { MediaType::Image },
+        media_type: if video {
+            MediaType::Video
+        } else {
+            MediaType::Image
+        },
         volume_id: 1,
         presence: Presence::Present,
         captured_at: Some(1_600_000_000 + (id as i64 * 977) % 100_000_000),
@@ -151,7 +159,11 @@ fn generate(dir: &Path, n: u64) {
     )
     .unwrap();
     // 컬렉션: 위치는 id 와 무관한 순열의 순위 × 2^20 (V12 직후와 같은 간격), 3번은 1% NULL
-    for (cid, pred) in [(1, "asset_id % 100 = 0"), (2, "asset_id % 10 = 3"), (3, "asset_id % 10 = 7")] {
+    for (cid, pred) in [
+        (1, "asset_id % 100 = 0"),
+        (2, "asset_id % 10 = 3"),
+        (3, "asset_id % 10 = 7"),
+    ] {
         tx.execute(
             "INSERT INTO collections (collection_id, name, name_key, created_at) VALUES (?1, ?2, ?2, 0)",
             rusqlite::params![cid, format!("c{cid}")],
@@ -173,7 +185,8 @@ fn generate(dir: &Path, n: u64) {
     println!("sqlite: {:.1}s", t.elapsed().as_secs_f64());
 
     let t = Instant::now();
-    let idx = SearchIndex::open_or_create(&dir.join("tantivy"), IndexOptions::strategy_b()).unwrap();
+    let idx =
+        SearchIndex::open_or_create(&dir.join("tantivy"), IndexOptions::strategy_b()).unwrap();
     for id in 1..=n {
         idx.upsert(&doc(id)).unwrap();
         if id % 200_000 == 0 {
@@ -213,7 +226,9 @@ fn page(
     tweak: impl Fn(&mut CoordRequest),
 ) -> (f64, f64, f64, f64, usize) {
     let t0 = Instant::now();
-    let order = Arc::new(CollectionOrder::from_rows(qs.collection_order_rows(cid).unwrap()));
+    let order = Arc::new(CollectionOrder::from_rows(
+        qs.collection_order_rows(cid).unwrap(),
+    ));
     let t1 = Instant::now();
     let mut r = req(cid as u64, &order, 100);
     tweak(&mut r);
@@ -223,7 +238,13 @@ fn page(
     let items = hydrate_page(conn, &ids).unwrap();
     let t3 = Instant::now();
     assert_eq!(items.len(), ids.len(), "hydrate dropped rows");
-    (ms(t3 - t0), ms(t1 - t0), ms(t2 - t1), ms(t3 - t2), ids.len())
+    (
+        ms(t3 - t0),
+        ms(t1 - t0),
+        ms(t2 - t1),
+        ms(t3 - t2),
+        ids.len(),
+    )
 }
 
 fn run(dir: &Path, n: u64, iters: usize) {
@@ -234,14 +255,21 @@ fn run(dir: &Path, n: u64, iters: usize) {
     let qs = QueryService::new(Arc::clone(&pool), Arc::clone(&clock));
     let ud = UserData::new(Arc::clone(&pool), Arc::clone(&clock));
     let t = Instant::now();
-    let idx = SearchIndex::open_or_create(&dir.join("tantivy"), IndexOptions::strategy_b()).unwrap();
+    let idx =
+        SearchIndex::open_or_create(&dir.join("tantivy"), IndexOptions::strategy_b()).unwrap();
     let h = SearchHandle::for_index(&idx);
-    println!("open index: {:.1}s ({n} assets)\n", t.elapsed().as_secs_f64());
+    println!(
+        "open index: {:.1}s ({n} assets)\n",
+        t.elapsed().as_secs_f64()
+    );
     println!("| op | runs | first (ms) | P50 / P95 / P99 (ms) | budget P95 |");
     println!("|---|---|---|---|---|");
 
     // 1) 첫 페이지
-    for (cid, budget, name) in [(1, "<= 150", "first page, 10k collection"), (2, "<= 300", "first page, 100k collection")] {
+    for (cid, budget, name) in [
+        (1, "<= 150", "first page, 10k collection"),
+        (2, "<= 300", "first page, 100k collection"),
+    ] {
         let first = page(&qs, &conn, &h, cid, |_| {}).0;
         let mut total = Vec::new();
         let (mut map, mut srch, mut hyd) = (Vec::new(), Vec::new(), Vec::new());
@@ -260,18 +288,32 @@ fn run(dir: &Path, n: u64, iters: usize) {
     // 2) seek total/2, 3) 텍스트 질의 (100k)
     let ids_of = |cid: i64| -> Vec<i64> {
         let mut s = conn
-            .prepare("SELECT asset_id FROM collection_assets WHERE collection_id = ?1 ORDER BY asset_id")
+            .prepare(
+                "SELECT asset_id FROM collection_assets WHERE collection_id = ?1 ORDER BY asset_id",
+            )
             .unwrap();
-        s.query_map([cid], |r| r.get(0)).unwrap().map(Result::unwrap).collect()
+        s.query_map([cid], |r| r.get(0))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
     };
     let members = ids_of(2);
     let half = members.len() / 2;
     let seek = |r: &mut CoordRequest| r.at = Some(half);
     let first = page(&qs, &conn, &h, 2, seek).0;
-    row("seek at=total/2, 100k", "<= 400", first, (0..iters).map(|_| page(&qs, &conn, &h, 2, seek).0).collect());
+    row(
+        "seek at=total/2, 100k",
+        "<= 400",
+        first,
+        (0..iters)
+            .map(|_| page(&qs, &conn, &h, 2, seek).0)
+            .collect(),
+    );
     let q = |r: &mut CoordRequest| r.text = "harbor".into();
     let matched = {
-        let order = Arc::new(CollectionOrder::from_rows(qs.collection_order_rows(2).unwrap()));
+        let order = Arc::new(CollectionOrder::from_rows(
+            qs.collection_order_rows(2).unwrap(),
+        ));
         let mut r = req(2, &order, 100);
         q(&mut r);
         h.search(&r).unwrap().total
@@ -319,17 +361,24 @@ fn run(dir: &Path, n: u64, iters: usize) {
         assert_eq!(qv.len(), members.len());
     }
     row("play_queue, 100k (SQLite only)", "<= 500", first, v);
-    row(&format!("  - JSON serialize ({:.1} MB)", bytes as f64 / 1e6), "<= 15 MB", 0.0, ser);
+    row(
+        &format!("  - JSON serialize ({:.1} MB)", bytes as f64 / 1e6),
+        "<= 15 MB",
+        0.0,
+        ser,
+    );
 
     // 5b) 진단: 같은 SQL 을 큰 페이지 캐시 연결(256 MB)로, 그리고 조인 없이 id 만 — 비용이 조인(무작위 조회)인지 확인
     {
         let big = open(&db).unwrap();
         big.pragma_update(None, "cache_size", -262_144).unwrap();
         let mm = open(&db).unwrap();
-        mm.query_row("PRAGMA mmap_size = 2147483648", [], |r| r.get::<_, i64>(0)).unwrap();
+        mm.query_row("PRAGMA mmap_size = 2147483648", [], |r| r.get::<_, i64>(0))
+            .unwrap();
         let both = open(&db).unwrap();
         both.pragma_update(None, "cache_size", -262_144).unwrap();
-        both.query_row("PRAGMA mmap_size = 2147483648", [], |r| r.get::<_, i64>(0)).unwrap();
+        both.query_row("PRAGMA mmap_size = 2147483648", [], |r| r.get::<_, i64>(0))
+            .unwrap();
         let run_sql = |c: &rusqlite::Connection, sql: &str| -> f64 {
             let t = Instant::now();
             let mut s = c.prepare(sql).unwrap();
@@ -340,9 +389,21 @@ fn run(dir: &Path, n: u64, iters: usize) {
         let ids_only = "SELECT x.asset_id FROM collection_assets x WHERE x.collection_id = ?1
                         ORDER BY x.position IS NULL, x.position, x.added_at, x.asset_id";
         for (name, c, sql) in [
-            ("  - diag: play_queue SQL, cache 256 MB", &big, mam_core::userdata::PLAY_QUEUE_SQL),
-            ("  - diag: play_queue SQL, mmap 2 GB only", &mm, mam_core::userdata::PLAY_QUEUE_SQL),
-            ("  - diag: play_queue SQL, cache 256 MB + mmap", &both, mam_core::userdata::PLAY_QUEUE_SQL),
+            (
+                "  - diag: play_queue SQL, cache 256 MB",
+                &big,
+                mam_core::userdata::PLAY_QUEUE_SQL,
+            ),
+            (
+                "  - diag: play_queue SQL, mmap 2 GB only",
+                &mm,
+                mam_core::userdata::PLAY_QUEUE_SQL,
+            ),
+            (
+                "  - diag: play_queue SQL, cache 256 MB + mmap",
+                &both,
+                mam_core::userdata::PLAY_QUEUE_SQL,
+            ),
             ("  - diag: ids only (no joins)", &conn, ids_only),
         ] {
             run_sql(c, sql);
@@ -360,12 +421,19 @@ fn run(dir: &Path, n: u64, iters: usize) {
             [members[salt]],
         )
         .unwrap();
-        ud.reorder_collection(2, &[members[salt + 1]], ReorderTarget::End).unwrap();
+        ud.reorder_collection(2, &[members[salt + 1]], ReorderTarget::End)
+            .unwrap();
     };
     for (k, budget, runs, label, reset) in [
         (1usize, "<= 30", iters, "gap path", 1u8),
         (100, "<= 50", iters, "gap path", 1),
-        (10_000, "<= 300", 30, "gap path, gaps reset before each run", 2),
+        (
+            10_000,
+            "<= 300",
+            30,
+            "gap path, gaps reset before each run",
+            2,
+        ),
         (10_000, "(fallback mix)", 30, "fragmented gaps", 0),
     ] {
         if reset == 1 {
@@ -377,13 +445,16 @@ fn run(dir: &Path, n: u64, iters: usize) {
                 fresh(k % 1000);
             }
             let start = (rng.next() as usize) % (members.len() - k);
-            let moved: Vec<i64> = (0..k).map(|j| members[(start + j * 7) % members.len()]).collect();
+            let moved: Vec<i64> = (0..k)
+                .map(|j| members[(start + j * 7) % members.len()])
+                .collect();
             let mut anchor = members[(rng.next() as usize) % members.len()];
             while moved.contains(&anchor) {
                 anchor = members[(rng.next() as usize) % members.len()];
             }
             let t = Instant::now();
-            ud.reorder_collection(2, &moved, ReorderTarget::Before { asset_id: anchor }).unwrap();
+            ud.reorder_collection(2, &moved, ReorderTarget::Before { asset_id: anchor })
+                .unwrap();
             let d = ms(t.elapsed());
             if r > 0 || runs == 30 {
                 v.push(d);
@@ -400,17 +471,29 @@ fn run(dir: &Path, n: u64, iters: usize) {
         )
         .unwrap();
         let t = Instant::now();
-        ud.reorder_collection(2, &[members[i * 5 + 1]], ReorderTarget::End).unwrap();
+        ud.reorder_collection(2, &[members[i * 5 + 1]], ReorderTarget::End)
+            .unwrap();
         v.push(ms(t.elapsed()));
     }
-    row("forced rebalance (normalize NULL) + move, 100k", "<= 1500", 0.0, v);
+    row(
+        "forced rebalance (normalize NULL) + move, 100k",
+        "<= 1500",
+        0.0,
+        v,
+    );
 
     // 8) 위치 NULL 1% 컬렉션 (3) 첫 페이지 — NULL 등급 포함
     let first = page(&qs, &conn, &h, 3, |_| {}).0;
-    let v = (0..iters).map(|_| page(&qs, &conn, &h, 3, |_| {}).0).collect();
-    row("first page, 100k with 1% NULL positions", "<= 300", first, v);
+    let v = (0..iters)
+        .map(|_| page(&qs, &conn, &h, 3, |_| {}).0)
+        .collect();
+    row(
+        "first page, 100k with 1% NULL positions",
+        "<= 300",
+        first,
+        v,
+    );
 }
-
 
 /// 실제 100만 건 DB 에서의 쿼리 계획 (EXPLAIN QUERY PLAN)
 fn plans(dir: &Path) {
@@ -425,7 +508,11 @@ fn plans(dir: &Path) {
         println!("{name}:\n  {}", lines.join("\n  "));
     };
     show("play_queue", mam_core::userdata::PLAY_QUEUE_SQL, &[&2i64]);
-    show("membership", mam_core::userdata::MEMBERSHIP_SQL, &[&"[100,200]"]);
+    show(
+        "membership",
+        mam_core::userdata::MEMBERSHIP_SQL,
+        &[&"[100,200]"],
+    );
     show(
         "neighbour (before)",
         "SELECT max(position) FROM collection_assets WHERE collection_id = 2 AND position < 5000000000
@@ -457,7 +544,9 @@ fn plans(dir: &Path) {
 
 fn main() {
     let dir = PathBuf::from(arg("dir").expect("--dir"));
-    let n: u64 = arg("assets").and_then(|v| v.parse().ok()).unwrap_or(1_000_000);
+    let n: u64 = arg("assets")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1_000_000);
     let iters: usize = arg("iters").and_then(|v| v.parse().ok()).unwrap_or(200);
     match arg("phase").as_deref() {
         Some("gen") => generate(&dir, n),

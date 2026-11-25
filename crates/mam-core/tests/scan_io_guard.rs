@@ -60,10 +60,19 @@ impl StuckShare {
 impl FileIdentityProvider for StuckShare {
     fn stat(&self, path: &Path) -> Result<FileMeta, CoreError> {
         let p = path.to_string_lossy().into_owned();
-        if self.blocked.lock().unwrap().iter().any(|n| p.contains(n.as_str())) {
+        if self
+            .blocked
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|n| p.contains(n.as_str()))
+        {
             self.entered.fetch_add(1, Ordering::SeqCst);
             let g = self.open.lock().unwrap();
-            let _ = self.cv.wait_timeout_while(g, SAFETY, |open| !*open).unwrap();
+            let _ = self
+                .cv
+                .wait_timeout_while(g, SAFETY, |open| !*open)
+                .unwrap();
         }
         self.inner.stat(path)
     }
@@ -86,10 +95,18 @@ fn nas_folder(env: &Env, files: &[&str]) -> (i64, PathBuf) {
     let root = env.vol.parent().unwrap().join("nas");
     fs::create_dir_all(root.join("lib")).unwrap();
     for (i, f) in files.iter().enumerate() {
-        fs::write(root.join("lib").join(f), vec![u8::try_from(i).unwrap() + 1; 64]).unwrap();
+        fs::write(
+            root.join("lib").join(f),
+            vec![u8::try_from(i).unwrap() + 1; 64],
+        )
+        .unwrap();
     }
     env.volumes.add("nas", VolumeKind::Network, &root);
-    let id = env.ingest.add_folder(root.join("lib").to_str().unwrap()).unwrap().folder_id;
+    let id = env
+        .ingest
+        .add_folder(root.join("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id;
     (id, root)
 }
 
@@ -130,12 +147,22 @@ fn t_ioguard_09_a_file_that_times_out_is_skipped_recorded_and_never_marked_missi
     let outcome = scan(&env, id);
 
     // Assert: 스캔은 끝났고, b.jpg 는 missing 이 아니며 "응답 없음" 으로 기록됐다
-    assert!(matches!(outcome, ScanOutcome::Completed { .. }), "{outcome:?}");
+    assert!(
+        matches!(outcome, ScanOutcome::Completed { .. }),
+        "{outcome:?}"
+    );
     assert_eq!(presence(&env, "b.jpg"), "present");
     assert_eq!(presence(&env, "a.jpg"), "present");
     assert_eq!(unresolved_unresponsive(&env, "b.jpg"), 1);
-    assert_eq!(env.count("SELECT COUNT(*) FROM file_locations WHERE presence = 'missing'"), 0);
-    assert_eq!(env.count("SELECT SUM(revision) FROM media_assets"), revision, "no asset was changed");
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM file_locations WHERE presence = 'missing'"),
+        0
+    );
+    assert_eq!(
+        env.count("SELECT SUM(revision) FROM media_assets"),
+        revision,
+        "no asset was changed"
+    );
 
     // Act 2: 응답이 돌아온 뒤 다시 스캔 — 오류가 해결되고 자산은 그대로
     share.release();
@@ -163,11 +190,17 @@ fn t_ioguard_10_rescanning_while_a_file_is_still_hung_does_not_start_another_che
     }
 
     // Assert: 막힌 호출은 한 번만 들어갔고 스레드는 하나뿐이다
-    assert!(wait_until(Duration::from_secs(5), || share.entered.load(Ordering::SeqCst) >= 1));
+    assert!(wait_until(Duration::from_secs(5), || share
+        .entered
+        .load(Ordering::SeqCst)
+        >= 1));
     assert_eq!(share.entered.load(Ordering::SeqCst), 1);
     assert_eq!(presence(&env, "b.jpg"), "present");
     share.release();
-    assert!(wait_until(Duration::from_secs(5), || env.ingest.unresponsive_volumes().is_empty()));
+    assert!(wait_until(Duration::from_secs(5), || env
+        .ingest
+        .unresponsive_volumes()
+        .is_empty()));
 }
 
 #[test]
@@ -188,17 +221,32 @@ fn t_ioguard_11_an_unresponsive_volume_stops_the_scan_without_missing_and_the_ne
 
     // Assert: 응답 없는 볼륨에서 멈췄고 끝난 것으로 치지 않으므로 아무것도 missing 이 아니다
     assert_eq!(outcome, ScanOutcome::Unresponsive);
-    assert_eq!(env.count("SELECT COUNT(*) FROM file_locations WHERE presence = 'missing'"), 0);
-    assert_eq!(env.count("SELECT COUNT(*) FROM scan_runs WHERE status = 'paused'"), 1);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM file_locations WHERE presence = 'missing'"),
+        0
+    );
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM scan_runs WHERE status = 'paused'"),
+        1
+    );
     assert_eq!(env.ingest.unresponsive_volumes().len(), 1);
 
     // Act 2: 응답이 돌아오면 같은 실행을 이어서 끝낸다
     share.release();
-    assert!(wait_until(Duration::from_secs(5), || env.ingest.unresponsive_volumes().is_empty()));
+    assert!(wait_until(Duration::from_secs(5), || env
+        .ingest
+        .unresponsive_volumes()
+        .is_empty()));
     env.clock.advance(5_000);
     assert!(matches!(scan(&env, id), ScanOutcome::Completed { .. }));
-    assert_eq!(env.count("SELECT COUNT(*) FROM scan_runs WHERE status = 'paused'"), 0);
-    assert_eq!(env.count("SELECT COUNT(*) FROM file_locations WHERE presence = 'missing'"), 0);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM scan_runs WHERE status = 'paused'"),
+        0
+    );
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM file_locations WHERE presence = 'missing'"),
+        0
+    );
     assert_eq!(snapshot(&root), before);
 }
 
@@ -208,7 +256,11 @@ fn t_ioguard_12_a_fixed_volume_scans_inline_without_guard_threads_or_timeouts() 
     let share = StuckShare::new();
     let env = env_with(&share, SAFETY_MS, 1);
     env.write("lib/a.jpg", 1);
-    let id = env.ingest.add_folder(env.path("lib").to_str().unwrap()).unwrap().folder_id;
+    let id = env
+        .ingest
+        .add_folder(env.path("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id;
 
     // Act
     let outcome = scan(&env, id);
@@ -228,17 +280,31 @@ fn t_lane_08_a_blocked_volume_does_not_stop_another_volumes_scan() {
     share.block("hung.jpg");
     let (nas, _) = nas_folder(&env, &["hung.jpg"]);
     env.write("lib/a.jpg", 1);
-    let local = env.ingest.add_folder(env.path("lib").to_str().unwrap()).unwrap().folder_id;
+    let local = env
+        .ingest
+        .add_folder(env.path("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id;
     env.ingest.start().unwrap();
 
     // Act / Assert: nas 스캔이 막혀 있는 동안 로컬 스캔은 끝난다
     let local_done = wait_until(Duration::from_secs(20), || {
         env.count(&format!("SELECT COUNT(*) FROM managed_folders WHERE folder_id = {local} AND last_full_scan_at IS NOT NULL")) == 1
     });
-    assert!(local_done, "local scan completes while the nas scan is blocked");
-    assert_eq!(env.count("SELECT COUNT(*) FROM file_locations WHERE rel_path LIKE '%a.jpg'"), 1);
     assert!(
-        wait_until(Duration::from_secs(5), || env.ingest.jobs().running_count(mam_core::jobs::JobKind::Scan) == 1),
+        local_done,
+        "local scan completes while the nas scan is blocked"
+    );
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM file_locations WHERE rel_path LIKE '%a.jpg'"),
+        1
+    );
+    assert!(
+        wait_until(Duration::from_secs(5), || env
+            .ingest
+            .jobs()
+            .running_count(mam_core::jobs::JobKind::Scan)
+            == 1),
         "only the nas scan is still running"
     );
     assert_eq!(
@@ -282,24 +348,40 @@ fn t_ioguard_13_hidden_ancestor_check_of_a_watch_event_goes_through_the_guard() 
     // Act / Assert 1: 정상 응답 — 숨김+시스템 폴더 아래는 무시, 일반 파일은 반영 (가드를 거쳐도 결과가 같다)
     let apply = |p: PathBuf| mam_core::scan::apply_path(env.ingest.env(), id, &p).unwrap();
     assert_eq!(apply(hs.join("x.jpg")), mam_core::scan::PathAction::Ignored);
-    assert_eq!(apply(root.join("lib").join("c.jpg")), mam_core::scan::PathAction::Reconciled);
+    assert_eq!(
+        apply(root.join("lib").join("c.jpg")),
+        mam_core::scan::PathAction::Reconciled
+    );
 
     // Act 2: 이 볼륨의 검사 스레드 자리(상한 1)가 막힌 호출 하나로 차 있다 -> 조상 속성 조회도 새 스레드를 걸지 않고 "응답 없음"
-    let volume_id: i64 = env.read(|c| c.query_row("SELECT volume_id FROM managed_folders", [], |r| r.get(0)).unwrap());
+    let volume_id: i64 = env.read(|c| {
+        c.query_row("SELECT volume_id FROM managed_folders", [], |r| r.get(0))
+            .unwrap()
+    });
     // 자리를 잡은 호출은 시계가 아니라 채널로 푼다 (부하로 느려져도 점유가 먼저 끝나지 않게 — 결정적)
     // 점유 호출만 짧은 제한 시간으로 건다 — 채널이 풀리기 전에는 돌아오지 않으므로 시간 초과는 결정적이고, 스레드는 계속 산다
     let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
-    let held = env.ingest.env().io.guarded("occupy", volume_id, Duration::from_millis(50), move || {
-        let _ = release_rx.recv_timeout(SAFETY);
-    });
+    let held =
+        env.ingest
+            .env()
+            .io
+            .guarded("occupy", volume_id, Duration::from_millis(50), move || {
+                let _ = release_rx.recv_timeout(SAFETY);
+            });
     assert!(matches!(held, mam_core::scan::Guarded::TimedOut));
-    assert!(env.ingest.env().io.is_unresponsive(volume_id), "the only slot is held");
+    assert!(
+        env.ingest.env().io.is_unresponsive(volume_id),
+        "the only slot is held"
+    );
     let act = apply(root.join("lib").join("c.jpg"));
 
     // Assert 2: 건너뛰고 오류로 남길 뿐 아무것도 바꾸지 않는다 (missing 아님), 원본 불변
     assert_eq!(act, mam_core::scan::PathAction::Failed);
     assert_eq!(unresolved_unresponsive(&env, "c.jpg"), 1);
-    assert_eq!(env.count("SELECT COUNT(*) FROM file_locations WHERE presence = 'missing'"), 0);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM file_locations WHERE presence = 'missing'"),
+        0
+    );
     assert_eq!(env.count("SELECT COUNT(*) FROM media_assets"), assets);
     assert_eq!(snapshot(&root), before, "originals are untouched");
     drop(release_tx);
@@ -324,8 +406,14 @@ impl FileIdentityProvider for DropsRootOnStat {
 #[test]
 fn t_ioguard_14_a_path_lookup_that_fails_after_the_share_dropped_is_not_marked_missing() {
     // Arrange: 스캔으로 a.jpg 를 등록한 뒤, 감시 반영 중 첫 stat 에서 루트가 사라진다 (루트 확인 통과 이후)
-    let fake = Arc::new(DropsRootOnStat { inner: WindowsFileIdentity, root: Mutex::new(None) });
-    let env = Env::with_identity(|_, _| {}, Arc::clone(&fake) as Arc<dyn FileIdentityProvider + Send + Sync>);
+    let fake = Arc::new(DropsRootOnStat {
+        inner: WindowsFileIdentity,
+        root: Mutex::new(None),
+    });
+    let env = Env::with_identity(
+        |_, _| {},
+        Arc::clone(&fake) as Arc<dyn FileIdentityProvider + Send + Sync>,
+    );
     let (id, root) = nas_folder(&env, &["a.jpg"]);
     assert!(matches!(scan(&env, id), ScanOutcome::Completed { .. }));
     let before = snapshot(&root);
@@ -340,9 +428,21 @@ fn t_ioguard_14_a_path_lookup_that_fails_after_the_share_dropped_is_not_marked_m
     // Assert: 루트가 다시 닿지 않으므로 missing 으로 만들지 않고 Failed(나중에 다시 확인)로 남긴다
     assert_eq!(act, mam_core::scan::PathAction::Failed);
     assert_eq!(presence(&env, "a.jpg"), "present");
-    assert_eq!(env.count("SELECT COUNT(*) FROM file_locations WHERE presence = 'missing'"), 0);
-    assert_eq!(env.count("SELECT SUM(revision) FROM media_assets"), revision, "no asset was changed");
-    assert_eq!(env.count("SELECT COUNT(*) FROM scan_errors WHERE rel_path = 'a.jpg' AND resolved_at IS NULL"), 1);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM file_locations WHERE presence = 'missing'"),
+        0
+    );
+    assert_eq!(
+        env.count("SELECT SUM(revision) FROM media_assets"),
+        revision,
+        "no asset was changed"
+    );
+    assert_eq!(
+        env.count(
+            "SELECT COUNT(*) FROM scan_errors WHERE rel_path = 'a.jpg' AND resolved_at IS NULL"
+        ),
+        1
+    );
 
     // 공유가 돌아오면(원위치) 원본은 그대로이고, 진짜로 사라진 파일만 missing 이 된다
     fs::rename(&away, &lib).unwrap();

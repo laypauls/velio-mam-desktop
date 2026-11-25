@@ -31,7 +31,16 @@ pub enum InvokeError {
 impl InvokeError {
     /// 워커를 버리고 차단기에 기록해야 하는 결함인가. 스크립트 예외·미등록 핸들러·시작 실패(실행 파일 문제)는 아니다
     pub fn is_fault(&self) -> bool {
-        matches!(self, Self::Init(_) | Self::Timeout | Self::Crashed | Self::Protocol(_) | Self::Oversize | Self::Flood | Self::Limit(_))
+        matches!(
+            self,
+            Self::Init(_)
+                | Self::Timeout
+                | Self::Crashed
+                | Self::Protocol(_)
+                | Self::Oversize
+                | Self::Flood
+                | Self::Limit(_)
+        )
     }
 
     /// 사용자 메시지 키 (i18n)

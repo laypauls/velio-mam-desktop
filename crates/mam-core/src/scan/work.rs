@@ -19,9 +19,9 @@ use serde::{Deserialize, Serialize};
 use super::IngestError;
 use super::errors::{core_code, io_code, record_error};
 use super::folders::FolderRow;
-use super::media_types::MediaTypeSet;
 use super::guarded::{Fail, UNRESPONSIVE_CODE, UNRESPONSIVE_MESSAGE};
 use super::io_guard::{Guarded, IoGuard};
+use super::media_types::MediaTypeSet;
 use super::progress::ScanProgressCell;
 use super::walk::{Listing, WalkRules, preorder_cmp, subtree_before};
 use crate::SharedClock;
@@ -31,7 +31,8 @@ use crate::identity::{FileIdentityProvider, FileMeta};
 use crate::keyrange::join_key;
 use crate::processing::schedule_for_outcome;
 use crate::reconcile::{
-    BatchItem, BatchOutcome, MediaType, Outcome, Reconciler, ScanEntry, ScanSession, touch_excluded_paths,
+    BatchItem, BatchOutcome, MediaType, Outcome, Reconciler, ScanEntry, ScanSession,
+    touch_excluded_paths,
 };
 
 /// 한 트랜잭션에 반영하는 최대 파일 수 (D3)
@@ -495,7 +496,10 @@ impl<'a> Walk<'a> {
             let files_done =
                 cursor.is_some_and(|c| preorder_cmp(&task.key, c) != Ordering::Greater);
             self.hold(&task.abs);
-            let listing = match self.env.list_dir_guarded(self.folder, &task.abs, &self.rules) {
+            let listing = match self
+                .env
+                .list_dir_guarded(self.folder, &task.abs, &self.rules)
+            {
                 Guarded::Done(Ok(l)) => l,
                 Guarded::Done(Err(f)) => {
                     self.buf.tail.errors.push(ErrRec {
@@ -550,7 +554,9 @@ impl<'a> Walk<'a> {
                             meta,
                         }),
                         // 목록화 직후 사라진 파일은 오류가 아니다 (마지막에 missing 처리)
-                        Guarded::Done(Err(Fail { not_found: true, .. })) => {}
+                        Guarded::Done(Err(Fail {
+                            not_found: true, ..
+                        })) => {}
                         Guarded::Done(Err(f)) => self.buf.tail.errors.push(ErrRec {
                             rel: rel_root,
                             code: f.code.into(),
@@ -663,7 +669,9 @@ impl<'a> Walk<'a> {
             .collect();
         let (now, cap) = (self.env.clock.now_ms(), self.env.pending_cap);
         let due = now + self.env.pending_due_ms;
-        match self.env.write(Priority::Low, move |c| upsert_batch(c, &items, now, due, cap)) {
+        match self.env.write(Priority::Low, move |c| {
+            upsert_batch(c, &items, now, due, cap)
+        }) {
             Ok(report) if report.overflowed.is_empty() => {}
             Ok(_) => self.deferred_overflow = true,
             Err(e) => {
@@ -697,7 +705,10 @@ impl<'a> Walk<'a> {
 
     fn write_chunk(&mut self, chunk: Vec<Work>, tail: Option<Tail>) -> Result<Flow, IngestError> {
         let before = self.counts.processed;
-        let r = self.run_chunk(chunk.into_iter().map(|w| (w, Pre::default())).collect(), tail)?;
+        let r = self.run_chunk(
+            chunk.into_iter().map(|w| (w, Pre::default())).collect(),
+            tail,
+        )?;
         self.counts = r.counts;
         if r.gone {
             return Ok(Flow::Gone);

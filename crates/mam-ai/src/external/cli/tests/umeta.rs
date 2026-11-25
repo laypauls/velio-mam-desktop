@@ -29,7 +29,10 @@ fn stdin_text(include_metadata: bool) -> String {
         .expect("request spawned");
     let v: serde_json::Value =
         serde_json::from_slice(&cmd.stdin.unwrap()).expect("stdin is one JSON message");
-    v["message"]["content"][0]["text"].as_str().unwrap().to_string()
+    v["message"]["content"][0]["text"]
+        .as_str()
+        .unwrap()
+        .to_string()
 }
 
 #[test]

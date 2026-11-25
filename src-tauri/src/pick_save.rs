@@ -32,7 +32,9 @@ fn validate_file_name(name: &str) -> Result<(), CommandError> {
     if len == 0 || len > MAX_FILE_NAME_CHARS {
         return Err(invalid("file name length is out of range"));
     }
-    if name.chars().any(|c| c.is_control() || matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|')) {
+    if name.chars().any(|c| {
+        c.is_control() || matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|')
+    }) {
         return Err(invalid("file name contains forbidden characters"));
     }
     if name.trim_matches('.').is_empty() || name.ends_with(' ') || name.ends_with('.') {
@@ -47,14 +49,18 @@ fn validate_filters(filters: &[SaveFileFilter]) -> Result<(), CommandError> {
     }
     for f in filters {
         let name_len = f.name.chars().count();
-        if name_len == 0 || name_len > MAX_FILTER_NAME_CHARS || f.name.chars().any(char::is_control) {
+        if name_len == 0 || name_len > MAX_FILTER_NAME_CHARS || f.name.chars().any(char::is_control)
+        {
             return Err(invalid("filter name is not valid"));
         }
         if f.extensions.is_empty() || f.extensions.len() > MAX_EXTENSIONS {
             return Err(invalid("filter extension count is out of range"));
         }
         for ext in &f.extensions {
-            if ext.is_empty() || ext.len() > MAX_EXTENSION_CHARS || !ext.chars().all(|c| c.is_ascii_alphanumeric()) {
+            if ext.is_empty()
+                || ext.len() > MAX_EXTENSION_CHARS
+                || !ext.chars().all(|c| c.is_ascii_alphanumeric())
+            {
                 return Err(invalid("filter extension must be alphanumeric"));
             }
         }
@@ -63,7 +69,10 @@ fn validate_filters(filters: &[SaveFileFilter]) -> Result<(), CommandError> {
 }
 
 /// 모든 인자를 대화상자를 열기 전에 검증한다 (프론트 입력은 신뢰하지 않는다).
-fn validate_args(default_file_name: Option<&str>, filters: Option<&[SaveFileFilter]>) -> Result<(), CommandError> {
+fn validate_args(
+    default_file_name: Option<&str>,
+    filters: Option<&[SaveFileFilter]>,
+) -> Result<(), CommandError> {
     if let Some(name) = default_file_name {
         validate_file_name(name)?;
     }
@@ -117,7 +126,10 @@ mod tests {
     use super::*;
 
     fn filter(name: &str, exts: &[&str]) -> SaveFileFilter {
-        SaveFileFilter { name: name.into(), extensions: exts.iter().map(|s| s.to_string()).collect() }
+        SaveFileFilter {
+            name: name.into(),
+            extensions: exts.iter().map(|s| s.to_string()).collect(),
+        }
     }
 
     fn code(r: Result<(), CommandError>) -> ErrorCode {
@@ -128,9 +140,20 @@ mod tests {
     fn t_pick_save_01_accepts_absent_and_valid_args() {
         // Happy / Boundary
         assert!(validate_args(None, None).is_ok());
-        assert!(validate_args(Some("export.csv"), Some(&[filter("CSV", &["csv"]), filter("모든 파일", &["txt", "tsv"])])).is_ok());
+        assert!(
+            validate_args(
+                Some("export.csv"),
+                Some(&[
+                    filter("CSV", &["csv"]),
+                    filter("모든 파일", &["txt", "tsv"])
+                ])
+            )
+            .is_ok()
+        );
         assert!(validate_args(Some(&"a".repeat(MAX_FILE_NAME_CHARS)), Some(&[])).is_ok());
-        let max_filters: Vec<_> = (0..MAX_FILTERS).map(|i| filter(&format!("f{i}"), &["a1"])).collect();
+        let max_filters: Vec<_> = (0..MAX_FILTERS)
+            .map(|i| filter(&format!("f{i}"), &["a1"]))
+            .collect();
         assert!(validate_args(None, Some(&max_filters)).is_ok());
     }
 
@@ -155,16 +178,25 @@ mod tests {
             "name.",
             "name ",
         ] {
-            assert_eq!(code(validate_args(Some(bad), None)), ErrorCode::InvalidInput, "{bad:?}");
+            assert_eq!(
+                code(validate_args(Some(bad), None)),
+                ErrorCode::InvalidInput,
+                "{bad:?}"
+            );
         }
         let too_long = "a".repeat(MAX_FILE_NAME_CHARS + 1);
-        assert_eq!(code(validate_args(Some(&too_long), None)), ErrorCode::InvalidInput);
+        assert_eq!(
+            code(validate_args(Some(&too_long), None)),
+            ErrorCode::InvalidInput
+        );
     }
 
     #[test]
     fn t_pick_save_03_rejects_bad_filters() {
         // Validation / Boundary
-        let too_many: Vec<_> = (0..=MAX_FILTERS).map(|i| filter(&format!("f{i}"), &["a"])).collect();
+        let too_many: Vec<_> = (0..=MAX_FILTERS)
+            .map(|i| filter(&format!("f{i}"), &["a"]))
+            .collect();
         let long_name = "n".repeat(MAX_FILTER_NAME_CHARS + 1);
         let too_many_exts: Vec<String> = (0..=MAX_EXTENSIONS).map(|i| format!("e{i}")).collect();
         let long_ext = "x".repeat(MAX_EXTENSION_CHARS + 1);
@@ -174,7 +206,10 @@ mod tests {
             vec![filter(&long_name, &["csv"])],
             vec![filter("a\nb", &["csv"])],
             vec![filter("CSV", &[])],
-            vec![SaveFileFilter { name: "CSV".into(), extensions: too_many_exts }],
+            vec![SaveFileFilter {
+                name: "CSV".into(),
+                extensions: too_many_exts,
+            }],
             vec![filter("CSV", &[""])],
             vec![filter("CSV", &[".csv"])],
             vec![filter("CSV", &["*"])],
@@ -184,14 +219,19 @@ mod tests {
             vec![filter("CSV", &[&long_ext])],
         ];
         for (i, c) in cases.iter().enumerate() {
-            assert_eq!(code(validate_args(None, Some(c))), ErrorCode::InvalidInput, "case {i}");
+            assert_eq!(
+                code(validate_args(None, Some(c))),
+                ErrorCode::InvalidInput,
+                "case {i}"
+            );
         }
     }
 
     #[test]
     fn t_pick_save_04_filters_json_shape_matches_ts_contract() {
         // Contract: TS `{ name, extensions }[]`
-        let parsed: Vec<SaveFileFilter> = serde_json::from_str(r#"[{"name":"CSV","extensions":["csv"]}]"#).expect("parses");
+        let parsed: Vec<SaveFileFilter> =
+            serde_json::from_str(r#"[{"name":"CSV","extensions":["csv"]}]"#).expect("parses");
         assert_eq!(parsed.len(), 1);
         assert_eq!(parsed[0].name, "CSV");
         assert_eq!(parsed[0].extensions, vec!["csv".to_string()]);

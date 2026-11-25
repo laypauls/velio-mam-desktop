@@ -5,8 +5,8 @@
 mod common;
 
 use common::migrated_db;
-use mam_db::settings;
 use mam_db::SettingsError;
+use mam_db::settings;
 use rusqlite::Connection;
 use serde_json::{Map, Value, json};
 
@@ -15,7 +15,11 @@ fn patch(v: Value) -> Map<String, Value> {
 }
 
 fn put_raw(conn: &Connection, key: &str, raw: &str) {
-    conn.execute("INSERT INTO settings (key, value) VALUES (?1, ?2)", [key, raw]).unwrap();
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?1, ?2)",
+        [key, raw],
+    )
+    .unwrap();
 }
 
 #[test]
@@ -25,7 +29,10 @@ fn t_lane_06s_default_is_3_bounds_round_trip_and_invalid_values_are_rejected() {
     let (s, warnings) = settings::load(&db.conn).unwrap();
     assert_eq!(s.max_concurrent_scans, 3);
     assert!(warnings.is_empty());
-    assert_eq!(serde_json::to_value(&s).unwrap()["maxConcurrentScans"], json!(3));
+    assert_eq!(
+        serde_json::to_value(&s).unwrap()["maxConcurrentScans"],
+        json!(3)
+    );
 
     // Act + Assert: 경계 1·8 은 통과
     for ok in [1, 8, 4] {
@@ -33,9 +40,24 @@ fn t_lane_06s_default_is_3_bounds_round_trip_and_invalid_values_are_rejected() {
         assert_eq!(s.max_concurrent_scans, ok);
     }
     // 범위 밖·잘못된 타입은 거부하고 마지막 값(4)을 유지한다
-    for bad in [json!(0), json!(9), json!(-1), json!(2.5), json!("3"), Value::Null, json!(true)] {
-        let err = settings::update(&mut db.conn, &patch(json!({"maxConcurrentScans": bad.clone()}))).unwrap_err();
-        assert!(matches!(&err, SettingsError::Invalid(f) if f == "maxConcurrentScans"), "{bad}");
+    for bad in [
+        json!(0),
+        json!(9),
+        json!(-1),
+        json!(2.5),
+        json!("3"),
+        Value::Null,
+        json!(true),
+    ] {
+        let err = settings::update(
+            &mut db.conn,
+            &patch(json!({"maxConcurrentScans": bad.clone()})),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(&err, SettingsError::Invalid(f) if f == "maxConcurrentScans"),
+            "{bad}"
+        );
     }
     assert_eq!(settings::load(&db.conn).unwrap().0.max_concurrent_scans, 4);
 }
@@ -63,5 +85,8 @@ fn t_lane_07s_an_invalid_value_in_a_patch_changes_nothing_and_a_corrupt_stored_v
     put_raw(&db2.conn, "max_concurrent_scans", "0");
     let (s, warnings) = settings::load(&db2.conn).unwrap();
     assert_eq!(s.max_concurrent_scans, 3);
-    assert!(warnings.iter().any(|w| w.contains("max_concurrent_scans")), "{warnings:?}");
+    assert!(
+        warnings.iter().any(|w| w.contains("max_concurrent_scans")),
+        "{warnings:?}"
+    );
 }

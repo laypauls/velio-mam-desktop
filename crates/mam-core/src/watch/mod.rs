@@ -9,14 +9,14 @@
 //! - Linux: inotify 어댑터(같은 `notify` 래퍼). 감시 수 상한(`fs.inotify.max_user_watches`) 초과는 시작 실패 -> `scan_only` 폴백.
 
 mod debounce;
-mod health;
 pub mod detector;
 pub mod detectors;
-pub mod remote;
+mod health;
 mod manager;
 mod options_ref;
 mod registry;
 mod release;
+pub mod remote;
 mod sink;
 
 #[cfg(test)]
@@ -28,14 +28,14 @@ mod manager_tests;
 
 pub use debounce::Debouncer;
 pub use detector::{
-    ChangeDetector, ChangeDetectorInfo, DetectError, DetectorOptions, OptionField, OptionKind,
-    ProbeResult, WatchHandle, WatchTarget, parse_integer_options, parse_options_checked, COMMON_OPTION_FIELDS, EXCLUSIVE_OPEN_CHECK,
-    exclusive_open_check_of,
+    COMMON_OPTION_FIELDS, ChangeDetector, ChangeDetectorInfo, DetectError, DetectorOptions,
+    EXCLUSIVE_OPEN_CHECK, OptionField, OptionKind, ProbeResult, WatchHandle, WatchTarget,
+    exclusive_open_check_of, parse_integer_options, parse_options_checked,
 };
 pub use detectors::{DdpAudit, FanotifyFeed, OsEvents, Polling, ScanOnly, convert};
+pub use health::SourceHealth;
 pub use manager::{StartOutcome, WatchManager, WatchStatus};
+pub use options_ref::{NoRefs, RefResolver};
 pub use registry::{Candidate, DetectorRegistry, FallbackReason, Plan};
 pub use release::{ReleaseToken, SinkId};
-pub use health::SourceHealth;
-pub use options_ref::{NoRefs, RefResolver};
 pub use sink::{ChangeSink, WatchMsg};

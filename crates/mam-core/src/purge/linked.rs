@@ -49,7 +49,8 @@ pub fn purge_assets(
     )?;
     conn.execute("DELETE FROM purge_batch", [])?;
     {
-        let mut ins = conn.prepare_cached("INSERT OR IGNORE INTO purge_batch (asset_id) VALUES (?1)")?;
+        let mut ins =
+            conn.prepare_cached("INSERT OR IGNORE INTO purge_batch (asset_id) VALUES (?1)")?;
         for id in asset_ids {
             ins.execute([id])?;
         }

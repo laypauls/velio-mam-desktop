@@ -14,7 +14,8 @@ use super::plan::mark_skipped;
 use super::state::upsert_queued;
 use super::types::StepKind;
 use crate::ai_store::{
-    AnalysisFields, NewAnalysis, RunRecord, TranscriptRecord, record_run, save_analysis, save_transcript,
+    AnalysisFields, NewAnalysis, RunRecord, TranscriptRecord, record_run, save_analysis,
+    save_transcript,
 };
 use crate::hash::{Blake3Hasher, ContentHash, HashedFile};
 use crate::jobs::{JobKind, JobOutcome, JobQueue, NewJob};
@@ -97,7 +98,11 @@ fn linked_rows(fx: &Fx) -> Vec<(String, i64)> {
             let mut out = Vec::new();
             for t in tables {
                 let n: i64 = c
-                    .query_row(&format!("SELECT COUNT(*) FROM {t} WHERE asset_id = ?1"), [id], |r| r.get(0))
+                    .query_row(
+                        &format!("SELECT COUNT(*) FROM {t} WHERE asset_id = ?1"),
+                        [id],
+                        |r| r.get(0),
+                    )
                     .unwrap();
                 out.push((t.to_string(), n));
             }
@@ -112,14 +117,22 @@ fn finish_like_a_late_job(fx: &Fx) {
     let mut conn = direct(fx);
     let c = &mut conn;
     // 파생물 상태 (meta 실패 경로 등)
-    crate::processing::set_state(c, now, id, DerivKind::Meta, DerivState::Failed, Some("x")).unwrap();
+    crate::processing::set_state(c, now, id, DerivKind::Meta, DerivState::Failed, Some("x"))
+        .unwrap();
     // AI 단계 행·실행 이력
     upsert_queued(c, now, id, &[StepKind::Describe, StepKind::Embedding], true).unwrap();
     mark_skipped(c, now, id, "image").unwrap();
     record_run(c, &SystemClock, &run_record(id)).unwrap();
     // 장면전환점 결과
     mam_db::scene_cuts::replace_auto_tx(c, id, &[1000], "medium", None, now).unwrap();
-    mam_db::scene_cuts::set_outcome_tx(c, id, mam_db::scene_cuts::SceneState::Failed, Some("other"), now).unwrap();
+    mam_db::scene_cuts::set_outcome_tx(
+        c,
+        id,
+        mam_db::scene_cuts::SceneState::Failed,
+        Some("other"),
+        now,
+    )
+    .unwrap();
     // 해시 반영
     let rec = Reconciler {
         clock: &SystemClock,
@@ -131,7 +144,10 @@ fn finish_like_a_late_job(fx: &Fx) {
         size: 1,
         modified_ms: 1,
     };
-    assert_eq!(rec.commit_pending_hash(c, id, &hashed).unwrap(), PendingHash::Deferred);
+    assert_eq!(
+        rec.commit_pending_hash(c, id, &hashed).unwrap(),
+        PendingHash::Deferred
+    );
     // AI 결과 저장 (이미 활성 자산만 허용하던 경로 - 회귀 고정)
     let analysis = NewAnalysis {
         fields: AnalysisFields {
@@ -152,7 +168,10 @@ fn finish_like_a_late_job(fx: &Fx) {
     assert!(save_transcript(c, &SystemClock, id, &transcript).is_err());
     // 임베딩 저장: 건너뛰고 빈 목록
     let ids = put_vector(fx, c, now);
-    assert!(ids.is_empty(), "no embedding id is issued for a deleted asset");
+    assert!(
+        ids.is_empty(),
+        "no embedding id is issued for a deleted asset"
+    );
 }
 
 fn run_record(asset_id: i64) -> RunRecord {
@@ -182,7 +201,11 @@ fn purge_all(fx: &Fx) {
     let volume = fx.volume;
     fx.pool
         .write(Priority::Low, move |c| {
-            let spec = RangeSpec { volume_id: volume, root_key: "lib", media_types: None };
+            let spec = RangeSpec {
+                volume_id: volume,
+                root_key: "lib",
+                media_types: None,
+            };
             let b = purge_range_batch(c, 50, &spec, 500).unwrap();
             assert_eq!(b.purged.len(), 1);
             Ok(())
@@ -194,23 +217,36 @@ fn purge_all(fx: &Fx) {
 fn t_late_01_job_claimed_before_the_purge_leaves_no_rows_when_it_finishes_after() {
     // Arrange: AI 작업을 잡은 채(running) 폴더 제거로 자산이 삭제 표시된다
     let fx = fixture();
-    assert!(fx.queue.enqueue(NewJob {
-        kind: Some(JobKind::Ai),
-        asset_id: Some(fx.asset),
-        folder_id: None,
-        priority: None,
-        not_before: 0,
-    })
-    .unwrap());
+    assert!(
+        fx.queue
+            .enqueue(NewJob {
+                kind: Some(JobKind::Ai),
+                asset_id: Some(fx.asset),
+                folder_id: None,
+                priority: None,
+                not_before: 0,
+            })
+            .unwrap()
+    );
     let job = fx.queue.claim_next(&[JobKind::Ai]).unwrap().unwrap();
     purge_all(&fx);
     let revision: i64 = fx
         .pool
-        .read(|c| Ok(c.query_row("SELECT revision FROM media_assets", [], |r| r.get(0)).unwrap()))
+        .read(|c| {
+            Ok(
+                c.query_row("SELECT revision FROM media_assets", [], |r| r.get(0))
+                    .unwrap(),
+            )
+        })
         .unwrap();
     let events_before: i64 = fx
         .pool
-        .read(|c| Ok(c.query_row("SELECT COUNT(*) FROM search_outbox", [], |r| r.get(0)).unwrap()))
+        .read(|c| {
+            Ok(
+                c.query_row("SELECT COUNT(*) FROM search_outbox", [], |r| r.get(0))
+                    .unwrap(),
+            )
+        })
         .unwrap();
 
     // Act: 늦게 끝난 작업의 결과 쓰기 + 작업 완료
@@ -225,8 +261,10 @@ fn t_late_01_job_claimed_before_the_purge_leaves_no_rows_when_it_finishes_after(
         .pool
         .read(|c| {
             Ok((
-                c.query_row("SELECT revision FROM media_assets", [], |r| r.get(0)).unwrap(),
-                c.query_row("SELECT COUNT(*) FROM search_outbox", [], |r| r.get(0)).unwrap(),
+                c.query_row("SELECT revision FROM media_assets", [], |r| r.get(0))
+                    .unwrap(),
+                c.query_row("SELECT COUNT(*) FROM search_outbox", [], |r| r.get(0))
+                    .unwrap(),
             ))
         })
         .unwrap();
@@ -242,7 +280,8 @@ fn t_late_02_the_same_writes_still_land_for_an_active_asset() {
     // Act
     let mut conn = direct(&fx);
     let c = &mut conn;
-    crate::processing::set_state(c, now, id, DerivKind::Meta, DerivState::Failed, Some("x")).unwrap();
+    crate::processing::set_state(c, now, id, DerivKind::Meta, DerivState::Failed, Some("x"))
+        .unwrap();
     upsert_queued(c, now, id, &[StepKind::Describe], true).unwrap();
     record_run(c, &SystemClock, &run_record(id)).unwrap();
     mam_db::scene_cuts::replace_auto_tx(c, id, &[1000], "medium", None, now).unwrap();
@@ -251,8 +290,18 @@ fn t_late_02_the_same_writes_still_land_for_an_active_asset() {
     // Assert
     assert_eq!(ids.len(), 1);
     let rows = linked_rows(&fx);
-    for table in ["asset_derivatives", "ai_task_state", "analysis_runs", "asset_scene_cuts", "embeddings"] {
-        assert_eq!(rows.iter().find(|(t, _)| t == table).unwrap().1, 1, "{table}");
+    for table in [
+        "asset_derivatives",
+        "ai_task_state",
+        "analysis_runs",
+        "asset_scene_cuts",
+        "embeddings",
+    ] {
+        assert_eq!(
+            rows.iter().find(|(t, _)| t == table).unwrap().1,
+            1,
+            "{table}"
+        );
     }
 }
 
@@ -263,25 +312,41 @@ fn t_late_03_purged_embeddings_are_reported_so_the_vector_cache_can_drop_them() 
     let now = 1;
     put_vector(&fx, &mut direct(&fx), now);
     let cache = mam_vector::ActiveMapCache::new();
-    let before = fx.pool.read(|c| Ok(cache.get_or_load(c, &fx.store, &key()).unwrap().len())).unwrap();
+    let before = fx
+        .pool
+        .read(|c| Ok(cache.get_or_load(c, &fx.store, &key()).unwrap().len()))
+        .unwrap();
 
     // Act: 제거 + 알림 (앱은 이 키로 `notify_changed` 를 부른다)
     let volume = fx.volume;
     let batch = fx
         .pool
         .write(Priority::Low, move |c| {
-            let spec = RangeSpec { volume_id: volume, root_key: "lib", media_types: None };
+            let spec = RangeSpec {
+                volume_id: volume,
+                root_key: "lib",
+                media_types: None,
+            };
             Ok(purge_range_batch(c, 50, &spec, 500).unwrap())
         })
         .unwrap();
-    let stale = fx.pool.read(|c| Ok(cache.get_or_load(c, &fx.store, &key()).unwrap().len())).unwrap();
+    let stale = fx
+        .pool
+        .read(|c| Ok(cache.get_or_load(c, &fx.store, &key()).unwrap().len()))
+        .unwrap();
     assert_eq!(batch.embedding_keys.len(), 1);
     assert_eq!(
-        (batch.embedding_keys[0].kind.as_str(), batch.embedding_keys[0].dimension),
+        (
+            batch.embedding_keys[0].kind.as_str(),
+            batch.embedding_keys[0].dimension
+        ),
         ("visual", 4)
     );
     fx.store.notify_changed(&key());
-    let after = fx.pool.read(|c| Ok(cache.get_or_load(c, &fx.store, &key()).unwrap().len())).unwrap();
+    let after = fx
+        .pool
+        .read(|c| Ok(cache.get_or_load(c, &fx.store, &key()).unwrap().len()))
+        .unwrap();
 
     // Assert: 알리기 전에는 캐시가 지운 슬롯을 들고 있고(전제), 알린 뒤에는 사라진다
     assert_eq!((before, stale, after), (1, 1, 0));

@@ -99,7 +99,8 @@ pub(crate) struct KeyChild {
 
 impl Drop for KeyChild {
     fn drop(&mut self) {
-        self.skipped.fetch_add(self.skipped_local, Ordering::Relaxed);
+        self.skipped
+            .fetch_add(self.skipped_local, Ordering::Relaxed);
     }
 }
 
@@ -143,7 +144,11 @@ impl SegmentSortKeyComputer for KeyChild {
         };
         let key = [present, k1, k2, tie_of(asset_id)];
         if let Some(after) = &self.after {
-            let out = if self.invert { key <= *after } else { key >= *after };
+            let out = if self.invert {
+                key <= *after
+            } else {
+                key >= *after
+            };
             if out {
                 self.skipped_local += 1;
                 return EXCLUDED;

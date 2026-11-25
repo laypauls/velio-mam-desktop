@@ -46,14 +46,27 @@ impl Core {
                 } else {
                     self.rem.ranges = ranges.clone();
                     let hint = self.rem.duration_hint_ms;
-                    self.user_cmd(Command::SetRanges { ranges, duration_ms: hint }, true, reply);
+                    self.user_cmd(
+                        Command::SetRanges {
+                            ranges,
+                            duration_ms: hint,
+                        },
+                        true,
+                        reply,
+                    );
                 }
             }
             ReqKind::SetSubtitle { asset_id, path } => {
                 if asset_id != self.rem.asset_id || !self.rem.has_session() {
                     answer(&reply, Ok(Reply::Unit));
                 } else {
-                    self.user_cmd(Command::SubSet { path: path.map(|p: PathBuf| p.to_string_lossy().into_owned()) }, true, reply);
+                    self.user_cmd(
+                        Command::SubSet {
+                            path: path.map(|p: PathBuf| p.to_string_lossy().into_owned()),
+                        },
+                        true,
+                        reply,
+                    );
                 }
             }
             ReqKind::Control(a) => self.control(a, reply),
@@ -63,7 +76,14 @@ impl Core {
                 self.user_cmd(Command::Seek { ms }, true, reply);
             }
             ReqKind::SetRate(r) => self.user_cmd(Command::SetSpeed { speed: r }, true, reply),
-            ReqKind::SetVolume { volume, muted } => self.user_cmd(Command::SetVolume { volume, mute: muted }, true, reply),
+            ReqKind::SetVolume { volume, muted } => self.user_cmd(
+                Command::SetVolume {
+                    volume,
+                    mute: muted,
+                },
+                true,
+                reply,
+            ),
             #[cfg(any(test, feature = "test-support"))]
             ReqKind::KillWorker => {
                 if let Some(inc) = self.inc.as_mut() {
@@ -106,7 +126,9 @@ impl Core {
             Phase::Idle | Phase::Opening(_) | Phase::Active => {
                 self.remember(&cmd);
                 let timeout = self.cfg.timeouts.command;
-                if let Err(e) = self.send_pending(cmd, Done::Reply, reply.clone(), idempotent, timeout) {
+                if let Err(e) =
+                    self.send_pending(cmd, Done::Reply, reply.clone(), idempotent, timeout)
+                {
                     answer(&reply, Err(e));
                 }
             }
@@ -140,7 +162,14 @@ impl Core {
             ControlAction::Play => (Command::Play, true),
             ControlAction::Pause => (Command::Pause, true),
             // 토글은 비멱등 — 재시도하면 두 번 뒤집힌다
-            ControlAction::Toggle => (if self.rem.paused || self.ended { Command::Play } else { Command::Pause }, false),
+            ControlAction::Toggle => (
+                if self.rem.paused || self.ended {
+                    Command::Play
+                } else {
+                    Command::Pause
+                },
+                false,
+            ),
             ControlAction::StepForward => (Command::FrameStep, false),
             ControlAction::StepBack => (Command::FrameBackStep, false),
         };
@@ -152,9 +181,18 @@ impl Core {
         if let Phase::Restoring(rw) = &mut self.phase {
             rw.plan.remembered_mut().render_active = active;
         }
-        if self.inc.is_some() && self.rem.has_session() && matches!(self.phase, Phase::Active | Phase::Opening(_)) {
+        if self.inc.is_some()
+            && self.rem.has_session()
+            && matches!(self.phase, Phase::Active | Phase::Opening(_))
+        {
             let timeout = self.cfg.timeouts.command;
-            let _ = self.send_pending(Command::SetRenderActive { active }, Done::Ignore, None, true, timeout);
+            let _ = self.send_pending(
+                Command::SetRenderActive { active },
+                Done::Ignore,
+                None,
+                true,
+                timeout,
+            );
         }
         answer(&reply, Ok(Reply::Unit));
     }
@@ -167,7 +205,9 @@ impl Core {
             return;
         }
         if self.spawner.is_none() || !self.surface.capabilities_ok() {
-            let _ = rep.send(Err(PlayerError::WorkerNotFound("worker executable, libmpv or shared buffers")));
+            let _ = rep.send(Err(PlayerError::WorkerNotFound(
+                "worker executable, libmpv or shared buffers",
+            )));
             return;
         }
         self.cancel_open(PlayerError::Cancelled);
@@ -183,7 +223,9 @@ impl Core {
     fn close(&mut self, reply: Option<ReplyTx>) {
         self.cancel_open(PlayerError::Cancelled);
         self.cancel_restart_reply(PlayerError::Cancelled);
-        let had_worker = self.inc.is_some() && self.rem.has_session() && !matches!(self.phase, Phase::Backoff { .. } | Phase::Failed);
+        let had_worker = self.inc.is_some()
+            && self.rem.has_session()
+            && !matches!(self.phase, Phase::Backoff { .. } | Phase::Failed);
         self.phase = Phase::Idle;
         self.streak = 0;
         self.end_session();
@@ -195,9 +237,17 @@ impl Core {
             return;
         }
         let timeout = self.cfg.timeouts.command;
-        if self.send_pending(Command::Close, Done::CloseAck, reply.clone(), false, timeout).is_err() {
+        if self
+            .send_pending(
+                Command::Close,
+                Done::CloseAck,
+                reply.clone(),
+                false,
+                timeout,
+            )
+            .is_err()
+        {
             answer(&reply, Ok(Reply::Unit));
         }
     }
 }
-

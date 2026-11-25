@@ -59,7 +59,11 @@ impl StopFlag {
             if left.is_zero() {
                 return Tick::Elapsed;
             }
-            g = self.cv.wait_timeout(g, left).unwrap_or_else(|p| p.into_inner()).0;
+            g = self
+                .cv
+                .wait_timeout(g, left)
+                .unwrap_or_else(|p| p.into_inner())
+                .0;
         }
     }
 
@@ -113,8 +117,14 @@ mod tests {
 
         // Assert: 30초를 기다리지 않고 디바운스 뒤에 깨어난다
         assert_eq!(tick, Tick::Woken);
-        assert!(waited >= Duration::from_millis(50), "debounce honoured: {waited:?}");
-        assert!(waited < Duration::from_secs(10), "did not wait the full tick: {waited:?}");
+        assert!(
+            waited >= Duration::from_millis(50),
+            "debounce honoured: {waited:?}"
+        );
+        assert!(
+            waited < Duration::from_secs(10),
+            "did not wait the full tick: {waited:?}"
+        );
     }
 
     #[test]

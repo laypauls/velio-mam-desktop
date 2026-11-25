@@ -57,7 +57,11 @@ pub(super) struct Stopper {
 
 impl Stopper {
     pub(super) fn new() -> Self {
-        Self { stopped: AtomicBool::new(false), lock: Mutex::new(()), cv: Condvar::new() }
+        Self {
+            stopped: AtomicBool::new(false),
+            lock: Mutex::new(()),
+            cv: Condvar::new(),
+        }
     }
 
     pub(super) fn is_stopped(&self) -> bool {
@@ -76,7 +80,11 @@ impl Stopper {
         if self.is_stopped() {
             return true;
         }
-        drop(self.cv.wait_timeout_while(g, d, |_| !self.is_stopped()).unwrap_or_else(|p| p.into_inner()));
+        drop(
+            self.cv
+                .wait_timeout_while(g, d, |_| !self.is_stopped())
+                .unwrap_or_else(|p| p.into_inner()),
+        );
         self.is_stopped()
     }
 }
@@ -120,13 +128,20 @@ impl Core {
     }
 
     pub(super) fn set_protected_source(&self, source: ProtectedSource) {
-        *self.protected_source.write().unwrap_or_else(|p| p.into_inner()) = Some(source);
+        *self
+            .protected_source
+            .write()
+            .unwrap_or_else(|p| p.into_inner()) = Some(source);
     }
 
     /// 고정 보호 경로 + 지금 설정에서 계산한 보호 경로
     pub(super) fn protected_paths(&self) -> Vec<std::path::PathBuf> {
         let mut all = self.protected.clone();
-        let source = self.protected_source.read().unwrap_or_else(|p| p.into_inner()).clone();
+        let source = self
+            .protected_source
+            .read()
+            .unwrap_or_else(|p| p.into_inner())
+            .clone();
         if let Some(source) = source {
             all.extend(source());
         }
@@ -134,7 +149,10 @@ impl Core {
     }
 
     pub(super) fn tuning(&self) -> JobsTuning {
-        self.tuning.read().unwrap_or_else(|p| p.into_inner()).clone()
+        self.tuning
+            .read()
+            .unwrap_or_else(|p| p.into_inner())
+            .clone()
     }
 
     pub(super) fn set_tuning(&self, t: JobsTuning) {
@@ -154,7 +172,10 @@ impl Core {
         self.stopper.is_stopped() || self.queue.is_shutdown()
     }
 
-    pub(super) fn read<T>(&self, f: impl FnOnce(&Connection) -> Result<T, DbError>) -> Result<T, PoolError> {
+    pub(super) fn read<T>(
+        &self,
+        f: impl FnOnce(&Connection) -> Result<T, DbError>,
+    ) -> Result<T, PoolError> {
         self.pool.read_until(self.deadline(), f)
     }
 
@@ -166,14 +187,15 @@ impl Core {
         F: FnOnce(&Transaction<'_>, i64) -> Result<T, DbError> + Send + 'static,
     {
         let (plugin, now) = (plugin.to_owned(), self.now());
-        self.pool.write_until(Priority::Low, self.deadline(), move |c| {
-            with_immediate_tx(c, |tx| {
-                if !is_installed(tx, &plugin)? {
-                    return Ok(None);
-                }
-                f(tx, now).map(Some)
+        self.pool
+            .write_until(Priority::Low, self.deadline(), move |c| {
+                with_immediate_tx(c, |tx| {
+                    if !is_installed(tx, &plugin)? {
+                        return Ok(None);
+                    }
+                    f(tx, now).map(Some)
+                })
             })
-        })
     }
 }
 
@@ -206,6 +228,9 @@ mod tests {
         std::thread::sleep(Duration::from_millis(20));
         s.stop();
         assert!(h.join().unwrap());
-        assert!(s.sleep(Duration::from_secs(30)), "already stopped returns immediately");
+        assert!(
+            s.sleep(Duration::from_secs(30)),
+            "already stopped returns immediately"
+        );
     }
 }

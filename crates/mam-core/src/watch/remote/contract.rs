@@ -1,7 +1,7 @@
 //! 수집기 계약 타입 — 폴더 부착 정보, 기록기 trait, 시간 설정, 의존성 묶음. (`collector.rs` 가 다시 내보낸다)
 
-use std::sync::{Arc, Mutex};
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use super::RemoteSource;
@@ -45,11 +45,29 @@ pub struct FeedItem {
 /// 보고 묶음과 커서를 **하나의 트랜잭션**으로 기록한다 (운영: `ingest::pending::remote`, 시험: 가짜).
 pub trait BatchCommitter: Send + Sync {
     /// `items` 의 `watch_pending` UPSERT 와 `watch_cursors` 갱신이 함께 커밋되거나 함께 롤백된다. `origin` = 보고한 감지기 ID (진단용)
-    fn commit_feed(&self, source_id: i64, items: &[FeedItem], cursor: &str, origin: &'static str) -> Result<CommitOutcome, CommitError>;
+    fn commit_feed(
+        &self,
+        source_id: i64,
+        items: &[FeedItem],
+        cursor: &str,
+        origin: &'static str,
+    ) -> Result<CommitOutcome, CommitError>;
 
     /// `items` = (폴더 ID, 절대 경로) — 전부 `Path` 보고, 출처 `ddp_audit`
-    fn commit(&self, source_id: i64, items: &[(i64, PathBuf)], cursor: &str) -> Result<CommitOutcome, CommitError> {
-        let feed: Vec<FeedItem> = items.iter().map(|(f, p)| FeedItem { folder_id: *f, path: p.clone(), subtree: false }).collect();
+    fn commit(
+        &self,
+        source_id: i64,
+        items: &[(i64, PathBuf)],
+        cursor: &str,
+    ) -> Result<CommitOutcome, CommitError> {
+        let feed: Vec<FeedItem> = items
+            .iter()
+            .map(|(f, p)| FeedItem {
+                folder_id: *f,
+                path: p.clone(),
+                subtree: false,
+            })
+            .collect();
         self.commit_feed(source_id, &feed, cursor, "ddp_audit")
     }
     /// 저장된 커서 (없으면 `None` — 처음 시작)

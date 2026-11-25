@@ -4,8 +4,8 @@ use std::time::{Duration, Instant};
 
 use mam_core::SharedClock;
 use mam_core::query::{
-    PageDirection, QueryService, SearchFilters, SearchMode, SearchRequest, SortDirection, SortField,
-    SortSpec,
+    PageDirection, QueryService, SearchFilters, SearchMode, SearchRequest, SortDirection,
+    SortField, SortSpec,
 };
 use mam_db::{DbPool, SystemClock, migrate, open};
 use mam_vector::{NewVector, VectorKind, VectorSource};
@@ -935,7 +935,10 @@ impl Fx {
 
     fn similar_ids(&self, limit: i64, cursor: Option<String>) -> (Vec<i64>, Option<String>) {
         let p = self.similar(1, limit, cursor).unwrap();
-        (p.items.iter().map(|i| i.summary.asset_id).collect(), p.next_cursor)
+        (
+            p.items.iter().map(|i| i.summary.asset_id).collect(),
+            p.next_cursor,
+        )
     }
 
     /// 제한 없이 읽은 자산 4(순위 3번째)의 유사도 — 경계 시험의 기준값
@@ -1057,7 +1060,8 @@ fn t_p3w_38_hybrid_pages_support_backward_cursor_and_at_seek() {
     fx.inject(embedder(Ok(dir(0.0, 0))));
     let all = fx.hybrid("beach", 50, None).unwrap().ids;
     assert!(all.len() >= 3, "needs at least 3 hybrid results: {all:?}");
-    let ids = |p: &mam_core::query::SearchPage| p.items.iter().map(|i| i.asset_id).collect::<Vec<_>>();
+    let ids =
+        |p: &mam_core::query::SearchPage| p.items.iter().map(|i| i.asset_id).collect::<Vec<_>>();
 
     // Act: 2건씩 앞으로 간 뒤 마지막 쪽의 prevCursor 로 뒤로
     let mut r = hybrid_request("beach", 2);
@@ -1083,8 +1087,13 @@ fn t_p3w_38_hybrid_pages_support_backward_cursor_and_at_seek() {
     assert_eq!(ids(&seek), all[1..3.min(all.len())], "at=1");
     assert_eq!(seek.start_offset, 1);
     assert!(seek.prev_cursor.is_some());
-    assert!(beyond.items.is_empty() && beyond.next_cursor.is_none() && beyond.prev_cursor.is_none());
-    assert_eq!(beyond.start_offset, beyond.total, "past the end clamps to the candidate count");
+    assert!(
+        beyond.items.is_empty() && beyond.next_cursor.is_none() && beyond.prev_cursor.is_none()
+    );
+    assert_eq!(
+        beyond.start_offset, beyond.total,
+        "past the end clamps to the candidate count"
+    );
     assert!(first.total_is_estimate);
     assert_eq!(first.generation, second.generation);
 
@@ -1094,8 +1103,14 @@ fn t_p3w_38_hybrid_pages_support_backward_cursor_and_at_seek() {
     both.at = Some(0);
     let mut orphan = hybrid_request("beach", 2);
     orphan.direction = Some(PageDirection::Backward);
-    assert_eq!(code_of(fx.search.search(&both).unwrap_err()), ErrorCode::InvalidInput);
-    assert_eq!(code_of(fx.search.search(&orphan).unwrap_err()), ErrorCode::InvalidInput);
+    assert_eq!(
+        code_of(fx.search.search(&both).unwrap_err()),
+        ErrorCode::InvalidInput
+    );
+    assert_eq!(
+        code_of(fx.search.search(&orphan).unwrap_err()),
+        ErrorCode::InvalidInput
+    );
 }
 
 // Business rule: 별점 범위 필터는 하이브리드에서도 후보 상한(400) 이전의 허용 집합에 적용된다 (후필터 아님)

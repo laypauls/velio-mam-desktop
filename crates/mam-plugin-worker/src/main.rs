@@ -17,9 +17,16 @@ use io::Io;
 
 fn main() -> ExitCode {
     let io = Rc::new(Io::new());
-    let Some(HostMsg::Init { v, source, limits, .. }) = io.read() else { return ExitCode::from(2) };
+    let Some(HostMsg::Init {
+        v, source, limits, ..
+    }) = io.read()
+    else {
+        return ExitCode::from(2);
+    };
     if v != PROTOCOL_VERSION {
-        let _ = io.send(&WorkerMsg::InitError { message: format!("unsupported protocol version {v}") });
+        let _ = io.send(&WorkerMsg::InitError {
+            message: format!("unsupported protocol version {v}"),
+        });
         return ExitCode::from(2);
     }
     io.set_max_line(usize::try_from(limits.max_line_bytes).unwrap_or(usize::MAX));
@@ -31,18 +38,48 @@ fn main() -> ExitCode {
         }
     };
     drop(source);
-    let _ = io.send(&WorkerMsg::Ready { v: PROTOCOL_VERSION, commands: engine.commands.clone(), providers: engine.providers.clone() });
+    let _ = io.send(&WorkerMsg::Ready {
+        v: PROTOCOL_VERSION,
+        commands: engine.commands.clone(),
+        providers: engine.providers.clone(),
+    });
 
     while let Some(msg) = io.read() {
         match msg {
-            HostMsg::Invoke { id, kind, target, params } => {
+            HostMsg::Invoke {
+                id,
+                kind,
+                target,
+                params,
+            } => {
                 let reply = match engine.invoke(kind, &target, &params) {
-                    Ok(value) => WorkerMsg::Result { id, ok: true, value: Some(value), error: None },
-                    Err(f) => WorkerMsg::Result { id, ok: false, value: None, error: Some(ErrorBody { code: f.code.to_owned(), message: f.message }) },
+                    Ok(value) => WorkerMsg::Result {
+                        id,
+                        ok: true,
+                        value: Some(value),
+                        error: None,
+                    },
+                    Err(f) => WorkerMsg::Result {
+                        id,
+                        ok: false,
+                        value: None,
+                        error: Some(ErrorBody {
+                            code: f.code.to_owned(),
+                            message: f.message,
+                        }),
+                    },
                 };
                 // 결과가 줄 상한을 넘으면 호스트가 워커를 죽이기 전에 오류 응답으로 바꾼다
                 if let Err(m) = io.send(&reply) {
-                    let _ = io.send(&WorkerMsg::Result { id, ok: false, value: None, error: Some(ErrorBody { code: CODE_TOO_LARGE.to_owned(), message: m }) });
+                    let _ = io.send(&WorkerMsg::Result {
+                        id,
+                        ok: false,
+                        value: None,
+                        error: Some(ErrorBody {
+                            code: CODE_TOO_LARGE.to_owned(),
+                            message: m,
+                        }),
+                    });
                 }
             }
             HostMsg::Quit => break,

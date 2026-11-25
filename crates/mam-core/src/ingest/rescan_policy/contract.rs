@@ -23,7 +23,10 @@ fn zones() -> Vec<Box<dyn LocalZone>> {
 }
 
 pub(super) fn check_kind(kind: &str, valid: &[Value]) {
-    assert!(SHIPPED_TRIGGER_KINDS.contains(&kind), "{kind} must be listed in SHIPPED_TRIGGER_KINDS");
+    assert!(
+        SHIPPED_TRIGGER_KINDS.contains(&kind),
+        "{kind} must be listed in SHIPPED_TRIGGER_KINDS"
+    );
     assert!(policy_registry().get(kind).is_some());
     for v in valid {
         assert_eq!(parse(v).expect("valid sample").kind(), kind);
@@ -39,7 +42,11 @@ pub(super) fn check_slot_bounds(valid: &[Value]) {
             for t in [None, Some(base)] {
                 for i in 0..200 {
                     let now = base + i * step;
-                    let cx = SlotCtx { now_ms: now, zone: &*zone, last_full_scan_at: t };
+                    let cx = SlotCtx {
+                        now_ms: now,
+                        zone: &*zone,
+                        last_full_scan_at: t,
+                    };
                     if let Some(l) = spec.last_slot(&cx) {
                         assert!(l <= now, "{v}: last_slot {l} > now {now}");
                     }
@@ -60,7 +67,11 @@ pub(super) fn check_monotonic(valid: &[Value]) {
         for zone in zones() {
             let mut prev: Option<i64> = None;
             for i in 0..200 {
-                let cx = SlotCtx { now_ms: base + i * step, zone: &*zone, last_full_scan_at: Some(base) };
+                let cx = SlotCtx {
+                    now_ms: base + i * step,
+                    zone: &*zone,
+                    last_full_scan_at: Some(base),
+                };
                 if let Some(l) = spec.last_slot(&cx) {
                     assert!(prev.is_none_or(|p| l >= p), "{v}: last_slot went backwards");
                     prev = Some(l);
@@ -72,7 +83,9 @@ pub(super) fn check_monotonic(valid: &[Value]) {
 
 pub(super) fn check_invalid(invalid: &[(Value, &str)]) {
     for (v, field) in invalid {
-        let err = parse(v).err().unwrap_or_else(|| panic!("{v} must be rejected"));
+        let err = parse(v)
+            .err()
+            .unwrap_or_else(|| panic!("{v} must be rejected"));
         assert_eq!(err.field, *field, "{v}");
     }
 }
@@ -126,13 +139,29 @@ macro_rules! trigger_contract_tests {
 trigger_contract_tests!(
     interval,
     "interval",
-    valid = [json!({"kind": "interval", "hours": 1}), json!({"kind": "interval", "hours": 6}), json!({"kind": "interval", "hours": 720})],
+    valid = [
+        json!({"kind": "interval", "hours": 1}),
+        json!({"kind": "interval", "hours": 6}),
+        json!({"kind": "interval", "hours": 720})
+    ],
     invalid = [
         (json!({"kind": "interval"}), "rescanPolicy.trigger.hours"),
-        (json!({"kind": "interval", "hours": 0}), "rescanPolicy.trigger.hours"),
-        (json!({"kind": "interval", "hours": 721}), "rescanPolicy.trigger.hours"),
-        (json!({"kind": "interval", "hours": 1.5}), "rescanPolicy.trigger.hours"),
-        (json!({"kind": "interval", "hours": 6, "x": 1}), "rescanPolicy.trigger"),
+        (
+            json!({"kind": "interval", "hours": 0}),
+            "rescanPolicy.trigger.hours"
+        ),
+        (
+            json!({"kind": "interval", "hours": 721}),
+            "rescanPolicy.trigger.hours"
+        ),
+        (
+            json!({"kind": "interval", "hours": 1.5}),
+            "rescanPolicy.trigger.hours"
+        ),
+        (
+            json!({"kind": "interval", "hours": 6, "x": 1}),
+            "rescanPolicy.trigger"
+        ),
     ]
 );
 
@@ -145,13 +174,34 @@ trigger_contract_tests!(
         json!({"kind": "schedule", "days": [], "at": "02:30"}),
     ],
     invalid = [
-        (json!({"kind": "schedule", "days": ["monday"], "at": "03:00"}), "rescanPolicy.trigger.days"),
-        (json!({"kind": "schedule", "days": "mon", "at": "03:00"}), "rescanPolicy.trigger.days"),
-        (json!({"kind": "schedule", "days": [], "at": "25:00"}), "rescanPolicy.trigger.at"),
-        (json!({"kind": "schedule", "days": []}), "rescanPolicy.trigger.at"),
-        (json!({"kind": "schedule", "at": "03:00"}), "rescanPolicy.trigger.days"),
-        (json!({"kind": "schedule", "at": "03:00"}), "rescanPolicy.trigger.days"),
-        (json!({"kind": "schedule", "at": "03:00", "x": 1}), "rescanPolicy.trigger"),
+        (
+            json!({"kind": "schedule", "days": ["monday"], "at": "03:00"}),
+            "rescanPolicy.trigger.days"
+        ),
+        (
+            json!({"kind": "schedule", "days": "mon", "at": "03:00"}),
+            "rescanPolicy.trigger.days"
+        ),
+        (
+            json!({"kind": "schedule", "days": [], "at": "25:00"}),
+            "rescanPolicy.trigger.at"
+        ),
+        (
+            json!({"kind": "schedule", "days": []}),
+            "rescanPolicy.trigger.at"
+        ),
+        (
+            json!({"kind": "schedule", "at": "03:00"}),
+            "rescanPolicy.trigger.days"
+        ),
+        (
+            json!({"kind": "schedule", "at": "03:00"}),
+            "rescanPolicy.trigger.days"
+        ),
+        (
+            json!({"kind": "schedule", "at": "03:00", "x": 1}),
+            "rescanPolicy.trigger"
+        ),
     ]
 );
 
@@ -159,5 +209,8 @@ trigger_contract_tests!(
     manual,
     "manual",
     valid = [json!({"kind": "manual"})],
-    invalid = [(json!({"kind": "manual", "hours": 1}), "rescanPolicy.trigger")]
+    invalid = [(
+        json!({"kind": "manual", "hours": 1}),
+        "rescanPolicy.trigger"
+    )]
 );

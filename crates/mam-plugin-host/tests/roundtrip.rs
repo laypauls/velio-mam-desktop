@@ -11,7 +11,14 @@ fn t_phost_rt_01_round_trip_with_host_call_and_provider() {
     let (host, _, _) = new_host(PLUGIN, |_| {});
     // Act
     let cmd = run(&host, "hostcall", json!({"n": 41})).unwrap();
-    let prov = host.invoke(InvokeKind::Provider, "meta.extract", json!({"asset": 7}), InvokeScope::empty()).unwrap();
+    let prov = host
+        .invoke(
+            InvokeKind::Provider,
+            "meta.extract",
+            json!({"asset": 7}),
+            InvokeScope::empty(),
+        )
+        .unwrap();
     // Assert
     assert_eq!(cmd, json!({"got": {"n": 41}}));
     assert_eq!(prov, json!({"kind": "provider", "p": {"asset": 7}}));
@@ -23,16 +30,25 @@ fn t_phost_rt_01_round_trip_with_host_call_and_provider() {
 fn t_phost_rt_02_plugin_id_comes_from_the_host_not_the_worker() {
     let (host, api, _) = new_host(PLUGIN, |_| {});
     run(&host, "hostcall", json!({"n": 1})).unwrap();
-    assert_eq!(api.calls.lock().unwrap().as_slice(), &[("com.example.test".to_owned(), "echo".to_owned())]);
+    assert_eq!(
+        api.calls.lock().unwrap().as_slice(),
+        &[("com.example.test".to_owned(), "echo".to_owned())]
+    );
 }
 
 #[test]
 fn t_phost_rt_03_host_error_reaches_js_as_exception_with_code() {
     let (host, _, _) = new_host(PLUGIN, |_| {});
-    assert_eq!(run(&host, "hosterr", json!(null)).unwrap(), json!({"code": "denied", "message": "nope"}));
+    assert_eq!(
+        run(&host, "hosterr", json!(null)).unwrap(),
+        json!({"code": "denied", "message": "nope"})
+    );
     // 처리되지 않은 호스트 오류는 스크립트 오류로 돌아오고 워커는 산다 (결함 아님)
     let e = run(&host, "unknown_host", json!(null)).unwrap_err();
-    assert!(matches!(&e, InvokeError::Script(m) if m.contains("unknown host method")), "{e:?}");
+    assert!(
+        matches!(&e, InvokeError::Script(m) if m.contains("unknown host method")),
+        "{e:?}"
+    );
     assert!(!e.is_fault());
     ok_echo(&host);
     assert_eq!(host.starts(), 1);
@@ -50,11 +66,25 @@ fn t_phost_rt_04_script_exception_is_an_error_not_a_fault() {
 #[test]
 fn t_phost_rt_05_unregistered_handler_and_async_handler_are_rejected() {
     let (host, _, _) = new_host(PLUGIN, |_| {});
-    assert_eq!(run(&host, "nope", json!(null)).unwrap_err(), InvokeError::NotRegistered("nope".into()));
+    assert_eq!(
+        run(&host, "nope", json!(null)).unwrap_err(),
+        InvokeError::NotRegistered("nope".into())
+    );
     // 종류가 다르면(명령 id 를 provider 로) 미등록
-    assert!(matches!(host.invoke(InvokeKind::Provider, "echo", json!(null), InvokeScope::empty()), Err(InvokeError::NotRegistered(_))));
+    assert!(matches!(
+        host.invoke(
+            InvokeKind::Provider,
+            "echo",
+            json!(null),
+            InvokeScope::empty()
+        ),
+        Err(InvokeError::NotRegistered(_))
+    ));
     let e = run(&host, "async", json!(null)).unwrap_err();
-    assert!(matches!(&e, InvokeError::Script(m) if m.contains("async")), "{e:?}");
+    assert!(
+        matches!(&e, InvokeError::Script(m) if m.contains("async")),
+        "{e:?}"
+    );
 }
 
 #[test]
@@ -74,7 +104,10 @@ fn t_phost_rt_07_result_over_line_limit_becomes_error_and_worker_survives() {
     // Act
     let e = run(&host, "bigresult", json!(null)).unwrap_err();
     // Assert: 워커가 스스로 too_large 오류로 바꾼다 — 호스트가 죽이지 않는다
-    assert!(matches!(&e, InvokeError::Plugin { code, .. } if code == "too_large"), "{e:?}");
+    assert!(
+        matches!(&e, InvokeError::Plugin { code, .. } if code == "too_large"),
+        "{e:?}"
+    );
     ok_echo(&host);
     assert_eq!(host.starts(), 1);
 }
@@ -82,7 +115,11 @@ fn t_phost_rt_07_result_over_line_limit_becomes_error_and_worker_survives() {
 #[test]
 fn t_phost_rt_08_init_failures_are_reported_and_counted_as_faults() {
     // 문법 오류·로드 중 예외·중복 등록
-    for src in ["this is not js (", "throw new Error('load failed');", "mam.commands.register('a', () => 1); mam.commands.register('a', () => 2);"] {
+    for src in [
+        "this is not js (",
+        "throw new Error('load failed');",
+        "mam.commands.register('a', () => 1); mam.commands.register('a', () => 2);",
+    ] {
         let (host, _, _) = new_host(src, |_| {});
         let e = run(&host, "a", json!(null)).unwrap_err();
         assert!(matches!(e, InvokeError::Init(_)), "{src}: {e:?}");
@@ -96,15 +133,27 @@ fn t_phost_rt_08_init_failures_are_reported_and_counted_as_faults() {
 fn t_phost_scope_01_scope_is_sorted_deduped_and_deadline_stamped_by_supervisor() {
     // Arrange: 호출자가 만든 범위는 마감이 의미 없는 값(과거)이다
     let (host, api, _) = new_host(PLUGIN, |_| {});
-    let scope = InvokeScope::new(vec![9, 3, 3, 5]).unwrap().with_deadline(std::time::Instant::now());
+    let scope = InvokeScope::new(vec![9, 3, 3, 5])
+        .unwrap()
+        .with_deadline(std::time::Instant::now());
     let before = std::time::Instant::now();
     // Act
-    host.invoke_with_timeout(InvokeKind::Command, "hostcall", json!({"n": 1}), scope, std::time::Duration::from_secs(7)).unwrap();
+    host.invoke_with_timeout(
+        InvokeKind::Command,
+        "hostcall",
+        json!({"n": 1}),
+        scope,
+        std::time::Duration::from_secs(7),
+    )
+    .unwrap();
     // Assert
     let seen = api.scopes.lock().unwrap();
     assert_eq!(seen[0].0, vec![3, 5, 9]);
     let remain = seen[0].1.duration_since(before);
-    assert!(remain >= std::time::Duration::from_secs(7) && remain < std::time::Duration::from_secs(9), "{remain:?}");
+    assert!(
+        remain >= std::time::Duration::from_secs(7) && remain < std::time::Duration::from_secs(9),
+        "{remain:?}"
+    );
 }
 
 #[test]

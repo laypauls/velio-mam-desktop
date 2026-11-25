@@ -53,13 +53,24 @@ fn t_total_01_purged_assets_are_not_counted_and_total_equals_rating_sum() {
     assert_eq!(total(&env), 3);
 
     // Act: 이미지 제외 + 정리 -> 제외한 유형의 자산은 연결 데이터와 위치가 지워지고 deleted 로 남는다
-    let types = MediaTypeSet { image: false, video: true, audio: true };
+    let types = MediaTypeSet {
+        image: false,
+        video: true,
+        audio: true,
+    };
     env.ingest.set_folder_media_types(id, types, true).unwrap();
     bump_generation(&env, id);
 
     // Assert
-    assert_eq!(env.count("SELECT COUNT(*) FROM media_assets WHERE status = 'active'"), 2);
-    assert_eq!(env.count("SELECT COUNT(*) FROM media_assets WHERE status = 'deleted'"), 1, "자산 행은 deleted 로 보존");
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM media_assets WHERE status = 'active'"),
+        2
+    );
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM media_assets WHERE status = 'deleted'"),
+        1,
+        "자산 행은 deleted 로 보존"
+    );
     assert_eq!(total(&env), 2);
     assert_eq!(total(&env), rating_sum(&env));
 }
@@ -127,8 +138,14 @@ fn t_total_04_hidden_folder_and_orphans_are_both_excluded() {
     scan(&env, other);
 
     // Act: other 의 이미지는 purge(고아), lib 는 숨김
-    let types = MediaTypeSet { image: false, video: true, audio: true };
-    env.ingest.set_folder_media_types(other, types, true).unwrap();
+    let types = MediaTypeSet {
+        image: false,
+        video: true,
+        audio: true,
+    };
+    env.ingest
+        .set_folder_media_types(other, types, true)
+        .unwrap();
     env.ingest.set_folder_hidden(lib, true).unwrap();
 
     // Assert

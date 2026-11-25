@@ -1,7 +1,7 @@
 //! 분류: Validation. External·Concurrency 는 순수 crate(IO·공유 상태 없음)라 해당 없음.
 
 use mam_plugin_manifest::{
-    MainPathError as M, ManifestError as E, Manifest, Permission, WhenErrorKind, check_engine,
+    MainPathError as M, Manifest, ManifestError as E, Permission, WhenErrorKind, check_engine,
     parse_manifest,
 };
 use semver::Version;
@@ -32,7 +32,12 @@ fn err(patch: Value) -> E {
 
 #[test]
 fn t_pmanifest_09_unknown_permissions() {
-    for p in ["network.fetch", "asset.write.original", "process.spawn", "fs.read"] {
+    for p in [
+        "network.fetch",
+        "asset.write.original",
+        "process.spawn",
+        "fs.read",
+    ] {
         assert_eq!(
             err(json!({ "permissions": [p] })),
             E::UnknownPermission { value: p.into() }
@@ -44,7 +49,9 @@ fn t_pmanifest_09_unknown_permissions() {
 fn t_pmanifest_10_duplicate_permission() {
     assert_eq!(
         err(json!({ "permissions": ["kv.read", "kv.read"] })),
-        E::DuplicatePermission { value: "kv.read".into() }
+        E::DuplicatePermission {
+            value: "kv.read".into()
+        }
     );
 }
 
@@ -58,40 +65,61 @@ fn t_pmanifest_11_engine_incompatible() {
 #[test]
 fn t_pmanifest_12_invalid_version_and_req() {
     for v in ["1.0", "v1.0.0"] {
-        assert_eq!(err(json!({ "version": v })), E::InvalidVersion { value: v.into() });
+        assert_eq!(
+            err(json!({ "version": v })),
+            E::InvalidVersion { value: v.into() }
+        );
     }
     assert_eq!(
         err(json!({ "engines": { "mam": "abc" } })),
-        E::InvalidVersionReq { value: "abc".into() }
+        E::InvalidVersionReq {
+            value: "abc".into()
+        }
     );
 }
 
 #[test]
 fn t_pmanifest_13_missing_required_fields() {
     for (field, path) in [
-        ("apiVersion", "apiVersion"), ("id", "id"), ("version", "version"),
-        ("engines", "engines"), ("main", "main"), ("displayName", "displayName"),
+        ("apiVersion", "apiVersion"),
+        ("id", "id"),
+        ("version", "version"),
+        ("engines", "engines"),
+        ("main", "main"),
+        ("displayName", "displayName"),
     ] {
         let mut v = base();
         v.as_object_mut().expect("obj").remove(field);
-        assert_eq!(parse(&v), Err(E::MissingField { path: path.into() }), "{field}");
+        assert_eq!(
+            parse(&v),
+            Err(E::MissingField { path: path.into() }),
+            "{field}"
+        );
     }
     assert_eq!(
         err(json!({ "engines": {} })),
-        E::MissingField { path: "engines.mam".into() }
+        E::MissingField {
+            path: "engines.mam".into()
+        }
     );
 }
 
 #[test]
 fn t_pmanifest_14_api_version_checked_first() {
     for n in [0, 2] {
-        assert!(matches!(err(json!({ "apiVersion": n })), E::UnsupportedApiVersion { .. }));
+        assert!(matches!(
+            err(json!({ "apiVersion": n })),
+            E::UnsupportedApiVersion { .. }
+        ));
     }
     assert!(matches!(
         err(json!({ "apiVersion": 2, "futureField": true })),
         E::UnsupportedApiVersion { .. }
     ));
-    assert!(matches!(err(json!({ "apiVersion": "1" })), E::UnsupportedApiVersion { .. }));
+    assert!(matches!(
+        err(json!({ "apiVersion": "1" })),
+        E::UnsupportedApiVersion { .. }
+    ));
 }
 
 #[test]
@@ -149,9 +177,18 @@ fn t_pmanifest_17_unknown_references() {
 
 #[test]
 fn t_pmanifest_18_invalid_activation_events() {
-    for ev in ["onMediaSelected", "onStartup", "*", "onCommand:", "onCommand:a b"] {
+    for ev in [
+        "onMediaSelected",
+        "onStartup",
+        "*",
+        "onCommand:",
+        "onCommand:a b",
+    ] {
         assert!(
-            matches!(err(json!({ "activationEvents": [ev] })), E::InvalidActivationEvent { .. }),
+            matches!(
+                err(json!({ "activationEvents": [ev] })),
+                E::InvalidActivationEvent { .. }
+            ),
             "{ev}"
         );
     }
@@ -175,18 +212,30 @@ fn t_pmanifest_19_invalid_when_reports_path_and_kind() {
 #[test]
 fn t_pmanifest_20_main_path_table() {
     let table: [(&str, M); 16] = [
-        ("../x.js", M::ParentEscape), ("dist/../../x.js", M::ParentEscape),
-        ("/x.js", M::Absolute), ("C:/x.js", M::Colon), ("C:x.js", M::Colon),
-        ("\\\\srv\\x.js", M::Backslash), ("dist\\x.js", M::Backslash),
-        ("x.ts", M::NotJs), ("x.JS", M::NotJs), ("x.js:s", M::Colon),
-        ("dist//x.js", M::EmptyComponent), ("dist/./x.js", M::DotComponent),
-        ("con.js", M::ReservedName), ("aux/x.js", M::ReservedName),
-        ("x.js.", M::TrailingDotOrSpace), ("", M::Empty),
+        ("../x.js", M::ParentEscape),
+        ("dist/../../x.js", M::ParentEscape),
+        ("/x.js", M::Absolute),
+        ("C:/x.js", M::Colon),
+        ("C:x.js", M::Colon),
+        ("\\\\srv\\x.js", M::Backslash),
+        ("dist\\x.js", M::Backslash),
+        ("x.ts", M::NotJs),
+        ("x.JS", M::NotJs),
+        ("x.js:s", M::Colon),
+        ("dist//x.js", M::EmptyComponent),
+        ("dist/./x.js", M::DotComponent),
+        ("con.js", M::ReservedName),
+        ("aux/x.js", M::ReservedName),
+        ("x.js.", M::TrailingDotOrSpace),
+        ("", M::Empty),
     ];
     for (main, reason) in table {
         assert_eq!(
             err(json!({ "main": main })),
-            E::InvalidMain { value: main.into(), reason },
+            E::InvalidMain {
+                value: main.into(),
+                reason
+            },
             "{main:?}"
         );
     }
@@ -195,10 +244,22 @@ fn t_pmanifest_20_main_path_table() {
 #[test]
 fn t_pmanifest_20b_main_path_rejects_console_device_names_and_superscript_com_lpt() {
     // Validation — conin$/conout$ 와 COM¹²³/LPT¹²³ (대소문자·끝 공백 무시) 는 장치로 열린다
-    for main in ["conin$.js", "CONOUT$.js", "COM\u{b9}.js", "com\u{b2}.js", "LPT\u{b3}.js", "dist/lpt\u{b9}/x.js", "con .js", "com1.js"] {
+    for main in [
+        "conin$.js",
+        "CONOUT$.js",
+        "COM\u{b9}.js",
+        "com\u{b2}.js",
+        "LPT\u{b3}.js",
+        "dist/lpt\u{b9}/x.js",
+        "con .js",
+        "com1.js",
+    ] {
         assert_eq!(
             err(json!({ "main": main })),
-            E::InvalidMain { value: main.into(), reason: M::ReservedName },
+            E::InvalidMain {
+                value: main.into(),
+                reason: M::ReservedName
+            },
             "{main:?}"
         );
     }
@@ -210,8 +271,19 @@ fn t_pmanifest_20b_main_path_rejects_console_device_names_and_superscript_com_lp
 
 #[test]
 fn t_pmanifest_21_plugin_id_table() {
-    for id in ["Com.example", "single", "com..x", ".com.x", "com.x-", "con.example", "com.exa_mple"] {
-        assert!(matches!(err(json!({ "id": id })), E::InvalidId { .. }), "{id}");
+    for id in [
+        "Com.example",
+        "single",
+        "com..x",
+        ".com.x",
+        "com.x-",
+        "con.example",
+        "com.exa_mple",
+    ] {
+        assert!(
+            matches!(err(json!({ "id": id })), E::InvalidId { .. }),
+            "{id}"
+        );
     }
 }
 
@@ -230,14 +302,21 @@ fn t_pmanifest_22_export_requires_permission() {
 #[test]
 fn t_pmanifest_23_title_key_asset_kind_extension() {
     for key in ["", "has space", "-lead"] {
-        assert!(matches!(err(json!({ "displayName": key })), E::InvalidTitleKey { .. }), "{key:?}");
+        assert!(
+            matches!(
+                err(json!({ "displayName": key })),
+                E::InvalidTitleKey { .. }
+            ),
+            "{key:?}"
+        );
     }
     let bad_kind = json!({ "metadata": [{ "id": "p", "title": "t", "assetKinds": ["doc"] }] });
     assert!(matches!(
         err(json!({ "contributes": { "providers": bad_kind } })),
         E::InvalidAssetKind { .. }
     ));
-    let dup_kind = json!({ "metadata": [{ "id": "p", "title": "t", "assetKinds": ["image", "image"] }] });
+    let dup_kind =
+        json!({ "metadata": [{ "id": "p", "title": "t", "assetKinds": ["image", "image"] }] });
     assert!(matches!(
         err(json!({ "contributes": { "providers": dup_kind } })),
         E::InvalidAssetKind { .. }

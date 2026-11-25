@@ -16,7 +16,9 @@ use crate::protocol::{Command, Message, PROTOCOL_VERSION, RENDER_CAP, fit_render
 fn surface_error(e: SurfaceError) -> PlayerError {
     match e {
         SurfaceError::Timeout => PlayerError::Timeout,
-        SurfaceError::Unsupported => PlayerError::SurfaceUnavailable("shared buffers are not supported".into()),
+        SurfaceError::Unsupported => {
+            PlayerError::SurfaceUnavailable("shared buffers are not supported".into())
+        }
         SurfaceError::Failed(m) => PlayerError::SurfaceUnavailable(m),
     }
 }
@@ -32,7 +34,10 @@ impl Core {
             }
             self.teardown_worker(false);
         }
-        let spawner = self.spawner.clone().ok_or(PlayerError::WorkerNotFound("worker executable or libmpv"))?;
+        let spawner = self
+            .spawner
+            .clone()
+            .ok_or(PlayerError::WorkerNotFound("worker executable or libmpv"))?;
         let conn = spawner.spawn()?;
         self.next_inc += 1;
         let id = self.next_inc;
@@ -42,8 +47,13 @@ impl Core {
         self.shared.set_writer(Some(inc.writer()));
         let verdict = match ready.recv_timeout(self.cfg.timeouts.spawn_ready) {
             Ok(Some(Message::Ready { protocol, .. })) if protocol == PROTOCOL_VERSION => Ok(()),
-            Ok(Some(Message::Ready { protocol, .. })) => Err(PlayerError::ProtocolMismatch { worker: protocol, host: PROTOCOL_VERSION }),
-            Ok(_) => Err(PlayerError::SpawnFailed("worker failed to initialize".into())),
+            Ok(Some(Message::Ready { protocol, .. })) => Err(PlayerError::ProtocolMismatch {
+                worker: protocol,
+                host: PROTOCOL_VERSION,
+            }),
+            Ok(_) => Err(PlayerError::SpawnFailed(
+                "worker failed to initialize".into(),
+            )),
             Err(_) => Err(PlayerError::SpawnFailed("worker start timed out".into())),
         };
         if let Err(e) = verdict {
@@ -77,7 +87,11 @@ impl Core {
         for p in std::mem::take(&mut self.pending) {
             if let Some(r) = p.reply {
                 // 죽은 워커에 보낸 명령 — 복원이 설정을 다시 적용하므로 호출자에게는 성공으로 답한다
-                let res = if matches!(p.cmd, Command::FrameStep | Command::FrameBackStep) { Err(PlayerError::Restarting) } else { Ok(Reply::Unit) };
+                let res = if matches!(p.cmd, Command::FrameStep | Command::FrameBackStep) {
+                    Err(PlayerError::Restarting)
+                } else {
+                    Ok(Reply::Unit)
+                };
                 let _ = r.send(res);
             }
         }
@@ -87,10 +101,17 @@ impl Core {
 
     fn new_bank(&mut self) -> Result<BankAttach, PlayerError> {
         let (w, h) = self.rem.render_size;
-        let handle = self.inc.as_ref().ok_or(PlayerError::HostGone)?.process.raw_handle();
+        let handle = self
+            .inc
+            .as_ref()
+            .ok_or(PlayerError::HostGone)?
+            .process
+            .raw_handle();
         let epoch = self.next_epoch;
         self.next_epoch += 1;
-        self.surface.create_bank(epoch, w, h, handle).map_err(surface_error)
+        self.surface
+            .create_bank(epoch, w, h, handle)
+            .map_err(surface_error)
     }
 
     /// 새 epoch 버퍼를 만들고 `Attach` 를 보낸다. 성공은 `on_attached`, 실패는 `on_attach_failed` 가 이어받는다
@@ -100,8 +121,25 @@ impl Core {
         // 새 epoch 의 프레임이 Attach 응답보다 먼저 와도 받아들이도록 먼저 올린다
         self.shared.epoch.store(b.epoch, Ordering::Release);
         self.last_epoch_change = Some(Instant::now());
-        let cmd = Command::Attach { epoch: b.epoch, w: b.w, h: b.h, stride: b.stride, size: b.size, handles: b.handles };
-        match self.send_pending(cmd, Done::Attach { new: b.epoch, old, purpose }, None, false, self.cfg.timeouts.command) {
+        let cmd = Command::Attach {
+            epoch: b.epoch,
+            w: b.w,
+            h: b.h,
+            stride: b.stride,
+            size: b.size,
+            handles: b.handles,
+        };
+        match self.send_pending(
+            cmd,
+            Done::Attach {
+                new: b.epoch,
+                old,
+                purpose,
+            },
+            None,
+            false,
+            self.cfg.timeouts.command,
+        ) {
             Ok(()) => Ok(()),
             Err(e) => {
                 self.shared.epoch.store(old, Ordering::Release);
@@ -161,7 +199,10 @@ impl Core {
             self.queued_size = None;
             return;
         }
-        if self.last_epoch_change.is_some_and(|t| now.saturating_duration_since(t) < self.cfg.timeouts.resize_interval) {
+        if self
+            .last_epoch_change
+            .is_some_and(|t| now.saturating_duration_since(t) < self.cfg.timeouts.resize_interval)
+        {
             return;
         }
         self.queued_size = None;
@@ -180,7 +221,9 @@ impl Core {
         self.streak = 0;
         let usable = self.spawner.is_some() && self.surface.capabilities_ok();
         if !usable {
-            let _ = reply.send(Err(PlayerError::WorkerNotFound("worker executable, libmpv or shared buffers")));
+            let _ = reply.send(Err(PlayerError::WorkerNotFound(
+                "worker executable, libmpv or shared buffers",
+            )));
             return;
         }
         if let Err(e) = self.ensure_worker() {
@@ -230,10 +273,26 @@ impl Core {
     }
 
     fn send_open_command(&mut self) {
-        let Some(path) = self.rem.path.as_ref().map(|p| p.to_string_lossy().into_owned()) else { return };
-        let cmd = Command::Open { path, paused: self.rem.paused, ranges: self.rem.ranges.clone(), duration_ms: self.rem.duration_hint_ms, start_ms: self.rem.start_ms };
+        let Some(path) = self
+            .rem
+            .path
+            .as_ref()
+            .map(|p| p.to_string_lossy().into_owned())
+        else {
+            return;
+        };
+        let cmd = Command::Open {
+            path,
+            paused: self.rem.paused,
+            ranges: self.rem.ranges.clone(),
+            duration_ms: self.rem.duration_hint_ms,
+            start_ms: self.rem.start_ms,
+        };
         if !self.rem.render_active {
-            let _ = self.inc.as_mut().map(|i| i.send(Command::SetRenderActive { active: false }, false));
+            let _ = self
+                .inc
+                .as_mut()
+                .map(|i| i.send(Command::SetRenderActive { active: false }, false));
         }
         let timeout = self.cfg.timeouts.open;
         if let Err(e) = self.send_pending(cmd, Done::OpenAck, None, false, timeout) {
@@ -245,18 +304,32 @@ impl Core {
     pub fn try_finish_open(&mut self, now: Instant) {
         let grace = self.cfg.timeouts.frame_grace;
         let frames = self.shared.frames.load(Ordering::Acquire);
-        let Phase::Opening(ow) = &self.phase else { return };
-        let Some((time_ms, at)) = ow.restart else { return };
+        let Phase::Opening(ow) = &self.phase else {
+            return;
+        };
+        let Some((time_ms, at)) = ow.restart else {
+            return;
+        };
         if !(ow.loaded && ow.attached) {
             return;
         }
-        let frame = frames > ow.baseline || !self.rem.render_active || now.saturating_duration_since(at) >= grace;
+        let frame = frames > ow.baseline
+            || !self.rem.render_active
+            || now.saturating_duration_since(at) >= grace;
         if !frame {
             return;
         }
-        let Phase::Opening(ow) = std::mem::replace(&mut self.phase, Phase::Active) else { return };
+        let Phase::Opening(ow) = std::mem::replace(&mut self.phase, Phase::Active) else {
+            return;
+        };
         self.rem.pos_ms = time_ms;
-        let info = OpenInfo { session_id: self.rem.session_id, length_ms: self.rem.length_ms, fps: self.rem.fps, paused: self.rem.paused, time_ms };
+        let info = OpenInfo {
+            session_id: self.rem.session_id,
+            length_ms: self.rem.length_ms,
+            fps: self.rem.fps,
+            paused: self.rem.paused,
+            time_ms,
+        };
         let seed = self.state_event();
         self.bridge.seed(seed);
         let _ = ow.reply.send(Ok(Reply::Open(info)));
@@ -285,8 +358,19 @@ impl Core {
 
     /// 세션 상태를 비운다 (설정 중 음량·숨김 상태는 유지). 이후 이전 세션의 이벤트는 나가지 않는다
     pub fn end_session(&mut self) {
-        let keep = (self.rem.volume, self.rem.muted, self.rem.render_active, self.rem.render_size);
-        self.rem = Remembered { volume: keep.0, muted: keep.1, render_active: keep.2, render_size: keep.3, ..Remembered::default() };
+        let keep = (
+            self.rem.volume,
+            self.rem.muted,
+            self.rem.render_active,
+            self.rem.render_size,
+        );
+        self.rem = Remembered {
+            volume: keep.0,
+            muted: keep.1,
+            render_active: keep.2,
+            render_size: keep.3,
+            ..Remembered::default()
+        };
         self.ended = false;
         self.bridge.reset();
         self.queued_size = None;
@@ -304,10 +388,25 @@ impl Core {
     // ---------- 명령 전송 ----------
 
     /// 응답을 기다리는 명령을 보낸다. `retry` 면 응답이 없을 때 한 번 더 보낸다 (멱등 명령만)
-    pub fn send_pending(&mut self, cmd: Command, done: Done, reply: Option<ReplyTx>, retry: bool, timeout: Duration) -> Result<(), PlayerError> {
+    pub fn send_pending(
+        &mut self,
+        cmd: Command,
+        done: Done,
+        reply: Option<ReplyTx>,
+        retry: bool,
+        timeout: Duration,
+    ) -> Result<(), PlayerError> {
         let inc = self.inc.as_mut().ok_or(PlayerError::HostGone)?;
         let id = inc.send(cmd.clone(), true).ok_or(PlayerError::Timeout)?;
-        self.pending.push(Pending { id, cmd, done, reply, deadline: Instant::now() + timeout, retry, timeout });
+        self.pending.push(Pending {
+            id,
+            cmd,
+            done,
+            reply,
+            deadline: Instant::now() + timeout,
+            retry,
+            timeout,
+        });
         Ok(())
     }
 
@@ -320,7 +419,11 @@ impl Core {
         match std::mem::replace(&mut self.phase, Phase::Idle) {
             Phase::Opening(ow) => {
                 // 로드 전에 죽으면 복원 루프 없이 열기만 실패시킨다 (워커는 다음 열기에서 다시 뜬다)
-                let _ = ow.reply.send(Err(if why == "open timed out" { PlayerError::Timeout } else { PlayerError::OpenFailed("worker stopped".into()) }));
+                let _ = ow.reply.send(Err(if why == "open timed out" {
+                    PlayerError::Timeout
+                } else {
+                    PlayerError::OpenFailed("worker stopped".into())
+                }));
                 self.end_session();
             }
             Phase::Active | Phase::Restoring(_) => self.schedule_restart(),
@@ -342,10 +445,15 @@ impl Core {
         }
         let mut e = self.state_event();
         e.state = EventState::Restarting;
-        e.restart = Some(RestartInfo { attempt: self.streak, max: MAX_RESTARTS });
+        e.restart = Some(RestartInfo {
+            attempt: self.streak,
+            max: MAX_RESTARTS,
+        });
         self.bridge.emit(e, Emit::Transition, Instant::now());
         let wait = self.cfg.timeouts.backoff[usize::from(self.streak - 1).min(2)];
-        self.phase = Phase::Backoff { until: Instant::now() + wait };
+        self.phase = Phase::Backoff {
+            until: Instant::now() + wait,
+        };
     }
 
     fn fail_for_good(&mut self) {
@@ -355,7 +463,10 @@ impl Core {
         e.state = EventState::RestartFailed;
         e.error = Some("player worker stopped repeatedly".into());
         e.error_code = Some(PlayerErrorCode::PlayerWorkerCrashed);
-        e.restart = Some(RestartInfo { attempt: MAX_RESTARTS, max: MAX_RESTARTS });
+        e.restart = Some(RestartInfo {
+            attempt: MAX_RESTARTS,
+            max: MAX_RESTARTS,
+        });
         self.bridge.emit(e, Emit::Transition, Instant::now());
         self.cancel_restart_reply(PlayerError::RestartFailed);
     }
@@ -382,7 +493,9 @@ impl Core {
     }
 
     fn send_restore_commands(&mut self) {
-        let Phase::Restoring(rw) = &mut self.phase else { return };
+        let Phase::Restoring(rw) = &mut self.phase else {
+            return;
+        };
         rw.attached = true;
         rw.baseline = self.shared.frames.load(Ordering::Acquire);
         let cmds = rw.plan.start();
@@ -396,15 +509,23 @@ impl Core {
     pub fn try_finish_restore(&mut self, now: Instant) {
         let grace = self.cfg.timeouts.frame_grace;
         let frames = self.shared.frames.load(Ordering::Acquire);
-        let Phase::Restoring(rw) = &self.phase else { return };
+        let Phase::Restoring(rw) = &self.phase else {
+            return;
+        };
         if !(rw.attached && rw.plan.is_done()) {
             return;
         }
-        let frame = frames > rw.baseline || !self.rem.render_active || rw.restart_at.is_some_and(|t| now.saturating_duration_since(t) >= grace);
+        let frame = frames > rw.baseline
+            || !self.rem.render_active
+            || rw
+                .restart_at
+                .is_some_and(|t| now.saturating_duration_since(t) >= grace);
         if !frame {
             return;
         }
-        let Phase::Restoring(rw) = std::mem::replace(&mut self.phase, Phase::Active) else { return };
+        let Phase::Restoring(rw) = std::mem::replace(&mut self.phase, Phase::Active) else {
+            return;
+        };
         let r = rw.plan.remembered();
         self.rem.paused = r.paused;
         self.rem.pos_ms = r.pos_ms;
@@ -418,7 +539,13 @@ impl Core {
         }
         self.emit_state(Emit::Transition);
         if let Some(reply) = manual {
-            let info = OpenInfo { session_id: self.rem.session_id, length_ms: self.rem.length_ms, fps: self.rem.fps, paused: self.rem.paused, time_ms: self.rem.pos_ms };
+            let info = OpenInfo {
+                session_id: self.rem.session_id,
+                length_ms: self.rem.length_ms,
+                fps: self.rem.fps,
+                paused: self.rem.paused,
+                time_ms: self.rem.pos_ms,
+            };
             let _ = reply.send(Ok(Reply::Open(info)));
         }
     }

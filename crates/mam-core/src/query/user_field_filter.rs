@@ -17,16 +17,28 @@ pub enum UserFieldFilter {
     #[serde(rename_all = "camelCase")]
     KeywordAnyOf { field_id: i64, values: Vec<String> },
     #[serde(rename_all = "camelCase")]
-    NumberRange { field_id: i64, min: Option<f64>, max: Option<f64> },
+    NumberRange {
+        field_id: i64,
+        min: Option<f64>,
+        max: Option<f64>,
+    },
     /// `YYYYMMDD`
     #[serde(rename_all = "camelCase")]
-    DateRange { field_id: i64, min: Option<i64>, max: Option<i64> },
+    DateRange {
+        field_id: i64,
+        min: Option<i64>,
+        max: Option<i64>,
+    },
     #[serde(rename_all = "camelCase")]
     Bool { field_id: i64, value: bool },
     #[serde(rename_all = "camelCase")]
     EnumAnyOf { field_id: i64, option_ids: Vec<i64> },
     #[serde(rename_all = "camelCase")]
-    MultiEnum { field_id: i64, option_ids: Vec<i64>, all: bool },
+    MultiEnum {
+        field_id: i64,
+        option_ids: Vec<i64>,
+        all: bool,
+    },
     #[serde(rename_all = "camelCase")]
     Has { field_id: i64 },
     #[serde(rename_all = "camelCase")]

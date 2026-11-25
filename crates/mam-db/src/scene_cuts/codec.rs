@@ -134,7 +134,10 @@ pub fn select_auto(raw: &[(i64, f32)], duration_ms: Option<i64>) -> Vec<i64> {
         order.push(ms);
     }
     if order.len() > MAX_AUTO_CUTS {
-        tracing::warn!(count = order.len(), "scene auto cuts over limit; keeping top scores");
+        tracing::warn!(
+            count = order.len(),
+            "scene auto cuts over limit; keeping top scores"
+        );
         order.truncate(MAX_AUTO_CUTS);
     }
     order.sort_unstable();

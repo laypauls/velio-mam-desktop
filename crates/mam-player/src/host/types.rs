@@ -35,7 +35,11 @@ impl Default for Timeouts {
             command: Duration::from_secs(3),
             silence: Duration::from_secs(5),
             spawn_ready: Duration::from_secs(10),
-            backoff: [Duration::ZERO, Duration::from_millis(250), Duration::from_secs(1)],
+            backoff: [
+                Duration::ZERO,
+                Duration::from_millis(250),
+                Duration::from_secs(1),
+            ],
             quit: Duration::from_millis(800),
             frame_grace: Duration::from_millis(500),
             restore: Duration::from_secs(20),

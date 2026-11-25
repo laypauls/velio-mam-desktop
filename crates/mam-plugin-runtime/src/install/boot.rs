@@ -20,7 +20,11 @@ const BOOT_DB_WAIT: Duration = Duration::from_secs(30);
 
 pub(crate) fn load_all(rt: &PluginRuntime) {
     let rows = rt.deps.pool.read_until(Instant::now() + BOOT_DB_WAIT, |c| {
-        Ok((load_prefixed(c, INSTALLED)?, load_prefixed(c, ENABLED)?, load_prefixed(c, GRANTED)?))
+        Ok((
+            load_prefixed(c, INSTALLED)?,
+            load_prefixed(c, ENABLED)?,
+            load_prefixed(c, GRANTED)?,
+        ))
     });
     let (installed, enabled, granted) = match rows {
         Ok(rows) => rows,
@@ -31,17 +35,33 @@ pub(crate) fn load_all(rt: &PluginRuntime) {
     };
     let mut current: BTreeMap<String, Option<String>> = BTreeMap::new();
     for (id, raw) in &installed {
-        let entry = load_one(rt, id, raw, enabled.get(id).map(String::as_str), granted.get(id).map(String::as_str));
+        let entry = load_one(
+            rt,
+            id,
+            raw,
+            enabled.get(id).map(String::as_str),
+            granted.get(id).map(String::as_str),
+        );
         current.insert(id.clone(), parse_installed(raw).map(|(v, _)| v));
         rt.put_entry(entry);
     }
-    if let Err(e) = rt.gateway.grants().refresh_all(&rt.deps.pool, Instant::now() + BOOT_DB_WAIT) {
+    if let Err(e) = rt
+        .gateway
+        .grants()
+        .refresh_all(&rt.deps.pool, Instant::now() + BOOT_DB_WAIT)
+    {
         tracing::warn!(error = %e, "grant refresh failed at boot; affected plugins stay closed");
     }
     cleanup(&rt.deps.plugins_dir, &current);
 }
 
-fn load_one(rt: &PluginRuntime, id: &str, raw: &str, enabled_raw: Option<&str>, granted_raw: Option<&str>) -> Entry {
+fn load_one(
+    rt: &PluginRuntime,
+    id: &str,
+    raw: &str,
+    enabled_raw: Option<&str>,
+    granted_raw: Option<&str>,
+) -> Entry {
     let (version, installed_at) = parse_installed(raw).unwrap_or_default();
     let broken = || Entry::broken(id, &version, installed_at);
     // 활성 값이 없거나 손상됐으면 꺼진 것으로 본다
@@ -52,9 +72,14 @@ fn load_one(rt: &PluginRuntime, id: &str, raw: &str, enabled_raw: Option<&str>, 
     };
     let dir = rt.deps.plugins_dir.join(pid.as_str()).join(ver.to_string());
     match read_package(&dir, None) {
-        Ok(pkg) if pkg.manifest.id == pid && pkg.manifest.version == ver => rt.build_entry(pkg, enabled, known_perms(granted_raw), installed_at),
+        Ok(pkg) if pkg.manifest.id == pid && pkg.manifest.version == ver => {
+            rt.build_entry(pkg, enabled, known_perms(granted_raw), installed_at)
+        }
         Ok(_) => {
-            tracing::warn!(plugin = id, "installed package does not match its settings row");
+            tracing::warn!(
+                plugin = id,
+                "installed package does not match its settings row"
+            );
             broken()
         }
         Err(e) => {
@@ -69,13 +94,16 @@ fn cleanup(root: &Path, current: &BTreeMap<String, Option<String>>) {
     if !root.is_dir() {
         return;
     }
-    let warn = |what: &str, e: std::io::Error| tracing::warn!(error = %e, "plugin cleanup failed: {what}");
+    let warn =
+        |what: &str, e: std::io::Error| tracing::warn!(error = %e, "plugin cleanup failed: {what}");
     for name in [STAGING_DIR, TRASH_DIR] {
         if let Err(e) = remove_confined(root, &root.join(name)) {
             warn(name, e);
         }
     }
-    let Ok(children) = fs::read_dir(root) else { return };
+    let Ok(children) = fs::read_dir(root) else {
+        return;
+    };
     for child in children.flatten() {
         let path = child.path();
         let name = child.file_name();
@@ -99,7 +127,9 @@ fn cleanup(root: &Path, current: &BTreeMap<String, Option<String>>) {
 }
 
 fn remove_old_versions(root: &Path, id_dir: &Path, keep: &str) {
-    let Ok(versions) = fs::read_dir(id_dir) else { return };
+    let Ok(versions) = fs::read_dir(id_dir) else {
+        return;
+    };
     for v in versions.flatten() {
         if v.file_name().to_str() != Some(keep) {
             let _ = remove_confined(root, &v.path());

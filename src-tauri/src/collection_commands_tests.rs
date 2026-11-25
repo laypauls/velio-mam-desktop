@@ -38,7 +38,8 @@ fn call<T: Send + 'static>(
 #[test]
 fn t_ipc_46_reorder_target_deserializes_three_forms_and_responses_use_camel_case() {
     // Arrange + Act: 계약 `ReorderTarget` 세 모양
-    let before: ReorderTarget = serde_json::from_value(json!({"kind": "before", "assetId": 7})).unwrap();
+    let before: ReorderTarget =
+        serde_json::from_value(json!({"kind": "before", "assetId": 7})).unwrap();
     let start: ReorderTarget = serde_json::from_value(json!({"kind": "start"})).unwrap();
     let end: ReorderTarget = serde_json::from_value(json!({"kind": "end"})).unwrap();
 
@@ -54,10 +55,17 @@ fn t_ipc_46_reorder_target_deserializes_three_forms_and_responses_use_camel_case
         json!(null),
         json!("end"),
     ] {
-        assert!(serde_json::from_value::<ReorderTarget>(bad.clone()).is_err(), "{bad}");
+        assert!(
+            serde_json::from_value::<ReorderTarget>(bad.clone()).is_err(),
+            "{bad}"
+        );
     }
     // 응답 키
-    let m = serde_json::to_value(CollectionMembership { collection_id: 3, count: 2 }).unwrap();
+    let m = serde_json::to_value(CollectionMembership {
+        collection_id: 3,
+        count: 2,
+    })
+    .unwrap();
     assert_eq!(m, json!({"collectionId": 3, "count": 2}));
     let q = serde_json::to_value(PlayQueueItem {
         asset_id: 1,
@@ -83,12 +91,21 @@ fn t_ipc_47_collection_command_errors_map_to_contract_codes_without_internals() 
     ud.add_to_collection(cid, &[1, 2]).unwrap();
 
     // Act + Assert: 정상 경로
-    call(&ud, move |u| u.reorder_collection(cid, &[2], ReorderTarget::Start)).unwrap();
+    call(&ud, move |u| {
+        u.reorder_collection(cid, &[2], ReorderTarget::Start)
+    })
+    .unwrap();
     let queue = call(&ud, move |u| u.collection_play_queue(cid)).unwrap();
     assert_eq!(queue.iter().map(|i| i.asset_id).collect::<Vec<_>>(), [2, 1]);
     assert_eq!(queue[1].file_name, "clip.mp4");
     let membership = call(&ud, |u| u.collection_membership(&[1, 2])).unwrap();
-    assert_eq!(membership, [CollectionMembership { collection_id: cid, count: 2 }]);
+    assert_eq!(
+        membership,
+        [CollectionMembership {
+            collection_id: cid,
+            count: 2
+        }]
+    );
 
     // 오류 코드: 없는 컬렉션 -> not_found, 잘못된 인자 -> invalid_input
     let not_found = [
@@ -96,16 +113,37 @@ fn t_ipc_47_collection_command_errors_map_to_contract_codes_without_internals() 
         call(&ud, |u| u.collection_play_queue(999)).unwrap_err(),
     ];
     let invalid = [
-        call(&ud, move |u| u.reorder_collection(cid, &[], ReorderTarget::End)).unwrap_err(),
-        call(&ud, move |u| u.reorder_collection(cid, &[1], ReorderTarget::Before { asset_id: 1 })).unwrap_err(),
-        call(&ud, move |u| u.reorder_collection(cid, &[42], ReorderTarget::End)).unwrap_err(),
-        call(&ud, |u| u.collection_membership(&(1..=10_001).collect::<Vec<_>>())).unwrap_err(),
+        call(&ud, move |u| {
+            u.reorder_collection(cid, &[], ReorderTarget::End)
+        })
+        .unwrap_err(),
+        call(&ud, move |u| {
+            u.reorder_collection(cid, &[1], ReorderTarget::Before { asset_id: 1 })
+        })
+        .unwrap_err(),
+        call(&ud, move |u| {
+            u.reorder_collection(cid, &[42], ReorderTarget::End)
+        })
+        .unwrap_err(),
+        call(&ud, |u| {
+            u.collection_membership(&(1..=10_001).collect::<Vec<_>>())
+        })
+        .unwrap_err(),
     ];
-    assert!(not_found.iter().all(|e| e.code() == ErrorCode::NotFound), "{not_found:?}");
-    assert!(invalid.iter().all(|e| e.code() == ErrorCode::InvalidInput), "{invalid:?}");
+    assert!(
+        not_found.iter().all(|e| e.code() == ErrorCode::NotFound),
+        "{not_found:?}"
+    );
+    assert!(
+        invalid.iter().all(|e| e.code() == ErrorCode::InvalidInput),
+        "{invalid:?}"
+    );
     for e in not_found.iter().chain(invalid.iter()) {
         let body = serde_json::to_string(e).unwrap();
-        assert!(!body.contains("SELECT") && !body.contains("mam.sqlite") && !body.contains("C:/"), "{body}");
+        assert!(
+            !body.contains("SELECT") && !body.contains("mam.sqlite") && !body.contains("C:/"),
+            "{body}"
+        );
     }
     // 실패한 호출은 순서를 바꾸지 않았다
     let queue = call(&ud, move |u| u.collection_play_queue(cid)).unwrap();

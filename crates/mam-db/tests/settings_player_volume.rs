@@ -16,11 +16,16 @@ fn patch(v: Value) -> Map<String, Value> {
 }
 
 fn put_raw(conn: &Connection, key: &str, raw: &str) {
-    conn.execute("INSERT INTO settings (key, value) VALUES (?1, ?2)", [key, raw]).unwrap();
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?1, ?2)",
+        [key, raw],
+    )
+    .unwrap();
 }
 
 fn count_rows(conn: &Connection) -> i64 {
-    conn.query_row("SELECT COUNT(*) FROM settings", [], |r| r.get(0)).unwrap()
+    conn.query_row("SELECT COUNT(*) FROM settings", [], |r| r.get(0))
+        .unwrap()
 }
 
 fn vol_json(s: &mam_db::Settings) -> Value {
@@ -64,8 +69,11 @@ fn t_set_vol_03_level_clamps_to_0_100_and_rounds() {
         (json!(49.6), 50),
         (json!(1_000_000_000_000u64), 100),
     ] {
-        let s = settings::update(&mut db.conn, &patch(json!({"playerVolume": {"level": input.clone()}})))
-            .unwrap();
+        let s = settings::update(
+            &mut db.conn,
+            &patch(json!({"playerVolume": {"level": input.clone()}})),
+        )
+        .unwrap();
         assert_eq!(vol_json(&s)["level"], json!(want), "{input}");
     }
 }
@@ -89,16 +97,30 @@ fn t_set_vol_04_bad_fields_normalize_to_defaults_without_failing() {
     .unwrap();
     assert_eq!(vol_json(&s), json!({"level": 20, "muted": false}));
 
-    let s = settings::update(&mut db.conn, &patch(json!({"playerVolume": {"muted": true}}))).unwrap();
+    let s = settings::update(
+        &mut db.conn,
+        &patch(json!({"playerVolume": {"muted": true}})),
+    )
+    .unwrap();
     assert_eq!(vol_json(&s), json!({"level": 100, "muted": true}));
 }
 
 #[test]
 fn t_set_vol_05_non_object_patch_is_invalid_and_changes_nothing() {
     let mut db = migrated_db();
-    for bad in [json!(null), json!(true), json!("loud"), json!(50), json!([1])] {
-        let err = settings::update(&mut db.conn, &patch(json!({"playerVolume": bad.clone()}))).unwrap_err();
-        assert!(matches!(&err, SettingsError::Invalid(f) if f == "playerVolume"), "{bad}");
+    for bad in [
+        json!(null),
+        json!(true),
+        json!("loud"),
+        json!(50),
+        json!([1]),
+    ] {
+        let err = settings::update(&mut db.conn, &patch(json!({"playerVolume": bad.clone()})))
+            .unwrap_err();
+        assert!(
+            matches!(&err, SettingsError::Invalid(f) if f == "playerVolume"),
+            "{bad}"
+        );
     }
     assert_eq!(count_rows(&db.conn), 0);
 }
@@ -113,7 +135,12 @@ fn t_set_vol_06_corrupt_stored_values_recover_on_read() {
     assert_eq!(vol_json(&s), json!({"level": 100, "muted": false}));
     assert!(warnings.is_empty(), "{warnings:?}");
 
-    db.conn.execute("UPDATE settings SET value = '\"junk\"' WHERE key = 'player_volume'", []).unwrap();
+    db.conn
+        .execute(
+            "UPDATE settings SET value = '\"junk\"' WHERE key = 'player_volume'",
+            [],
+        )
+        .unwrap();
     let (s, warnings) = settings::load(&db.conn).unwrap();
     assert_eq!(vol_json(&s), json!({"level": 100, "muted": false}));
     assert_eq!(warnings.len(), 1, "{warnings:?}");

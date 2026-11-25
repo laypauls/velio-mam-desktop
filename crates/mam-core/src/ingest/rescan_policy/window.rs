@@ -17,7 +17,11 @@ impl TimeWindow {
         let t = local_naive(now_ms, zone).time();
         let m = (t.hour() * 60 + t.minute()) as u16;
         let (s, e) = (self.start.minutes(), self.end.minutes());
-        if s < e { s <= m && m < e } else { m >= s || m < e }
+        if s < e {
+            s <= m && m < e
+        } else {
+            m >= s || m < e
+        }
     }
 
     /// `from_ms` 이후 처음으로 시간대가 열려 있는 시각 (이미 안이면 그대로).

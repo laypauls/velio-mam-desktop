@@ -67,7 +67,11 @@ impl ChangeSink {
 
     /// 메시지를 보낸다. 종료 중이라 수신자가 없으면 무시한다.
     pub fn emit(&self, msg: WatchMsg) {
-        debug_assert_eq!(msg.folder_id(), self.folder_id, "message for a different folder");
+        debug_assert_eq!(
+            msg.folder_id(),
+            self.folder_id,
+            "message for a different folder"
+        );
         let _ = self.tx.send(msg);
     }
 
@@ -100,7 +104,8 @@ impl ChangeSink {
 
     /// 신호원에 문제가 있다 (재연결 중·응답 느림) — `recovered` 가 불릴 때까지 `Degraded`.
     pub fn degraded(&self, reason_key: &'static str) {
-        self.health.degrade(self.folder_id, self.sink, reason_key, None);
+        self.health
+            .degrade(self.folder_id, self.sink, reason_key, None);
     }
 
     /// 짧은 문제 (이벤트 넘침 등) — `hold_ms` 뒤 저절로 정상으로 돌아온다.

@@ -16,11 +16,16 @@ fn patch(v: Value) -> Map<String, Value> {
 }
 
 fn put_raw(conn: &Connection, key: &str, raw: &str) {
-    conn.execute("INSERT INTO settings (key, value) VALUES (?1, ?2)", [key, raw]).unwrap();
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?1, ?2)",
+        [key, raw],
+    )
+    .unwrap();
 }
 
 fn count_rows(conn: &Connection) -> i64 {
-    conn.query_row("SELECT COUNT(*) FROM settings", [], |r| r.get(0)).unwrap()
+    conn.query_row("SELECT COUNT(*) FROM settings", [], |r| r.get(0))
+        .unwrap()
 }
 
 fn layout_json(s: &mam_db::Settings) -> Value {
@@ -32,7 +37,10 @@ fn t_set_step_01_defaults_to_5_with_contract_name() {
     let (s, warnings) = settings::load(&migrated_db().conn).unwrap();
 
     assert_eq!(s.player_playing_step_sec, 5);
-    assert_eq!(serde_json::to_value(&s).unwrap()["playerPlayingStepSec"], json!(5));
+    assert_eq!(
+        serde_json::to_value(&s).unwrap()["playerPlayingStepSec"],
+        json!(5)
+    );
     assert!(warnings.is_empty());
 }
 
@@ -40,7 +48,8 @@ fn t_set_step_01_defaults_to_5_with_contract_name() {
 fn t_set_step_02_boundaries_1_and_60_round_trip_across_reload() {
     let mut db = migrated_db();
     for ok in [1, 15, 60] {
-        let s = settings::update(&mut db.conn, &patch(json!({"playerPlayingStepSec": ok}))).unwrap();
+        let s =
+            settings::update(&mut db.conn, &patch(json!({"playerPlayingStepSec": ok}))).unwrap();
         assert_eq!(s.player_playing_step_sec, ok);
         assert_eq!(settings::load(&db.conn).unwrap().0, s);
     }
@@ -49,9 +58,20 @@ fn t_set_step_02_boundaries_1_and_60_round_trip_across_reload() {
 #[test]
 fn t_set_step_03_out_of_range_or_wrong_type_is_invalid_and_changes_nothing() {
     let mut db = migrated_db();
-    for bad in [json!(0), json!(61), json!(-1), json!(2.5), json!("5"), json!(null), json!(true)] {
-        let err = settings::update(&mut db.conn, &patch(json!({"playerPlayingStepSec": bad.clone()})))
-            .unwrap_err();
+    for bad in [
+        json!(0),
+        json!(61),
+        json!(-1),
+        json!(2.5),
+        json!("5"),
+        json!(null),
+        json!(true),
+    ] {
+        let err = settings::update(
+            &mut db.conn,
+            &patch(json!({"playerPlayingStepSec": bad.clone()})),
+        )
+        .unwrap_err();
         assert!(
             matches!(&err, SettingsError::Invalid(f) if f == "playerPlayingStepSec"),
             "{bad}"
@@ -92,7 +112,8 @@ fn t_set_layout_02_saves_and_reloads_every_field() {
     assert_eq!(layout_json(&s), want);
     assert_eq!(layout_json(&settings::load(&db.conn).unwrap().0), want);
     for tab in ["info", "ai", "similar"] {
-        let s = settings::update(&mut db.conn, &patch(json!({"layout": {"detailTab": tab}}))).unwrap();
+        let s =
+            settings::update(&mut db.conn, &patch(json!({"layout": {"detailTab": tab}}))).unwrap();
         assert_eq!(layout_json(&s)["detailTab"], json!(tab));
     }
 }
@@ -142,8 +163,11 @@ fn t_set_layout_05_viewer_width_clamps_to_min_320_and_rounds() {
         (json!(600.6), 601),
         (json!(1_000_000_000_000u64), 8192),
     ] {
-        let s = settings::update(&mut db.conn, &patch(json!({"layout": {"viewerWidth": input.clone()}})))
-            .unwrap();
+        let s = settings::update(
+            &mut db.conn,
+            &patch(json!({"layout": {"viewerWidth": input.clone()}})),
+        )
+        .unwrap();
         assert_eq!(layout_json(&s)["viewerWidth"], json!(want), "{input}");
     }
 }
@@ -151,9 +175,19 @@ fn t_set_layout_05_viewer_width_clamps_to_min_320_and_rounds() {
 #[test]
 fn t_set_layout_06_non_object_patch_is_invalid_and_changes_nothing() {
     let mut db = migrated_db();
-    for bad in [json!(null), json!(true), json!("open"), json!(5), json!([1])] {
-        let err = settings::update(&mut db.conn, &patch(json!({"layout": bad.clone()}))).unwrap_err();
-        assert!(matches!(&err, SettingsError::Invalid(f) if f == "layout"), "{bad}");
+    for bad in [
+        json!(null),
+        json!(true),
+        json!("open"),
+        json!(5),
+        json!([1]),
+    ] {
+        let err =
+            settings::update(&mut db.conn, &patch(json!({"layout": bad.clone()}))).unwrap_err();
+        assert!(
+            matches!(&err, SettingsError::Invalid(f) if f == "layout"),
+            "{bad}"
+        );
     }
     assert_eq!(count_rows(&db.conn), 0);
 }
@@ -162,7 +196,11 @@ fn t_set_layout_06_non_object_patch_is_invalid_and_changes_nothing() {
 fn t_set_layout_07_corrupt_stored_values_recover_on_read() {
     let db = migrated_db();
     // 객체지만 필드가 깨진 값은 필드 단위로 복구, 객체가 아니면 기본값 + 경고
-    put_raw(&db.conn, "layout", r#"{"detailOpen":false,"viewerWidth":10,"detailTab":7}"#);
+    put_raw(
+        &db.conn,
+        "layout",
+        r#"{"detailOpen":false,"viewerWidth":10,"detailTab":7}"#,
+    );
 
     let (s, warnings) = settings::load(&db.conn).unwrap();
 
@@ -172,7 +210,12 @@ fn t_set_layout_07_corrupt_stored_values_recover_on_read() {
     );
     assert!(warnings.is_empty(), "{warnings:?}");
 
-    db.conn.execute("UPDATE settings SET value = '\"junk\"' WHERE key = 'layout'", []).unwrap();
+    db.conn
+        .execute(
+            "UPDATE settings SET value = '\"junk\"' WHERE key = 'layout'",
+            [],
+        )
+        .unwrap();
     let (s, warnings) = settings::load(&db.conn).unwrap();
     assert_eq!(layout_json(&s)["detailOpen"], json!(true));
     assert_eq!(warnings.len(), 1, "{warnings:?}");
@@ -183,7 +226,11 @@ fn t_set_layout_08_filmstrip_height_defaults_to_104_when_missing_and_round_trips
     let mut db = migrated_db();
 
     // 필드가 없는 기존(구버전) 저장값 -> 기본값, 다른 필드는 그대로
-    put_raw(&db.conn, "layout", r#"{"detailOpen":false,"sidebarOpen":false,"viewerWidth":700,"detailTab":"ai"}"#);
+    put_raw(
+        &db.conn,
+        "layout",
+        r#"{"detailOpen":false,"sidebarOpen":false,"viewerWidth":700,"detailTab":"ai"}"#,
+    );
     let (s, warnings) = settings::load(&db.conn).unwrap();
     assert_eq!(
         layout_json(&s),
@@ -198,7 +245,10 @@ fn t_set_layout_08_filmstrip_height_defaults_to_104_when_missing_and_round_trips
         }})))
         .unwrap();
         assert_eq!(layout_json(&s)["filmstripHeight"], json!(ok));
-        assert_eq!(layout_json(&settings::load(&db.conn).unwrap().0), layout_json(&s));
+        assert_eq!(
+            layout_json(&settings::load(&db.conn).unwrap().0),
+            layout_json(&s)
+        );
         assert_eq!(layout_json(&s)["viewerWidth"], json!(700));
         assert_eq!(layout_json(&s)["detailTab"], json!("ai"));
     }
@@ -217,8 +267,11 @@ fn t_set_layout_09_filmstrip_height_clamps_to_72_160_and_rounds() {
         (json!(1_000_000_000_000u64), 160),
         (json!(100.6), 101),
     ] {
-        let s = settings::update(&mut db.conn, &patch(json!({"layout": {"filmstripHeight": input.clone()}})))
-            .unwrap();
+        let s = settings::update(
+            &mut db.conn,
+            &patch(json!({"layout": {"filmstripHeight": input.clone()}})),
+        )
+        .unwrap();
         assert_eq!(layout_json(&s)["filmstripHeight"], json!(want), "{input}");
     }
 }
@@ -226,9 +279,18 @@ fn t_set_layout_09_filmstrip_height_clamps_to_72_160_and_rounds() {
 #[test]
 fn t_set_layout_10_filmstrip_height_wrong_type_falls_back_to_default() {
     let mut db = migrated_db();
-    for bad in [json!("120"), json!(null), json!(true), json!([120]), json!({"h": 1})] {
-        let s = settings::update(&mut db.conn, &patch(json!({"layout": {"filmstripHeight": bad.clone()}})))
-            .unwrap();
+    for bad in [
+        json!("120"),
+        json!(null),
+        json!(true),
+        json!([120]),
+        json!({"h": 1}),
+    ] {
+        let s = settings::update(
+            &mut db.conn,
+            &patch(json!({"layout": {"filmstripHeight": bad.clone()}})),
+        )
+        .unwrap();
         assert_eq!(layout_json(&s)["filmstripHeight"], json!(104), "{bad}");
     }
 }

@@ -32,9 +32,9 @@ pub use sections::{
 
 use std::sync::Arc;
 
+use tantivy::Searcher;
 use tantivy::collector::{Count, MultiCollector, TopDocs};
 use tantivy::query::Query;
-use tantivy::Searcher;
 
 use crate::error::{Result, SearchError};
 use crate::query::FilenameStrategy;

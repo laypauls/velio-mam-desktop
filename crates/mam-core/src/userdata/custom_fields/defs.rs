@@ -63,7 +63,11 @@ impl UserData {
     }
 
     /// 이름만 바꾼다 — 색인 키는 `f{field_id}` 라 재색인·revision 증가가 없다.
-    pub fn rename_metadata_field(&self, field_id: i64, name: &str) -> Result<MetadataField, IngestError> {
+    pub fn rename_metadata_field(
+        &self,
+        field_id: i64,
+        name: &str,
+    ) -> Result<MetadataField, IngestError> {
         let name = clean_name(name)?;
         let key = name_key(&name);
         self.write(move |tx, now| {
@@ -83,7 +87,11 @@ impl UserData {
     pub fn reorder_metadata_fields(&self, ordered: &[i64]) -> Result<(), IngestError> {
         let ordered = ordered.to_vec();
         self.write(move |tx, _| {
-            let current = returning_ids(tx, "SELECT field_id FROM metadata_fields WHERE deleting_at IS NULL", [])?;
+            let current = returning_ids(
+                tx,
+                "SELECT field_id FROM metadata_fields WHERE deleting_at IS NULL",
+                [],
+            )?;
             if !is_permutation(&current, &ordered) {
                 return Err(IngestError::InvalidInput("field order"));
             }
@@ -164,7 +172,11 @@ pub(crate) fn load_fields(c: &Connection) -> Result<Vec<MetadataField>, IngestEr
     for row in stmt.query_map([], |r| {
         Ok((
             r.get::<_, i64>(0)?,
-            FieldOption { option_id: r.get(1)?, label: r.get(2)?, position: r.get(3)? },
+            FieldOption {
+                option_id: r.get(1)?,
+                label: r.get(2)?,
+                position: r.get(3)?,
+            },
         ))
     })? {
         let (field_id, opt) = row?;
@@ -187,7 +199,8 @@ pub(crate) fn load_fields(c: &Connection) -> Result<Vec<MetadataField>, IngestEr
     let mut out = Vec::new();
     for row in rows {
         let (field_id, name, vt, position, created_at, updated_at) = row?;
-        let value_type = ValueType::parse(&vt).ok_or(IngestError::InvalidInput("stored value type"))?;
+        let value_type =
+            ValueType::parse(&vt).ok_or(IngestError::InvalidInput("stored value type"))?;
         out.push(MetadataField {
             field_id,
             name,

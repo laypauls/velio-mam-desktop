@@ -36,8 +36,10 @@ pub const ALL_VALUES_SQL: &str = values_select!(
 );
 
 /// 배치: `?1` = asset_id JSON 배열.
-pub const VALUES_BY_IDS_SQL: &str =
-    values_select!("json_each(?1) j CROSS JOIN asset_metadata_values v ON v.asset_id = j.value", "");
+pub const VALUES_BY_IDS_SQL: &str = values_select!(
+    "json_each(?1) j CROSS JOIN asset_metadata_values v ON v.asset_id = j.value",
+    ""
+);
 
 fn value_from_row(r: &Row) -> rusqlite::Result<(u64, Option<UserFieldValue>)> {
     let asset_id = r.get::<_, i64>(0)? as u64;
@@ -49,7 +51,10 @@ fn value_from_row(r: &Row) -> rusqlite::Result<(u64, Option<UserFieldValue>)> {
     } else {
         r.get::<_, Option<i64>>(3)?.map(UserValue::Int)
     };
-    Ok((asset_id, value.map(|value| UserFieldValue { field_id, value })))
+    Ok((
+        asset_id,
+        value.map(|value| UserFieldValue { field_id, value }),
+    ))
 }
 
 /// 여러 자산의 값을 질의 1회로 읽는다 (N+1 없음). 값이 없는 자산은 결과에 없다.
@@ -80,7 +85,11 @@ pub struct UserValueStream<'s> {
 
 impl<'s> UserValueStream<'s> {
     pub fn new(rows: Rows<'s>) -> Self {
-        Self { rows, pending: None, done: false }
+        Self {
+            rows,
+            pending: None,
+            done: false,
+        }
     }
 
     fn advance(&mut self) -> rusqlite::Result<()> {

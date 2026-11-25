@@ -10,9 +10,14 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use mam_core::SharedClock;
-use mam_core::jobs::{ExecutorRegistry, Job, JobContext, JobError, JobExecutor, JobKind, JobOutcome, JobQueue, JobRunner};
+use mam_core::jobs::{
+    ExecutorRegistry, Job, JobContext, JobError, JobExecutor, JobKind, JobOutcome, JobQueue,
+    JobRunner,
+};
 use mam_core::userdata::{UpdateTagsInput, UserData};
-use mam_plugin_runtime::{PluginJobs, PluginJobsDeps, PluginRuntime, ProviderInvoker, ProviderSpec, RunError, Permission};
+use mam_plugin_runtime::{
+    Permission, PluginJobs, PluginJobsDeps, PluginRuntime, ProviderInvoker, ProviderSpec, RunError,
+};
 use serde_json::Value;
 
 use crate::common_rt::{FixedClock, Rt, T0, copy_dir};
@@ -39,7 +44,13 @@ impl ProviderInvoker for Spy {
         self.inner.allows(plugin, perm)
     }
 
-    fn invoke_provider(&self, plugin: &str, provider: &str, assets: Vec<i64>, params: Value) -> Result<Value, RunError> {
+    fn invoke_provider(
+        &self,
+        plugin: &str,
+        provider: &str,
+        assets: Vec<i64>,
+        params: Value,
+    ) -> Result<Value, RunError> {
         let _ = self.started.lock().unwrap().send(());
         self.inner.invoke_provider(plugin, provider, assets, params)
     }
@@ -85,7 +96,14 @@ impl Integ {
         let clock: SharedClock = Arc::new(FixedClock(T0));
         let queue = JobQueue::new(Arc::clone(&rt.pool), Arc::clone(&clock));
         let (tx, rx) = channel();
-        let invoker: Arc<dyn ProviderInvoker> = if spy { Arc::new(Spy { inner: Arc::clone(&rt.rt), started: Mutex::new(tx) }) } else { Arc::clone(&rt.rt) as _ };
+        let invoker: Arc<dyn ProviderInvoker> = if spy {
+            Arc::new(Spy {
+                inner: Arc::clone(&rt.rt),
+                started: Mutex::new(tx),
+            })
+        } else {
+            Arc::clone(&rt.rt) as _
+        };
         let jobs = PluginJobs::new(PluginJobsDeps {
             pool: Arc::clone(&rt.pool),
             clock: Arc::clone(&clock),
@@ -97,21 +115,45 @@ impl Integ {
         rt.rt.set_job_hooks(Arc::clone(&jobs) as _);
         let userdata = Arc::new(UserData::new(Arc::clone(&rt.pool), clock));
         let (done_tx, done_rx) = channel();
-        Self { rt, jobs, queue, userdata, runner: Mutex::new(None), done_tx, done_rx: Mutex::new(done_rx), started: spy.then_some(rx) }
+        Self {
+            rt,
+            jobs,
+            queue,
+            userdata,
+            runner: Mutex::new(None),
+            done_tx,
+            done_rx: Mutex::new(done_rx),
+            started: spy.then_some(rx),
+        }
     }
 
     /// 픽스처 플러그인을 임시 폴더로 복사해 `kv.write`·`tag.write`·`asset.read.metadata` 를 허용하고 설치한다
     pub fn install(&self) {
-        let from = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("fixtures").join("jobs").join("integ");
+        let from = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("fixtures")
+            .join("jobs")
+            .join("integ");
         let dir: PathBuf = self.rt.src_root.join("integ");
         copy_dir(&from, &dir);
-        let perms = ["asset.read.metadata", "kv.write", "tag.write"].map(String::from).to_vec();
-        self.rt.rt.install(&dir, ID, "1.0.0", perms, "en").expect("install the integration fixture");
+        let perms = ["asset.read.metadata", "kv.write", "tag.write"]
+            .map(String::from)
+            .to_vec();
+        self.rt
+            .rt
+            .install(&dir, ID, "1.0.0", perms, "en")
+            .expect("install the integration fixture");
     }
 
     /// 사용자 태그 편집 (새 태그 이름 `tag`) -> revision +1 과 outbox upsert 이벤트
     pub fn edit(&self, asset: i64, tag: &str) {
-        self.userdata.update_asset_tags(UpdateTagsInput { asset_ids: vec![asset], add: vec![tag.to_owned()], remove: vec![] }).unwrap();
+        self.userdata
+            .update_asset_tags(UpdateTagsInput {
+                asset_ids: vec![asset],
+                add: vec![tag.to_owned()],
+                remove: vec![],
+            })
+            .unwrap();
     }
 
     pub fn start_runner(&self) {
@@ -120,7 +162,13 @@ impl Integ {
             return;
         }
         let mut reg = ExecutorRegistry::new();
-        reg.register(JobKind::Plugin, Arc::new(Probe { inner: self.jobs.executor(), tx: Mutex::new(self.done_tx.clone()) }));
+        reg.register(
+            JobKind::Plugin,
+            Arc::new(Probe {
+                inner: self.jobs.executor(),
+                tx: Mutex::new(self.done_tx.clone()),
+            }),
+        );
         *slot = Some(JobRunner::start(Arc::clone(&self.queue), reg).unwrap());
     }
 
@@ -133,7 +181,15 @@ impl Integ {
     /// 작업 `n` 건이 끝날 때까지 기다린다 (결과 채널) -> `finish` 의 DB 쓰기까지 마친 뒤 돌려준다
     pub fn run(&self, n: usize) -> Vec<Result<JobOutcome, JobError>> {
         self.start_runner();
-        let out: Vec<_> = (0..n).map(|_| self.done_rx.lock().unwrap().recv_timeout(Duration::from_secs(60)).expect("a plugin job should finish within 60s")).collect();
+        let out: Vec<_> = (0..n)
+            .map(|_| {
+                self.done_rx
+                    .lock()
+                    .unwrap()
+                    .recv_timeout(Duration::from_secs(60))
+                    .expect("a plugin job should finish within 60s")
+            })
+            .collect();
         self.settle();
         out
     }
@@ -175,7 +231,10 @@ impl Integ {
     }
 
     pub fn cursor(&self) -> Option<i64> {
-        self.rt.pool.read(|c| Ok(mam_db::plugin_tasks::feed_cursor(c, ID)?)).unwrap()
+        self.rt
+            .pool
+            .read(|c| Ok(mam_db::plugin_tasks::feed_cursor(c, ID)?))
+            .unwrap()
     }
 }
 
@@ -192,7 +251,13 @@ impl Integ {
     pub fn editor(&self) -> impl Fn(i64, &str) + Send + Sync + 'static {
         let userdata = Arc::clone(&self.userdata);
         move |asset, tag| {
-            userdata.update_asset_tags(UpdateTagsInput { asset_ids: vec![asset], add: vec![tag.to_owned()], remove: vec![] }).unwrap();
+            userdata
+                .update_asset_tags(UpdateTagsInput {
+                    asset_ids: vec![asset],
+                    add: vec![tag.to_owned()],
+                    remove: vec![],
+                })
+                .unwrap();
         }
     }
 }

@@ -56,11 +56,20 @@ fn t_edge_db_01_v11_applies_to_a_v10_db_keeping_existing_rows_without_edge_sig()
     let report = migrate(&mut db.conn, &db.backup_dir, &FixedClock(T0 + 1)).unwrap();
 
     // Assert
-    assert_eq!(report.applied, vec![11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]);
+    assert_eq!(
+        report.applied,
+        vec![
+            11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27
+        ]
+    );
     assert!(report.backup.is_some_and(|b| b.is_file()));
     let sig: Option<Vec<u8>> = db
         .conn
-        .query_row("SELECT edge_sig FROM media_assets WHERE asset_id = 1", [], |r| r.get(0))
+        .query_row(
+            "SELECT edge_sig FROM media_assets WHERE asset_id = 1",
+            [],
+            |r| r.get(0),
+        )
         .unwrap();
     assert_eq!(sig, None);
 }
@@ -80,10 +89,16 @@ fn t_edge_db_02_check_constraint_requires_exactly_32_bytes() {
         assert!(r.is_err(), "length {bad} must violate the CHECK");
     }
     db.conn
-        .execute("UPDATE media_assets SET edge_sig = zeroblob(32) WHERE asset_id = 1", [])
+        .execute(
+            "UPDATE media_assets SET edge_sig = zeroblob(32) WHERE asset_id = 1",
+            [],
+        )
         .unwrap();
     db.conn
-        .execute("UPDATE media_assets SET edge_sig = NULL WHERE asset_id = 1", [])
+        .execute(
+            "UPDATE media_assets SET edge_sig = NULL WHERE asset_id = 1",
+            [],
+        )
         .unwrap();
 }
 
@@ -99,7 +114,13 @@ fn t_edge_db_03_old_style_insert_works_and_rerun_is_a_noop() {
 
     // Assert
     assert!(again.applied.is_empty());
-    assert_eq!(common::count(&db.conn, "SELECT count(*) FROM media_assets WHERE edge_sig IS NULL"), 1);
+    assert_eq!(
+        common::count(
+            &db.conn,
+            "SELECT count(*) FROM media_assets WHERE edge_sig IS NULL"
+        ),
+        1
+    );
 }
 
 #[test]
@@ -119,7 +140,10 @@ fn t_edge_db_04_same_size_and_edge_lookup_uses_the_partial_index() {
              AND b.asset_id <> a.asset_id)",
     ] {
         let p = plan(&db.conn, sql);
-        assert!(p.contains("idx_media_assets_edge"), "expected idx_media_assets_edge: {p}");
+        assert!(
+            p.contains("idx_media_assets_edge"),
+            "expected idx_media_assets_edge: {p}"
+        );
     }
     // 같은 크기·같은 sig 상대에게 hash 작업을 등록하는 SELECT 도 같다
     let p = plan(

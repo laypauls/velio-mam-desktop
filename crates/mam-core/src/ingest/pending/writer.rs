@@ -57,7 +57,10 @@ impl Ingest {
         if let Some(mut item) = Incoming::new(folder_id, &p, kind, self.source_of(folder_id)) {
             let key = (folder_id, item.path_key.clone());
             // 같은 경로를 Path 와 Subtree 로 보고했으면 하위 순회(Subtree)가 이긴다 (DB UPSERT 와 같은 규칙)
-            if buf.get(&key).is_some_and(|old| old.kind == PendingKind::Subtree) {
+            if buf
+                .get(&key)
+                .is_some_and(|old| old.kind == PendingKind::Subtree)
+            {
                 item.kind = PendingKind::Subtree;
             }
             buf.insert(key, item);

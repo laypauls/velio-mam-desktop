@@ -95,8 +95,12 @@ impl ExitServices {
         shutdown::timed("search-worker", || {
             self.search.shutdown_within(deadline.remaining())
         });
-        shutdown::timed("ai-runner", || self.ai_runner.stop_within(deadline.remaining()));
-        shutdown::timed("ingest", || self.ingest.shutdown_within(deadline.remaining()));
+        shutdown::timed("ai-runner", || {
+            self.ai_runner.stop_within(deadline.remaining())
+        });
+        shutdown::timed("ingest", || {
+            self.ingest.shutdown_within(deadline.remaining())
+        });
         // 플러그인: 피드·전체 실행 스레드를 멈춘 뒤 워커 프로세스를 PID 로 종료한다 (JobRunner 는 위에서 이미 멈췄다)
         shutdown::timed("plugin-feed", || self.plugin_jobs.stop());
         shutdown::timed("plugin-workers", || self.plugin_runtime.shutdown_all());

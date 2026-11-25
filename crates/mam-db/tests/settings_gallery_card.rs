@@ -333,9 +333,11 @@ fn t_rating_gcard_01_missing_rating_key_defaults_to_true_while_other_fields_are_
 fn t_rating_gcard_02_false_round_trips_and_non_boolean_is_rejected() {
     let mut db = migrated_db();
 
-    let after =
-        settings::update(&mut db.conn, &patch(json!({"galleryCardDisplay": {"rating": false}})))
-            .unwrap();
+    let after = settings::update(
+        &mut db.conn,
+        &patch(json!({"galleryCardDisplay": {"rating": false}})),
+    )
+    .unwrap();
     assert!(!after.gallery_card_display.rating);
     assert_eq!(settings::load(&db.conn).unwrap().0, after);
 
@@ -345,6 +347,9 @@ fn t_rating_gcard_02_false_round_trips_and_non_boolean_is_rejected() {
             &patch(json!({"galleryCardDisplay": {"rating": bad.clone()}})),
         )
         .unwrap_err();
-        assert!(matches!(&err, SettingsError::Invalid(f) if f == "galleryCardDisplay"), "{bad}");
+        assert!(
+            matches!(&err, SettingsError::Invalid(f) if f == "galleryCardDisplay"),
+            "{bad}"
+        );
     }
 }

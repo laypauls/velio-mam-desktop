@@ -5,8 +5,8 @@
 mod common;
 
 use common::migrated_db;
-use mam_db::settings;
 use mam_db::SettingsError;
+use mam_db::settings;
 use serde_json::{Map, Value, json};
 
 fn patch(v: Value) -> Map<String, Value> {
@@ -31,14 +31,20 @@ fn t_oact_01_default_is_false() {
 fn t_oact_02_value_round_trips() {
     let mut db = migrated_db();
 
-    let after =
-        settings::update(&mut db.conn, &patch(json!({"originalActionsEnabled": true}))).unwrap();
+    let after = settings::update(
+        &mut db.conn,
+        &patch(json!({"originalActionsEnabled": true})),
+    )
+    .unwrap();
     let (loaded, _) = settings::load(&db.conn).unwrap();
 
     assert_eq!(after, loaded);
     assert!(loaded.original_actions_enabled);
-    let back =
-        settings::update(&mut db.conn, &patch(json!({"originalActionsEnabled": false}))).unwrap();
+    let back = settings::update(
+        &mut db.conn,
+        &patch(json!({"originalActionsEnabled": false})),
+    )
+    .unwrap();
     assert!(!back.original_actions_enabled);
 }
 
@@ -47,8 +53,11 @@ fn t_oact_03_non_boolean_is_rejected_and_changes_nothing() {
     let mut db = migrated_db();
 
     for body in [json!("yes"), json!(1), json!(null)] {
-        let err = settings::update(&mut db.conn, &patch(json!({"originalActionsEnabled": body})))
-            .unwrap_err();
+        let err = settings::update(
+            &mut db.conn,
+            &patch(json!({"originalActionsEnabled": body})),
+        )
+        .unwrap_err();
         assert!(
             matches!(&err, SettingsError::Invalid(f) if f == "originalActionsEnabled"),
             "{body}: {err:?}"

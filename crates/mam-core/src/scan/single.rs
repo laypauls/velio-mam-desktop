@@ -106,7 +106,12 @@ pub fn apply_path(env: &ScanEnv, folder_id: i64, abs: &Path) -> Result<PathActio
 
 /// [`apply_path`] 의 감시(변경 대기열) 경로용 — 폴더를 순회하면 새로 찾은 하위 폴더는 계속 따라가되 **파일은 바로 반영하지 않고**
 /// 변경 대기열에 `path` 행(`source` 보존)으로 넘겨 안정화 게이트를 거치게 한다. 대기열에 다 못 넣으면 `SubtreeOverflow`.
-pub fn apply_path_settled(env: &ScanEnv, folder_id: i64, abs: &Path, source: &str) -> Result<PathAction, IngestError> {
+pub fn apply_path_settled(
+    env: &ScanEnv,
+    folder_id: i64,
+    abs: &Path,
+    source: &str,
+) -> Result<PathAction, IngestError> {
     apply_path_with(env, folder_id, abs, Some(source))
 }
 

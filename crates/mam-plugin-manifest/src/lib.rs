@@ -18,11 +18,11 @@ mod raw;
 mod text;
 pub mod when;
 
-pub use contributions::{EXPORT_EXTENSIONS, export_extension_allowed};
 pub use contrib_types::{
     ActivationEvent, AssetKind, Command, Contributes, ExportProvider, MenuItem, Menus, Provider,
     Providers,
 };
+pub use contributions::{EXPORT_EXTENSIONS, export_extension_allowed};
 pub use engine::check_engine;
 pub use error::{EngineError, LocaleError, MainPathError, ManifestError};
 pub use ids::{CommandId, PluginId, ProviderId, TitleKey, is_reserved_name};
@@ -31,9 +31,7 @@ pub use main_path::MainPath;
 pub use manifest::{Engines, Manifest, parse_manifest};
 pub use permission::Permission;
 pub use text::{clean_text, is_format_char};
-pub use when::{
-    WhenContext, WhenError, WhenErrorKind, WhenEvalError, WhenExpr, WhenValue,
-};
+pub use when::{WhenContext, WhenError, WhenErrorKind, WhenEvalError, WhenExpr, WhenValue};
 
 pub const MANIFEST_FILE_NAME: &str = "plugin.json";
 pub const L10N_DIR: &str = "l10n";

@@ -21,11 +21,12 @@ use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use super::super::detector::{
-    ChangeDetector, DetectError, DetectorOptions, OptionField, OptionKind, ProbeResult, WatchHandle, WatchTarget,
+    ChangeDetector, DetectError, DetectorOptions, OptionField, OptionKind, ProbeResult,
+    WatchHandle, WatchTarget,
 };
 use super::super::sink::ChangeSink;
-use crate::scan::io_guard::{IoGuard, IoGuardConfig};
 use crate::SharedClock;
+use crate::scan::io_guard::{IoGuard, IoGuardConfig};
 use crate::volume::VolumeKind;
 
 pub use fs::{GuardedFs, Listing, PollError, PollFs, StdFs};
@@ -88,7 +89,11 @@ impl Polling {
     }
 
     #[cfg(test)]
-    pub(crate) fn for_tests(fs: Option<Arc<dyn PollFs>>, interval: Duration, io: IoGuardConfig) -> Self {
+    pub(crate) fn for_tests(
+        fs: Option<Arc<dyn PollFs>>,
+        interval: Duration,
+        io: IoGuardConfig,
+    ) -> Self {
         Self {
             fs,
             interval: Some(interval),
@@ -139,10 +144,15 @@ impl ChangeDetector for Polling {
         FIELDS
     }
 
-    fn start(&self, target: &WatchTarget, opts: &DetectorOptions, sink: ChangeSink) -> Result<Box<dyn WatchHandle>, DetectError> {
-        let interval = self
-            .interval
-            .unwrap_or_else(|| Duration::from_secs(opts.get_i64(OPT_INTERVAL).unwrap_or(DEFAULT_INTERVAL_SEC) as u64));
+    fn start(
+        &self,
+        target: &WatchTarget,
+        opts: &DetectorOptions,
+        sink: ChangeSink,
+    ) -> Result<Box<dyn WatchHandle>, DetectError> {
+        let interval = self.interval.unwrap_or_else(|| {
+            Duration::from_secs(opts.get_i64(OPT_INTERVAL).unwrap_or(DEFAULT_INTERVAL_SEC) as u64)
+        });
         let stop = Arc::new(StopSignal::default());
         let base: Arc<dyn PollFs> = self.fs.clone().unwrap_or_else(|| Arc::new(StdFs));
         let fs: Arc<dyn PollFs> = match target.volume_kind {
@@ -158,12 +168,25 @@ impl ChangeDetector for Polling {
         };
         let ready = Arc::new(stop::Latch::default());
         let token = sink.release_token();
-        let (root, thread_stop, thread_ready, clock) = (target.root.clone(), Arc::clone(&stop), Arc::clone(&ready), Arc::clone(&self.clock));
+        let (root, thread_stop, thread_ready, clock) = (
+            target.root.clone(),
+            Arc::clone(&stop),
+            Arc::clone(&ready),
+            Arc::clone(&self.clock),
+        );
         std::thread::Builder::new()
             .name("mam-poll".into())
             .spawn(move || {
                 let _token = token;
-                run(&root, &*fs, &sink, &*clock, interval, &thread_stop, &thread_ready);
+                run(
+                    &root,
+                    &*fs,
+                    &sink,
+                    &*clock,
+                    interval,
+                    &thread_stop,
+                    &thread_ready,
+                );
             })
             .map_err(|e| DetectError::Start(e.to_string()))?;
         ready.wait(BASELINE_WAIT);
@@ -171,12 +194,24 @@ impl ChangeDetector for Polling {
     }
 }
 
-fn run(root: &Path, fs: &dyn PollFs, sink: &ChangeSink, clock: &dyn mam_db::Clock, interval: Duration, stop: &StopSignal, ready: &stop::Latch) {
+fn run(
+    root: &Path,
+    fs: &dyn PollFs,
+    sink: &ChangeSink,
+    clock: &dyn mam_db::Clock,
+    interval: Duration,
+    stop: &StopSignal,
+    ready: &stop::Latch,
+) {
     let mut poller = Poller::default();
     loop {
         poller.step(fs, root, sink, clock.now_ms(), &|| stop.is_set());
         ready.open();
-        let wait = if poller.failing { interval.min(RETRY_MAX) } else { interval };
+        let wait = if poller.failing {
+            interval.min(RETRY_MAX)
+        } else {
+            interval
+        };
         if stop.is_set() || stop.wait(wait) {
             break;
         }
@@ -192,7 +227,14 @@ pub(crate) struct Poller {
 
 impl Poller {
     /// 한 걸음: 기준선이 없으면 조용히 만들고, 있으면 한 주기를 돌려 변경을 보고한다. 실패는 `Degraded`, 회복은 `Ok` + `Rescan` 한 번.
-    pub(crate) fn step(&mut self, fs: &dyn PollFs, root: &Path, sink: &ChangeSink, now_ms: i64, stop: &dyn Fn() -> bool) {
+    pub(crate) fn step(
+        &mut self,
+        fs: &dyn PollFs,
+        root: &Path,
+        sink: &ChangeSink,
+        now_ms: i64,
+        stop: &dyn Fn() -> bool,
+    ) {
         let (mut changes, failure) = match self.snap.as_mut() {
             None => match Snapshot::baseline(fs, root, now_ms, stop).0 {
                 Ok(s) => {
@@ -225,7 +267,11 @@ impl Poller {
             Some(PollError::Stopped) => {}
             Some(e) => {
                 tracing::warn!(?e, "polling tick failed; will retry");
-                sink.degraded(if e == PollError::TimedOut { HEALTH_TIMEOUT } else { HEALTH_ERROR });
+                sink.degraded(if e == PollError::TimedOut {
+                    HEALTH_TIMEOUT
+                } else {
+                    HEALTH_ERROR
+                });
                 self.failing = true;
             }
             None if self.failing => {

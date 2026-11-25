@@ -5,7 +5,9 @@
 mod common;
 
 use common::{doc, indexed};
-use mam_search::coordinator::{CoordPage, CoordRequest, Direction, SearchHandle, SortField, SortSpec};
+use mam_search::coordinator::{
+    CoordPage, CoordRequest, Direction, SearchHandle, SortField, SortSpec,
+};
 use mam_search::search::FolderFilter;
 use mam_search::{AssetDoc, FilenameStrategy, Filters, MediaType, Presence, Range, SearchError};
 use tempfile::tempdir;
@@ -712,8 +714,19 @@ fn t_coord_title_02_title_is_keyword_searchable_and_cursor_does_not_cross_sort_f
 
     // Assert: 제목 검색 / 정렬 필드가 다른 요청에 커서를 재사용하면 StaleCursor (이름순 <-> 제목순 토글 시 안전)
     assert_eq!(by_title.ids, [1]);
-    assert!(hidden.ids.is_empty(), "disabled: stored title must not match");
-    assert_eq!(search(&h, &file_on).ids.len(), 3, "file name matches when enabled");
-    assert_eq!(search(&h, &file_off).ids.len(), 3, "file name matches when disabled");
+    assert!(
+        hidden.ids.is_empty(),
+        "disabled: stored title must not match"
+    );
+    assert_eq!(
+        search(&h, &file_on).ids.len(),
+        3,
+        "file name matches when enabled"
+    );
+    assert_eq!(
+        search(&h, &file_off).ids.len(),
+        3,
+        "file name matches when disabled"
+    );
     assert!(matches!(err, SearchError::StaleCursor), "{err:?}");
 }

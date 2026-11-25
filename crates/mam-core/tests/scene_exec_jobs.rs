@@ -52,7 +52,10 @@ fn t_scene_30_kind_definition_matches_mam_db_constants() {
 #[test]
 fn t_scene_30_scene_is_the_lowest_priority_kind() {
     // Plugin(70)은 자동 실행 작업이라 장면 검출보다 뒤다 (P6 골격에서 종류 추가)
-    for k in ALL.into_iter().filter(|k| !matches!(k, JobKind::Scene | JobKind::Plugin)) {
+    for k in ALL
+        .into_iter()
+        .filter(|k| !matches!(k, JobKind::Scene | JobKind::Plugin))
+    {
         assert!(
             k.default_priority() < JobKind::Scene.default_priority(),
             "{k:?}"

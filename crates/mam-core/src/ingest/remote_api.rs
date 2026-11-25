@@ -11,8 +11,8 @@ use crate::scan::{IngestError, load_folder};
 use crate::secret::{Secret, SecretError};
 use crate::watch::remote::mapper::{Mapping, map_reaches};
 use crate::watch::remote::runner::RunError;
-use crate::watch::remote::store::{self, NewSource, SourceView, StoreError};
 use crate::watch::remote::ses;
+use crate::watch::remote::store::{self, NewSource, SourceView, StoreError};
 use crate::watch::remote::tail::list_sizes;
 use crate::watch::remote::{Auth, RemoteSource, SourceKind};
 
@@ -54,7 +54,14 @@ pub struct RemoteTestResult {
 
 impl RemoteTestResult {
     fn failed(e: &RunError) -> Self {
-        Self { ok: false, error_key: Some(e.key()), fingerprint: e.fingerprint().map(str::to_string), file_count: None, row_count: None, max_id: None }
+        Self {
+            ok: false,
+            error_key: Some(e.key()),
+            fingerprint: e.fingerprint().map(str::to_string),
+            file_count: None,
+            row_count: None,
+            max_id: None,
+        }
     }
 }
 
@@ -65,7 +72,9 @@ impl From<StoreError> for IngestError {
             StoreError::NotFound => Self::NotFound,
             StoreError::NameTaken => Self::AlreadyRegistered,
             StoreError::InUse => Self::Busy,
-            StoreError::Secret(SecretError::Unsupported) => Self::Io(std::io::Error::other("secret protection is unavailable")),
+            StoreError::Secret(SecretError::Unsupported) => {
+                Self::Io(std::io::Error::other("secret protection is unavailable"))
+            }
             StoreError::Secret(SecretError::Crypto(m)) => Self::Io(std::io::Error::other(m)),
             StoreError::Db(e) => Self::Sql(e),
         }
@@ -75,7 +84,10 @@ impl From<StoreError> for IngestError {
 /// 입력 -> (저장 입력, 비밀). `kind` 는 `ddp_audit`·`ses_queue`.
 fn parse_input(i: &RemoteSourceInput) -> Result<(NewSource, Option<Auth>), IngestError> {
     let kind = SourceKind::parse(&i.kind).ok_or(IngestError::InvalidInput("kind"))?;
-    let port = u16::try_from(i.port).ok().filter(|p| *p != 0).ok_or(IngestError::InvalidInput("port"))?;
+    let port = u16::try_from(i.port)
+        .ok()
+        .filter(|p| *p != 0)
+        .ok_or(IngestError::InvalidInput("port"))?;
     let poll_sec = u32::try_from(i.poll_sec).map_err(|_| IngestError::InvalidInput("pollSec"))?;
     let auth = match (i.auth_kind.as_str(), &i.secret) {
         (_, None) => None,
@@ -93,10 +105,25 @@ fn parse_input(i: &RemoteSourceInput) -> Result<(NewSource, Option<Auth>), Inges
         port,
         user: i.user.clone(),
         host_key: i.host_key.clone().filter(|s| !s.is_empty()),
-        log_dir: i.log_dir.clone().map(|d| d.trim().to_string()).filter(|d| !d.is_empty()),
-        db_path: i.db_path.clone().map(|d| d.trim().to_string()).filter(|d| !d.is_empty()),
+        log_dir: i
+            .log_dir
+            .clone()
+            .map(|d| d.trim().to_string())
+            .filter(|d| !d.is_empty()),
+        db_path: i
+            .db_path
+            .clone()
+            .map(|d| d.trim().to_string())
+            .filter(|d| !d.is_empty()),
         poll_sec,
-        path_map: i.path_map.iter().map(|m| Mapping { from: m.from.trim().into(), to: m.to.trim().into() }).collect(),
+        path_map: i
+            .path_map
+            .iter()
+            .map(|m| Mapping {
+                from: m.from.trim().into(),
+                to: m.to.trim().into(),
+            })
+            .collect(),
     };
     store::validate(&n)?;
     Ok((n, auth))
@@ -107,17 +134,26 @@ impl Ingest {
         Ok(self.env.pool.read(|c| Ok(store::list(c)))??)
     }
 
-    pub fn create_remote_source(&self, input: RemoteSourceInput) -> Result<SourceView, IngestError> {
+    pub fn create_remote_source(
+        &self,
+        input: RemoteSourceInput,
+    ) -> Result<SourceView, IngestError> {
         let (n, auth) = parse_input(&input)?;
         let auth = auth.ok_or(IngestError::InvalidInput("secret"))?;
         let secrets = self.config.secrets.clone();
         let now = self.env.clock.now_ms();
-        let id = self.env.write(Priority::High, move |c| Ok(store::create(c, &n, &auth, secrets.as_ref(), now)?))?;
+        let id = self.env.write(Priority::High, move |c| {
+            Ok(store::create(c, &n, &auth, secrets.as_ref(), now)?)
+        })?;
         Ok(self.env.pool.read(|c| Ok(store::view(c, id)))??)
     }
 
     /// 수정. 이 접속을 쓰는 폴더가 있으면 새 경로 변환도 그 폴더 루트에 닿아야 한다(`InvalidInput("pathMap")`). 도는 수집기는 재접속한다.
-    pub fn update_remote_source(&self, source_id: i64, input: RemoteSourceInput) -> Result<SourceView, IngestError> {
+    pub fn update_remote_source(
+        &self,
+        source_id: i64,
+        input: RemoteSourceInput,
+    ) -> Result<SourceView, IngestError> {
         let (n, auth) = parse_input(&input)?;
         let (secrets, now) = (self.config.secrets.clone(), self.env.clock.now_ms());
         let rules = n.path_map.clone();
@@ -126,7 +162,10 @@ impl Ingest {
             let tx = c.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
             for fid in store::referencing_folders(&tx, source_id)? {
                 let root = load_folder(&tx, fid)?.root_path();
-                if !map_reaches(&rules, &crate::volume::strip_verbatim(&root.to_string_lossy())) {
+                if !map_reaches(
+                    &rules,
+                    &crate::volume::strip_verbatim(&root.to_string_lossy()),
+                ) {
                     return Err(IngestError::InvalidInput("pathMap"));
                 }
             }
@@ -140,17 +179,29 @@ impl Ingest {
 
     /// 삭제 — 쓰는 폴더가 있으면 `Busy` (먼저 폴더의 감지 방식을 바꿔야 한다).
     pub fn delete_remote_source(&self, source_id: i64) -> Result<(), IngestError> {
-        self.env.write(Priority::High, move |c| Ok(store::delete(c, source_id)?))
+        self.env
+            .write(Priority::High, move |c| Ok(store::delete(c, source_id)?))
     }
 
     /// 접속 시험 — 네트워크를 쓴다(사용자가 누른 경우에만). `source_id` 가 있고 입력에 비밀이 없으면 저장된 비밀을 쓴다.
     /// 호스트 키 지문이 없으면 **인증하지 않고** 지문만 알려 준다.
-    pub fn test_remote_source(&self, source_id: Option<i64>, input: RemoteSourceInput) -> Result<RemoteTestResult, IngestError> {
+    pub fn test_remote_source(
+        &self,
+        source_id: Option<i64>,
+        input: RemoteSourceInput,
+    ) -> Result<RemoteTestResult, IngestError> {
         let (n, auth) = parse_input(&input)?;
         let connector = self.config.remote.connector().clone();
         let Some(host_key) = n.host_key.clone() else {
             return Ok(match connector.fingerprint(&n.host, n.port) {
-                Ok(fp) => RemoteTestResult { ok: false, error_key: Some(RunError::HostKeyUnconfirmed { actual: fp.clone() }.key()), fingerprint: Some(fp), file_count: None, row_count: None, max_id: None },
+                Ok(fp) => RemoteTestResult {
+                    ok: false,
+                    error_key: Some(RunError::HostKeyUnconfirmed { actual: fp.clone() }.key()),
+                    fingerprint: Some(fp),
+                    file_count: None,
+                    row_count: None,
+                    max_id: None,
+                },
                 Err(e) => RemoteTestResult::failed(&e),
             });
         };
@@ -158,7 +209,10 @@ impl Ingest {
             (Some(a), _) => a,
             (None, Some(id)) => {
                 let secrets = self.config.secrets.clone();
-                self.env.pool.read(|c| Ok(store::load(c, id, secrets.as_ref())))??.auth
+                self.env
+                    .pool
+                    .read(|c| Ok(store::load(c, id, secrets.as_ref())))??
+                    .auth
             }
             (None, None) => return Err(IngestError::InvalidInput("secret")),
         };
@@ -176,14 +230,23 @@ impl Ingest {
             poll_sec: n.poll_sec,
             path_map: n.path_map.clone(),
         };
-        let ok = |file_count, row_count, max_id| RemoteTestResult { ok: true, error_key: None, fingerprint: Some(host_key.clone()), file_count, row_count, max_id };
+        let ok = |file_count, row_count, max_id| RemoteTestResult {
+            ok: true,
+            error_key: None,
+            fingerprint: Some(host_key.clone()),
+            file_count,
+            row_count,
+            max_id,
+        };
         Ok(match (src.kind, connector.connect(&src)) {
             (_, Err(e)) => RemoteTestResult::failed(&e),
             // sqlite3 존재·DB 읽기 가능 여부와 큐의 행 수·최대 id (읽기 전용)
-            (SourceKind::SesQueue, Ok(mut run)) => match ses::probe(run.as_mut(), src.db_path.as_deref().unwrap_or_default()) {
-                Ok(p) => ok(None, Some(p.rows), Some(p.max_id)),
-                Err(e) => RemoteTestResult::failed(&e),
-            },
+            (SourceKind::SesQueue, Ok(mut run)) => {
+                match ses::probe(run.as_mut(), src.db_path.as_deref().unwrap_or_default()) {
+                    Ok(p) => ok(None, Some(p.rows), Some(p.max_id)),
+                    Err(e) => RemoteTestResult::failed(&e),
+                }
+            }
             (SourceKind::DdpAudit, Ok(mut run)) => match list_sizes(run.as_mut(), src.log_dir()) {
                 Ok(sizes) => ok(Some(sizes.len() as u32), None, None),
                 Err(e) => RemoteTestResult::failed(&e),

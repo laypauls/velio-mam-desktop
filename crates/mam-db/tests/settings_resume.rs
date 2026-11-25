@@ -29,7 +29,8 @@ fn t_resume_set_01_defaults_with_contract_names() {
 fn t_resume_set_02_allowed_values_round_trip() {
     let mut db = migrated_db();
     for ok in [0, 60, 180, 300, 600] {
-        let s = settings::update(&mut db.conn, &patch(json!({"resumeMinDurationSec": ok}))).unwrap();
+        let s =
+            settings::update(&mut db.conn, &patch(json!({"resumeMinDurationSec": ok}))).unwrap();
         assert_eq!(s.resume_min_duration_sec, ok);
         assert_eq!(settings::load(&db.conn).unwrap().0, s);
     }
@@ -41,15 +42,36 @@ fn t_resume_set_02_allowed_values_round_trip() {
 #[test]
 fn t_resume_set_03_other_values_are_invalid_and_change_nothing() {
     let mut db = migrated_db();
-    for bad in [json!(1), json!(120), json!(601), json!(-60), json!(180.5), json!("180"), json!(null)] {
-        let err =
-            settings::update(&mut db.conn, &patch(json!({"resumeMinDurationSec": bad.clone()}))).unwrap_err();
-        assert!(matches!(&err, SettingsError::Invalid(f) if f == "resumeMinDurationSec"), "{bad}");
+    for bad in [
+        json!(1),
+        json!(120),
+        json!(601),
+        json!(-60),
+        json!(180.5),
+        json!("180"),
+        json!(null),
+    ] {
+        let err = settings::update(
+            &mut db.conn,
+            &patch(json!({"resumeMinDurationSec": bad.clone()})),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(&err, SettingsError::Invalid(f) if f == "resumeMinDurationSec"),
+            "{bad}"
+        );
     }
     for bad in [json!(1), json!("true"), json!(null)] {
-        let err = settings::update(&mut db.conn, &patch(json!({"resumeEnabled": bad.clone()}))).unwrap_err();
-        assert!(matches!(&err, SettingsError::Invalid(f) if f == "resumeEnabled"), "{bad}");
+        let err = settings::update(&mut db.conn, &patch(json!({"resumeEnabled": bad.clone()})))
+            .unwrap_err();
+        assert!(
+            matches!(&err, SettingsError::Invalid(f) if f == "resumeEnabled"),
+            "{bad}"
+        );
     }
-    let n: i64 = db.conn.query_row("SELECT COUNT(*) FROM settings", [], |r| r.get(0)).unwrap();
+    let n: i64 = db
+        .conn
+        .query_row("SELECT COUNT(*) FROM settings", [], |r| r.get(0))
+        .unwrap();
     assert_eq!(n, 0);
 }

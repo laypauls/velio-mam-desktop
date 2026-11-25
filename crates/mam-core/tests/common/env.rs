@@ -70,17 +70,32 @@ impl FakeVolumes {
     }
     /// 같은 볼륨(키)이 다른 마운트 지점(드라이브 문자)으로 다시 연결된 것처럼 바꾼다.
     pub fn remount(&self, key: &str, mount: &Path) {
-        for v in self.vols.lock().unwrap().iter_mut().filter(|v| v.key == key) {
+        for v in self
+            .vols
+            .lock()
+            .unwrap()
+            .iter_mut()
+            .filter(|v| v.key == key)
+        {
             v.mount_point = strip_verbatim(&mount.to_string_lossy());
         }
     }
     pub fn set_label(&self, key: &str, label: &str) {
-        for v in self.vols.lock().unwrap().iter_mut().filter(|v| v.key == key) {
+        for v in self
+            .vols
+            .lock()
+            .unwrap()
+            .iter_mut()
+            .filter(|v| v.key == key)
+        {
             v.label = Some(label.to_string());
         }
     }
     pub fn set_ejectable(&self, key: &str, device: Option<bool>) {
-        self.ejectable.lock().unwrap().insert(key.to_string(), device);
+        self.ejectable
+            .lock()
+            .unwrap()
+            .insert(key.to_string(), device);
     }
     pub fn set_total_bytes(&self, key: &str, bytes: u64) {
         self.sizes.lock().unwrap().insert(key.to_string(), bytes);
@@ -107,8 +122,20 @@ fn norm(s: &str) -> String {
 impl VolumeProvider for FakeVolumes {
     fn is_ejectable_device(&self, mount_point: &str) -> Option<bool> {
         let m = norm(mount_point);
-        let key = self.vols.lock().unwrap().iter().find(|v| norm(&v.mount_point) == m)?.key.clone();
-        self.ejectable.lock().unwrap().get(&key).copied().unwrap_or(Some(true))
+        let key = self
+            .vols
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|v| norm(&v.mount_point) == m)?
+            .key
+            .clone();
+        self.ejectable
+            .lock()
+            .unwrap()
+            .get(&key)
+            .copied()
+            .unwrap_or(Some(true))
     }
 
     fn total_bytes(&self, mount_point: &str) -> Option<u64> {

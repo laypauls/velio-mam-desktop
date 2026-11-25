@@ -29,7 +29,11 @@ fn fixture() -> Fx {
     drop(conn);
     let pool = Arc::new(DbPool::open(&db, 2).unwrap());
     let ud = Arc::new(UserData::new(Arc::clone(&pool), Arc::new(SystemClock)));
-    Fx { _dir: dir, pool, ud }
+    Fx {
+        _dir: dir,
+        pool,
+        ud,
+    }
 }
 
 /// command 본문과 같은 경로: `run_blocking` -> 서비스 호출 -> `CommandError` 변환
@@ -41,7 +45,8 @@ fn call<T: Send + 'static>(
 }
 
 fn scalar(pool: &DbPool, sql: &'static str) -> i64 {
-    pool.read(|c| Ok(c.query_row(sql, [], |r| r.get::<_, i64>(0))?)).unwrap()
+    pool.read(|c| Ok(c.query_row(sql, [], |r| r.get::<_, i64>(0))?))
+        .unwrap()
 }
 
 #[test]
@@ -66,14 +71,20 @@ fn t_ipc_scene_01_arguments_use_camel_case_and_reject_malformed_shapes() {
         json!({"unknown": true}),
         json!(null),
     ] {
-        assert!(serde_json::from_value::<SceneDetectOptions>(bad.clone()).is_err(), "{bad}");
+        assert!(
+            serde_json::from_value::<SceneDetectOptions>(bad.clone()).is_err(),
+            "{bad}"
+        );
     }
     // source: 소문자만
     for ok in ["auto", "user"] {
         assert!(serde_json::from_value::<CutSource>(json!(ok)).is_ok());
     }
     for bad in [json!("Auto"), json!("manual"), json!(1), json!(null)] {
-        assert!(serde_json::from_value::<CutSource>(bad.clone()).is_err(), "{bad}");
+        assert!(
+            serde_json::from_value::<CutSource>(bad.clone()).is_err(),
+            "{bad}"
+        );
     }
     // ms·assetId: 정수만 (소수·문자열은 command 진입 전에 거부)
     for bad in [json!(1.5), json!("1000"), json!(null), json!(true)] {
@@ -99,15 +110,30 @@ fn t_ipc_scene_01_responses_serialize_to_the_contract_shapes() {
     let v = serde_json::to_value(&with_cut).unwrap();
     assert_eq!(v["state"], "done");
     assert_eq!(v["sensitivity"], json!(null));
-    assert_eq!(v["cuts"], json!([{"ms": 5000, "source": "user"}, {"ms": 20000, "source": "user"}]));
+    assert_eq!(
+        v["cuts"],
+        json!([{"ms": 5000, "source": "user"}, {"ms": 20000, "source": "user"}])
+    );
     assert!(v["updatedAt"].is_i64());
     let keys: Vec<_> = v.as_object().unwrap().keys().cloned().collect();
-    for k in ["assetId", "state", "sensitivity", "error", "cuts", "suppressedCount", "updatedAt"] {
+    for k in [
+        "assetId",
+        "state",
+        "sensitivity",
+        "error",
+        "cuts",
+        "suppressedCount",
+        "updatedAt",
+    ] {
         assert!(keys.iter().any(|x| x == k), "missing {k}: {keys:?}");
     }
     assert_eq!(keys.len(), 7, "{keys:?}");
     assert_eq!(
-        serde_json::to_value(SceneRequestResult { queued: 2, skipped: 1 }).unwrap(),
+        serde_json::to_value(SceneRequestResult {
+            queued: 2,
+            skipped: 1
+        })
+        .unwrap(),
         json!({"queued": 2, "skipped": 1})
     );
     assert_eq!(
@@ -139,13 +165,30 @@ fn t_ipc_scene_02_errors_map_to_contract_codes_without_internals() {
     ];
 
     // Assert
-    assert!(not_found.iter().all(|e| e.code() == ErrorCode::NotFound), "{not_found:?}");
-    assert!(invalid.iter().all(|e| e.code() == ErrorCode::InvalidInput), "{invalid:?}");
-    let msgs: Vec<String> = invalid.iter().map(|e| serde_json::to_string(e).unwrap()).collect();
-    assert!(msgs[0].contains("mediaType") && msgs[2].contains("ms"), "{msgs:?}");
+    assert!(
+        not_found.iter().all(|e| e.code() == ErrorCode::NotFound),
+        "{not_found:?}"
+    );
+    assert!(
+        invalid.iter().all(|e| e.code() == ErrorCode::InvalidInput),
+        "{invalid:?}"
+    );
+    let msgs: Vec<String> = invalid
+        .iter()
+        .map(|e| serde_json::to_string(e).unwrap())
+        .collect();
+    assert!(
+        msgs[0].contains("mediaType") && msgs[2].contains("ms"),
+        "{msgs:?}"
+    );
     for e in not_found.iter().chain(invalid.iter()) {
         let body = serde_json::to_string(e).unwrap();
-        assert!(!body.contains("SELECT") && !body.contains("mam.sqlite") && !body.contains("asset_scene_cuts"), "{body}");
+        assert!(
+            !body.contains("SELECT")
+                && !body.contains("mam.sqlite")
+                && !body.contains("asset_scene_cuts"),
+            "{body}"
+        );
     }
     // 실패한 호출은 기존 컷을 바꾸지 않았다
     let kept = call(&fx.ud, |u| u.scene_cuts_get(1)).unwrap();
@@ -158,13 +201,37 @@ fn t_ipc_scene_03_request_registers_user_priority_jobs_and_skips_non_videos() {
     let fx = fixture();
 
     // Act
-    let out = request_assets(&fx.pool, &[1, 2, 3, 4, 99, 1], &SceneDetectOptions::default(), NOW).unwrap();
+    let out = request_assets(
+        &fx.pool,
+        &[1, 2, 3, 4, 99, 1],
+        &SceneDetectOptions::default(),
+        NOW,
+    )
+    .unwrap();
     let again = request_assets(&fx.pool, &[1, 3], &SceneDetectOptions::default(), NOW + 1).unwrap();
 
     // Assert: 중복 id 는 한 번만, 비영상·없는 자산은 skipped, 재요청은 멱등
-    assert_eq!(out, SceneRequestResult { queued: 2, skipped: 3 });
-    assert_eq!(again, SceneRequestResult { queued: 2, skipped: 0 });
-    assert_eq!(scalar(&fx.pool, "SELECT COUNT(*) FROM jobs WHERE kind = 'scene' AND priority = 45 AND status = 'pending'"), 2);
+    assert_eq!(
+        out,
+        SceneRequestResult {
+            queued: 2,
+            skipped: 3
+        }
+    );
+    assert_eq!(
+        again,
+        SceneRequestResult {
+            queued: 2,
+            skipped: 0
+        }
+    );
+    assert_eq!(
+        scalar(
+            &fx.pool,
+            "SELECT COUNT(*) FROM jobs WHERE kind = 'scene' AND priority = 45 AND status = 'pending'"
+        ),
+        2
+    );
     let state = call(&fx.ud, |u| u.scene_cuts_get(1)).unwrap();
     assert_eq!(serde_json::to_value(&state).unwrap()["state"], "pending");
 }
@@ -178,7 +245,8 @@ fn t_ipc_scene_03_request_validates_the_asset_id_list_size() {
 
     // Act
     let empty = request_assets(&fx.pool, &[], &SceneDetectOptions::default(), NOW).unwrap_err();
-    let over = request_assets(&fx.pool, &too_many, &SceneDetectOptions::default(), NOW).unwrap_err();
+    let over =
+        request_assets(&fx.pool, &too_many, &SceneDetectOptions::default(), NOW).unwrap_err();
     let ok = request_assets(&fx.pool, &max_ok, &SceneDetectOptions::default(), NOW).unwrap();
 
     // Assert
@@ -203,17 +271,36 @@ fn t_ipc_scene_03_redetect_options_flow_through_to_the_stored_request() {
     let plain = request_assets(&fx.pool, &[1], &SceneDetectOptions::default(), NOW).unwrap();
 
     // Act
-    let opts = SceneDetectOptions { redetect: true, restore_suppressed: true, sensitivity: Some(SceneSensitivity::Low) };
+    let opts = SceneDetectOptions {
+        redetect: true,
+        restore_suppressed: true,
+        sensitivity: Some(SceneSensitivity::Low),
+    };
     let redo = request_assets(&fx.pool, &[1], &opts, NOW).unwrap();
 
     // Assert: 옵션 없는 요청은 건너뛰고, 재검출은 등록 + 숨김 비움 + 요청 민감도 기록
-    assert_eq!(plain, SceneRequestResult { queued: 0, skipped: 1 });
-    assert_eq!(redo, SceneRequestResult { queued: 1, skipped: 0 });
+    assert_eq!(
+        plain,
+        SceneRequestResult {
+            queued: 0,
+            skipped: 1
+        }
+    );
+    assert_eq!(
+        redo,
+        SceneRequestResult {
+            queued: 1,
+            skipped: 0
+        }
+    );
     let got = call(&fx.ud, |u| u.scene_cuts_get(1)).unwrap();
     assert_eq!(got.suppressed_count, 0);
     assert_eq!(got.cuts.len(), 1, "새 결과가 오기 전까지 기존 자동 컷 유지");
     assert_eq!(
-        scalar(&fx.pool, "SELECT COUNT(*) FROM asset_scene_cuts WHERE requested_sensitivity = 'low'"),
+        scalar(
+            &fx.pool,
+            "SELECT COUNT(*) FROM asset_scene_cuts WHERE requested_sensitivity = 'low'"
+        ),
         1
     );
 }
@@ -263,9 +350,18 @@ fn run_with(
 
 fn job_snapshot(pool: &DbPool) -> (i64, i64, i64) {
     (
-        scalar(pool, "SELECT COUNT(*) FROM jobs WHERE kind = 'scene' AND priority = 60"),
-        scalar(pool, "SELECT COUNT(*) FROM asset_scene_cuts WHERE state = 'pending'"),
-        scalar(pool, "SELECT COUNT(*) FROM jobs WHERE kind = 'scene' AND asset_id = 1"),
+        scalar(
+            pool,
+            "SELECT COUNT(*) FROM jobs WHERE kind = 'scene' AND priority = 60",
+        ),
+        scalar(
+            pool,
+            "SELECT COUNT(*) FROM asset_scene_cuts WHERE state = 'pending'",
+        ),
+        scalar(
+            pool,
+            "SELECT COUNT(*) FROM jobs WHERE kind = 'scene' AND asset_id = 1",
+        ),
     )
 }
 
@@ -278,7 +374,10 @@ fn t_ipc_scene_03_backfill_returns_before_registration_completes_and_finishes_in
     let (release_tx, release_rx) = mpsc::channel::<()>();
     let release_rx = std::sync::Mutex::new(release_rx);
     let gate: Arc<dyn Fn() + Send + Sync> = Arc::new(move || {
-        let _ = release_rx.lock().unwrap().recv_timeout(Duration::from_secs(20));
+        let _ = release_rx
+            .lock()
+            .unwrap()
+            .recv_timeout(Duration::from_secs(20));
     });
     let (run, done_rx) = run_with(&fx, &running, &stop, gate);
 
@@ -287,7 +386,10 @@ fn t_ipc_scene_03_backfill_returns_before_registration_completes_and_finishes_in
 
     // Assert: 반환 시점에는 아직 아무것도 등록되지 않았고, 등록 중 표시가 켜져 있다
     assert_eq!(out.queued, 2101);
-    assert_eq!(scalar(&fx.pool, "SELECT COUNT(*) FROM jobs WHERE kind = 'scene'"), 0);
+    assert_eq!(
+        scalar(&fx.pool, "SELECT COUNT(*) FROM jobs WHERE kind = 'scene'"),
+        0
+    );
     assert!(running.load(Ordering::SeqCst));
     // 풀어 주면 끝까지 등록하고 표시를 내리며 대기열을 깨운다
     for _ in 0..4 {
@@ -311,7 +413,10 @@ fn t_ipc_scene_03_second_backfill_while_running_does_not_start_another_registrat
     let counter = Arc::clone(&started);
     let gate: Arc<dyn Fn() + Send + Sync> = Arc::new(move || {
         counter.fetch_add(1, Ordering::SeqCst);
-        let _ = release_rx.lock().unwrap().recv_timeout(Duration::from_secs(20));
+        let _ = release_rx
+            .lock()
+            .unwrap()
+            .recv_timeout(Duration::from_secs(20));
     });
     let (first, done_rx) = run_with(&fx, &running, &stop, Arc::clone(&gate));
     let (second, second_done) = run_with(&fx, &running, &stop, gate);
@@ -327,7 +432,11 @@ fn t_ipc_scene_03_second_backfill_while_running_does_not_start_another_registrat
     // Assert: 두 번째 호출은 현재 대상 수만 돌려주고 스레드·완료 알림을 만들지 않는다
     assert_eq!((a.queued, b.queued), (2101, 2101));
     assert!(second_done.try_recv().is_err());
-    assert_eq!(started.load(Ordering::SeqCst), 4, "배치 3 + 마지막 빈 배치 1 — 한 스레드분");
+    assert_eq!(
+        started.load(Ordering::SeqCst),
+        4,
+        "배치 3 + 마지막 빈 배치 1 — 한 스레드분"
+    );
     assert_eq!(job_snapshot(&fx.pool).0, 2101, "중복 없음");
     // 끝난 뒤의 호출은 대상이 없어 아무것도 시작하지 않는다
     let (third, third_done) = run_with(&fx, &running, &stop, Arc::new(|| {}));
@@ -343,7 +452,12 @@ fn t_ipc_scene_03_background_backfill_ends_in_the_same_state_as_the_synchronous_
     let running = Arc::new(AtomicBool::new(false));
     let stop = Arc::new(AtomicBool::new(false));
     let (sync_run, _rx) = run_with(&sync_fx, &running, &stop, Arc::new(|| {}));
-    let (bg_run, done_rx) = run_with(&bg_fx, &Arc::new(AtomicBool::new(false)), &stop, Arc::new(|| {}));
+    let (bg_run, done_rx) = run_with(
+        &bg_fx,
+        &Arc::new(AtomicBool::new(false)),
+        &stop,
+        Arc::new(|| {}),
+    );
 
     // Act
     let registered = backfill_all(&sync_run).unwrap();

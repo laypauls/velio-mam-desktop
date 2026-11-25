@@ -67,15 +67,43 @@ fn t_search_rating_01_range_exact_and_unrated_filters_include_their_bounds() {
     };
 
     // Act + Assert
-    assert_eq!(ids_of(Filters::default()), [1, 2, 3, 4, 5, 6], "no rating bound -> everything");
-    assert_eq!(ids_of(range(Some(3), None)), [4, 5, 6], "min only (inclusive)");
-    assert_eq!(ids_of(range(None, Some(2))), [1, 2, 3], "max only includes unrated");
-    assert_eq!(ids_of(range(Some(2), Some(4))), [3, 4, 5], "both bounds inclusive");
-    assert_eq!(ids_of(range(Some(4), Some(4))), [5], "min == max is an exact match");
+    assert_eq!(
+        ids_of(Filters::default()),
+        [1, 2, 3, 4, 5, 6],
+        "no rating bound -> everything"
+    );
+    assert_eq!(
+        ids_of(range(Some(3), None)),
+        [4, 5, 6],
+        "min only (inclusive)"
+    );
+    assert_eq!(
+        ids_of(range(None, Some(2))),
+        [1, 2, 3],
+        "max only includes unrated"
+    );
+    assert_eq!(
+        ids_of(range(Some(2), Some(4))),
+        [3, 4, 5],
+        "both bounds inclusive"
+    );
+    assert_eq!(
+        ids_of(range(Some(4), Some(4))),
+        [5],
+        "min == max is an exact match"
+    );
     assert_eq!(ids_of(range(Some(0), Some(0))), [1], "0..0 = unrated only");
     assert_eq!(ids_of(range(Some(5), Some(5))), [6]);
-    assert_eq!(ids_of(range(Some(4), Some(2))), Vec::<u64>::new(), "min > max matches nothing");
-    assert_eq!(ids_of(range(Some(6), None)), Vec::<u64>::new(), "above the scale matches nothing");
+    assert_eq!(
+        ids_of(range(Some(4), Some(2))),
+        Vec::<u64>::new(),
+        "min > max matches nothing"
+    );
+    assert_eq!(
+        ids_of(range(Some(6), None)),
+        Vec::<u64>::new(),
+        "above the scale matches nothing"
+    );
 }
 
 #[test]
@@ -117,7 +145,10 @@ fn t_search_rating_03_keyword_and_other_filters_combine_with_the_rating_range() 
     let mut by_fav = creq("");
     by_fav.filters = Filters {
         favorite_only: true,
-        rating: Range { min: Some(5), max: None },
+        rating: Range {
+            min: Some(5),
+            max: None,
+        },
         ..Default::default()
     };
 
@@ -132,7 +163,9 @@ fn t_search_rating_03_keyword_and_other_filters_combine_with_the_rating_range() 
 fn t_search_rating_04_the_filter_runs_inside_the_search_not_after_the_top_k() {
     // Arrange: 별점 5 가 3건뿐이고 나머지 200건이 모두 더 앞선 정렬 위치(asset_id 작음)에 있다
     let dir = tempdir().unwrap();
-    let mut docs: Vec<AssetDoc> = (1..=200).map(|i| rated(i, &format!("n{i}.jpg"), 1)).collect();
+    let mut docs: Vec<AssetDoc> = (1..=200)
+        .map(|i| rated(i, &format!("n{i}.jpg"), 1))
+        .collect();
     docs.extend((201..=203).map(|i| rated(i, &format!("n{i}.jpg"), 5)));
     let idx = indexed(&dir, &docs);
     let h = SearchHandle::for_index(&idx);
@@ -169,7 +202,10 @@ fn t_search_rating_05_sort_by_rating_orders_by_value_and_ties_by_asset_id() {
     let h = SearchHandle::for_index(&idx);
     let order = |desc| {
         let mut r = creq("");
-        r.sort = SortSpec { field: SortField::Rating, descending: desc };
+        r.sort = SortSpec {
+            field: SortField::Rating,
+            descending: desc,
+        };
         page(&h, &r).ids
     };
 
@@ -179,7 +215,10 @@ fn t_search_rating_05_sort_by_rating_orders_by_value_and_ties_by_asset_id() {
 
     // 커서 페이징도 같은 순서 (limit 2)
     let mut r = creq("");
-    r.sort = SortSpec { field: SortField::Rating, descending: true };
+    r.sort = SortSpec {
+        field: SortField::Rating,
+        descending: true,
+    };
     r.limit = 2;
     let mut seen = Vec::new();
     loop {
@@ -210,7 +249,10 @@ fn t_search_rating_06_changing_the_rating_filter_or_sort_makes_an_old_cursor_sta
     assert!(matches!(h.search(&other), Err(SearchError::StaleCursor)));
     // 정렬 변경
     let mut sorted = r.clone();
-    sorted.sort = SortSpec { field: SortField::Rating, descending: true };
+    sorted.sort = SortSpec {
+        field: SortField::Rating,
+        descending: true,
+    };
     sorted.cursor = Some(cursor.clone());
     assert!(matches!(h.search(&sorted), Err(SearchError::StaleCursor)));
     // 같은 요청은 계속 유효
@@ -224,7 +266,10 @@ fn t_search_rating_07_rating_sort_has_no_section_index_but_counts_the_filtered_t
     let (_dir, idx) = six();
     let h = SearchHandle::for_index(&idx);
     let mut r = creq("");
-    r.sort = SortSpec { field: SortField::Rating, descending: true };
+    r.sort = SortSpec {
+        field: SortField::Rating,
+        descending: true,
+    };
     r.filters = range(Some(2), None);
 
     // Act

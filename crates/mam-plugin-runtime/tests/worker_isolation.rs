@@ -25,7 +25,10 @@ fn t_prt_iso_01_no_worker_never_falls_back_to_a_planted_exe_in_mamdata() {
 
     // Assert: 시작 오류 — 심은 파일이 돌았다면 성공했을 호출이다
     assert!(!info.worker_available);
-    assert!(matches!(&err, RunError::Invoke(InvokeError::Start(_))), "{err:?}");
+    assert!(
+        matches!(&err, RunError::Invoke(InvokeError::Start(_))),
+        "{err:?}"
+    );
 }
 
 /// T-prt-iso-02 (대조군): 실제 워커 경로를 주면 같은 호출이 성공한다

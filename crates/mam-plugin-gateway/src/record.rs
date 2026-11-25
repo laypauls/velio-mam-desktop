@@ -85,7 +85,6 @@ struct RawOutput {
     tags: Option<Vec<String>>,
 }
 
-
 /// 검증을 마친 반환값 (KV 값은 compact JSON 텍스트, 태그는 `None` = 키 없음)
 struct Output {
     kv: Vec<(String, String)>,
@@ -98,12 +97,16 @@ fn invalid(m: &'static str) -> RecordError {
 
 fn parse_output(out: Value, value_max: usize) -> Result<Output, RecordError> {
     if out.is_null() {
-        return Ok(Output { kv: Vec::new(), tags: None });
+        return Ok(Output {
+            kv: Vec::new(),
+            tags: None,
+        });
     }
     if !out.is_object() {
         return Err(invalid("output must be null or an object"));
     }
-    let raw: RawOutput = serde_json::from_value(out).map_err(|_| invalid("unknown or malformed field"))?;
+    let raw: RawOutput =
+        serde_json::from_value(out).map_err(|_| invalid("unknown or malformed field"))?;
     let mut kv = Vec::new();
     if let Some(map) = raw.kv {
         if map.len() > MAX_OUTPUT_KV {
@@ -151,7 +154,10 @@ fn apply(tx: &Transaction<'_>, j: &Job) -> Result<(Recorded, i64), RecordError> 
         return Err(RecordError::AssetInactive);
     }
     // 권한은 살아 있는 레지스트리에서 지금 읽는다 (큐 대기 중 철회·비활성이 반영된다)
-    for (needed, perm) in [(!j.out.kv.is_empty(), Permission::KvWrite), (j.out.tags.is_some(), Permission::TagWrite)] {
+    for (needed, perm) in [
+        (!j.out.kv.is_empty(), Permission::KvWrite),
+        (j.out.tags.is_some(), Permission::TagWrite),
+    ] {
         if needed && !j.grants.allows(&j.plugin, perm) {
             return Err(RecordError::PermissionDenied(perm));
         }
@@ -171,24 +177,39 @@ fn apply(tx: &Transaction<'_>, j: &Job) -> Result<(Recorded, i64), RecordError> 
             Ok(o) => tags_added = o.added,
             Err(PluginTagError::InvalidName) => return Err(invalid("invalid tag name")),
             Err(PluginTagError::NotFound) => return Err(RecordError::AssetInactive),
-            Err(PluginTagError::AssetTagLimit | PluginTagError::NewNameBudget) => return Err(RecordError::QuotaExceeded),
+            Err(PluginTagError::AssetTagLimit | PluginTagError::NewNameBudget) => {
+                return Err(RecordError::QuotaExceeded);
+            }
             Err(PluginTagError::Busy) => return Err(RecordError::Busy),
             Err(PluginTagError::Internal(e)) => return Err(RecordError::Db(e.to_string())),
         }
     }
-    let Completion { task_id, processed_rev } = j.completion;
+    let Completion {
+        task_id,
+        processed_rev,
+    } = j.completion;
     // 루프 방지: 이 트랜잭션이 태그를 붙여 올린 revision 까지 처리한 것으로 본다.
     // 단 provider 가 실행되는 사이 다른 편집(사용자·다른 플러그인)이 revision 을 올렸으면(`rev_before > processed_rev`) 그 편집은
     // provider 가 보지 못했다 — 자기 이벤트까지 건너뛰면 그 편집도 같이 삼켜지므로 `processed_rev` 만 인정하고 한 번 더 돌게 둔다.
     let own_only = rev_before.is_some_and(|b| b <= processed_rev);
-    let done_rev = match (tags_added > 0 && own_only).then(|| plugin_tasks::asset_revision(tx, j.asset_id)).transpose()? {
+    let done_rev = match (tags_added > 0 && own_only)
+        .then(|| plugin_tasks::asset_revision(tx, j.asset_id))
+        .transpose()?
+    {
         Some(Some(after)) => after.max(processed_rev),
         _ => processed_rev,
     };
     if !plugin_tasks::complete(tx, task_id, processed_rev, done_rev, j.now)? {
         return Err(RecordError::TaskGone);
     }
-    Ok((Recorded { kv_entries: j.out.kv.len(), tags_added, done_rev }, delta))
+    Ok((
+        Recorded {
+            kv_entries: j.out.kv.len(),
+            tags_added,
+            done_rev,
+        },
+        delta,
+    ))
 }
 
 /// KV 총량 검사 — 계량기를 (필요하면) 초기화하고, 늘어나면 상한을 확인한다(거부 전에 합계를 한 번 다시 센다). 반환 = 총 delta
@@ -221,7 +242,14 @@ impl Gateway {
     ///
     /// 루프 방지: 이 트랜잭션이 태그를 실제로 붙였으면 `done_rev = MAX(processed_rev, 붙인 뒤의 자산 revision)` — 자기 outbox 이벤트가
     /// 이 플러그인의 작업을 다시 pending 으로 만들지 않는다(다른 플러그인은 본다). 붙인 게 없으면 `processed_rev` 그대로.
-    pub fn record_provider_output(&self, plugin: &str, asset_id: i64, out: Value, completion: Completion, deadline: Instant) -> Result<Recorded, RecordError> {
+    pub fn record_provider_output(
+        &self,
+        plugin: &str,
+        asset_id: i64,
+        out: Value,
+        completion: Completion,
+        deadline: Instant,
+    ) -> Result<Recorded, RecordError> {
         let out = parse_output(out, self.cfg.kv_value_max_bytes)?;
         let job = Job {
             plugin: plugin.to_owned(),
@@ -231,7 +259,10 @@ impl Gateway {
             grants: Arc::clone(&self.grants),
             meter: self.meters.of(plugin),
             quota: self.cfg.kv_quota_bytes,
-            limits: PluginTagLimits { max_per_asset: self.cfg.max_asset_tags, max_new_names: self.cfg.max_new_tags_per_call },
+            limits: PluginTagLimits {
+                max_per_asset: self.cfg.max_asset_tags,
+                max_new_names: self.cfg.max_new_tags_per_call,
+            },
             now: self.clock.now_ms(),
         };
         let wait = (Instant::now() + self.cfg.write_wait).min(deadline);

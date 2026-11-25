@@ -6,7 +6,7 @@ use std::sync::Arc;
 use mam_plugin_host::{HostApi, HostConfig, PluginHost};
 use mam_plugin_manifest::check_engine;
 
-use super::{Entry, PluginRuntime, Pkg};
+use super::{Entry, Pkg, PluginRuntime};
 use crate::api::{Permission, PluginStatus};
 use crate::install::package::Package;
 
@@ -16,32 +16,57 @@ impl PluginRuntime {
     fn make_host(&self, pkg: &Package, source: String) -> Arc<PluginHost> {
         let exe = self.deps.worker_exe.clone().unwrap_or_default();
         let mut cfg = HostConfig::new(exe, source);
-        let tweak = self.knobs.read().unwrap_or_else(|p| p.into_inner()).host_tweak.clone();
+        let tweak = self
+            .knobs
+            .read()
+            .unwrap_or_else(|p| p.into_inner())
+            .host_tweak
+            .clone();
         if let Some(tweak) = tweak {
             tweak(&mut cfg);
         }
         let api: Arc<dyn HostApi> = Arc::clone(&self.gateway) as Arc<dyn HostApi>;
-        Arc::new(PluginHost::new(pkg.manifest.id.clone(), cfg, api, Arc::clone(&self.deps.host_clock)))
+        Arc::new(PluginHost::new(
+            pkg.manifest.id.clone(),
+            cfg,
+            api,
+            Arc::clone(&self.deps.host_clock),
+        ))
     }
 
     /// 읽은 패키지 + 저장된 상태 -> 항목. 앱 버전이 안 맞으면 Incompatible(호스트·권한 등록 없음 = 닫힘).
     /// Ok 면 권한 레지스트리에 선언 권한을 등록한다(허용 상태는 `refresh` 전까지 닫힘)
-    pub(crate) fn build_entry(&self, pkg: Package, enabled: bool, granted: BTreeSet<Permission>, installed_at: i64) -> Entry {
+    pub(crate) fn build_entry(
+        &self,
+        pkg: Package,
+        enabled: bool,
+        granted: BTreeSet<Permission>,
+        installed_at: i64,
+    ) -> Entry {
         let compatible = check_engine(&pkg.manifest, &self.deps.app_version).is_ok();
         let host = compatible.then(|| {
             let host = self.make_host(&pkg, pkg.main_source.clone());
-            self.gateway.grants().register(&pkg.manifest.id, &pkg.manifest.permissions);
+            self.gateway
+                .grants()
+                .register(&pkg.manifest.id, &pkg.manifest.permissions);
             host
         });
         Entry {
             id: pkg.manifest.id.to_string(),
             version: pkg.manifest.version.to_string(),
-            status: if compatible { PluginStatus::Ok } else { PluginStatus::Incompatible },
+            status: if compatible {
+                PluginStatus::Ok
+            } else {
+                PluginStatus::Incompatible
+            },
             enabled,
             granted,
             installed_at,
             host,
-            pkg: Some(Arc::new(Pkg { manifest: pkg.manifest, locales: pkg.locales })),
+            pkg: Some(Arc::new(Pkg {
+                manifest: pkg.manifest,
+                locales: pkg.locales,
+            })),
         }
     }
 }

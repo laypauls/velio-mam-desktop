@@ -89,4 +89,3 @@ pub struct ExportProvider {
     pub asset_kinds: Vec<AssetKind>,
     pub file_extension: String,
 }
-

@@ -6,14 +6,17 @@ use serde_json::Value;
 use super::Ingest;
 use super::rescan_policy::{PolicySource, RescanPolicy, SlotCtx, effective_policy, parse_policy};
 use crate::scan::{
-    Availability, FolderRow, IngestError, ManagedFolderView, load_all, load_folder, set_rescan_policy,
-    set_watch_mode,
+    Availability, FolderRow, IngestError, ManagedFolderView, load_all, load_folder,
+    set_rescan_policy, set_watch_mode,
 };
 use crate::watch::{ChangeDetectorInfo, ProbeResult, SourceHealth, WatchTarget};
 
 impl Ingest {
     /// 이 폴더 기준으로 각 감지기의 사용 가능 여부 (레지스트리 순서). 없는 폴더는 `NotFound`.
-    pub fn list_change_detectors(&self, folder_id: i64) -> Result<Vec<ChangeDetectorInfo>, IngestError> {
+    pub fn list_change_detectors(
+        &self,
+        folder_id: i64,
+    ) -> Result<Vec<ChangeDetectorInfo>, IngestError> {
         let f = self.env.pool.read(|c| Ok(load_folder(c, folder_id)))??;
         if !f.enabled {
             return Err(IngestError::NotFound); // 등록 해제 중 — set_* 와 같다
@@ -62,21 +65,31 @@ impl Ingest {
                     .ok_or(IngestError::InvalidInput("watchMode"))?;
                 let to_err = |e: crate::watch::DetectError| match e {
                     crate::watch::DetectError::InvalidOptions { field }
-                    | crate::watch::DetectError::UnknownReference { field } => IngestError::InvalidInput(field),
-                    crate::watch::DetectError::Start(_) => IngestError::InvalidInput("watchOptions"),
+                    | crate::watch::DetectError::UnknownReference { field } => {
+                        IngestError::InvalidInput(field)
+                    }
+                    crate::watch::DetectError::Start(_) => {
+                        IngestError::InvalidInput("watchOptions")
+                    }
                 };
                 let parsed = d
                     .parse_options_with(options.as_ref(), self.watchers.registry().refs())
                     .map_err(to_err)?;
                 // 옵션이 이 폴더에 맞는지 (예: 원격 접속의 경로 변환이 폴더 루트에 닿는가) — 저장 전에 거부한다
                 let folder = self.env.pool.read(|c| Ok(load_folder(c, folder_id)))??;
-                d.validate_target(&WatchTarget::of(&folder), &parsed).map_err(to_err)?;
+                d.validate_target(&WatchTarget::of(&folder), &parsed)
+                    .map_err(to_err)?;
                 parsed.to_stored()
             }
         };
         let saved_mode = mode.clone();
         self.env.write(Priority::High, move |c| {
-            set_watch_mode(c, folder_id, saved_mode.as_deref(), stored_options.as_deref())
+            set_watch_mode(
+                c,
+                folder_id,
+                saved_mode.as_deref(),
+                stored_options.as_deref(),
+            )
         })?;
         {
             // 감시 교체는 시작·중지와 같은 잠금 안에서 — 점검 스레드가 옛 방식을 되살리지 못하게
@@ -113,14 +126,22 @@ impl Ingest {
     /// 폴더의 유효 재스캔 정책. 저장된 값을 해석할 수 없으면 전역 기본으로 동작하고 폴더·프로세스당 한 번만 경고한다.
     pub(super) fn effective_policy_of(&self, f: &FolderRow, default_hours: u32) -> RescanPolicy {
         let (policy, source) = effective_policy(f.rescan_policy.as_deref(), default_hours);
-        if source == PolicySource::InvalidFallback && super::lock(&self.policy_warned).insert(f.folder_id) {
-            tracing::warn!(folder_id = f.folder_id, "invalid rescan policy; using the global default");
+        if source == PolicySource::InvalidFallback
+            && super::lock(&self.policy_warned).insert(f.folder_id)
+        {
+            tracing::warn!(
+                folder_id = f.folder_id,
+                "invalid rescan policy; using the global default"
+            );
         }
         policy
     }
 
     /// `list_folders` 뷰에 변경 감지·재스캔 정책 필드를 채운다.
-    pub(super) fn fill_detection(&self, views: &mut [ManagedFolderView]) -> Result<(), IngestError> {
+    pub(super) fn fill_detection(
+        &self,
+        views: &mut [ManagedFolderView],
+    ) -> Result<(), IngestError> {
         let rows = self.env.pool.read(|c| Ok(load_all(c)))??;
         let (s, _) = self.env.pool.read(settings::load)?;
         let now = self.env.clock.now_ms();
@@ -137,10 +158,14 @@ impl Ingest {
                 .as_deref()
                 .and_then(|t| serde_json::from_str::<Value>(t).ok());
             // 보고할 것이 없는 정상(`Ok` + 신호 없음)은 싣지 않는다 — 선택 필드
-            v.watch_health = self
-                .watchers
-                .health(f.folder_id)
-                .filter(|h| !matches!(h, SourceHealth::Ok { last_signal_at: None }));
+            v.watch_health = self.watchers.health(f.folder_id).filter(|h| {
+                !matches!(
+                    h,
+                    SourceHealth::Ok {
+                        last_signal_at: None
+                    }
+                )
+            });
             if let Some(st) = self.watchers.status(f.folder_id) {
                 v.watch_active = Some(st.active.to_string());
                 v.watch_fallback_key = st.fallback.map(|r| r.key().to_string());

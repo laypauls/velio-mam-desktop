@@ -6,8 +6,8 @@
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 
-use super::collections::require_collection;
 use super::UserData;
+use super::collections::require_collection;
 use crate::scan::IngestError;
 
 /// 자산당 구간 수 상한
@@ -63,7 +63,10 @@ pub fn normalize_ranges(
     if ranges.len() > MAX_PLAY_RANGES {
         return Err(IngestError::InvalidInput("ranges"));
     }
-    if ranges.iter().any(|r| r.start_ms < 0 || r.end_ms <= r.start_ms) {
+    if ranges
+        .iter()
+        .any(|r| r.start_ms < 0 || r.end_ms <= r.start_ms)
+    {
         return Err(IngestError::InvalidInput("ranges"));
     }
     let duration = duration_ms.filter(|d| *d > 0);

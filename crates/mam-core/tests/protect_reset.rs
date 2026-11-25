@@ -244,7 +244,12 @@ fn t_pinst_22_reset_plan_includes_the_plugins_folder_and_keeps_every_protection(
     let protected = vec![w.originals.path().to_path_buf()];
 
     // Act
-    let plan = plan_reset(&w.paths, &BackupOutcome::Created(w.backup.clone()), &protected).unwrap();
+    let plan = plan_reset(
+        &w.paths,
+        &BackupOutcome::Created(w.backup.clone()),
+        &protected,
+    )
+    .unwrap();
     write_reset_marker(&w.paths, &clock, &plan).unwrap();
     let report = apply_pending_reset(&w.paths, &protected).unwrap().unwrap();
 
@@ -259,7 +264,12 @@ fn t_pinst_22_reset_plan_includes_the_plugins_folder_and_keeps_every_protection(
     // 보호 경로가 plugins/ 안(또는 위)에 있으면 거부, 백업이 plugins/ 안이면 거부
     let w = world();
     let inside = w.paths.plugins().join("my-originals");
-    let e = plan_reset(&w.paths, &BackupOutcome::Created(w.backup.clone()), &[inside]).unwrap_err();
+    let e = plan_reset(
+        &w.paths,
+        &BackupOutcome::Created(w.backup.clone()),
+        &[inside],
+    )
+    .unwrap_err();
     assert_eq!(e.code(), "invalid_input");
     let bad_backup = w.paths.plugins().join("pre_reset.sqlite");
     fs::write(&bad_backup, b"b").unwrap();

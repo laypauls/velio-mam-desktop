@@ -4,7 +4,9 @@
 use std::cell::{Cell, RefCell};
 use std::io::{BufRead, StdinLock, Write};
 
-use mam_plugin_host::protocol::{CODE_TOO_LARGE, HostMsg, LogLevel, WorkerMsg, encode_line, parse_host_line};
+use mam_plugin_host::protocol::{
+    CODE_TOO_LARGE, HostMsg, LogLevel, WorkerMsg, encode_line, parse_host_line,
+};
 use serde_json::Value;
 
 use crate::meter::Meter;
@@ -21,7 +23,11 @@ fn gone() -> ! {
 
 impl Io {
     pub fn new() -> Self {
-        Self { stdin: RefCell::new(std::io::stdin().lock()), next_id: Cell::new(1), max_line: Cell::new(0) }
+        Self {
+            stdin: RefCell::new(std::io::stdin().lock()),
+            next_id: Cell::new(1),
+            max_line: Cell::new(0),
+        }
     }
 
     /// 0 = 제한 없음
@@ -38,7 +44,10 @@ impl Io {
         let line = encode_line(msg).map_err(|e| e.to_string())?;
         let max = self.max_line.get();
         if max > 0 && line.len() > max {
-            return Err(format!("message of {} bytes exceeds the {max} byte limit", line.len()));
+            return Err(format!(
+                "message of {} bytes exceeds the {max} byte limit",
+                line.len()
+            ));
         }
         let mut out = std::io::stdout().lock();
         if out.write_all(&line).and_then(|_| out.flush()).is_err() {
@@ -48,7 +57,10 @@ impl Io {
     }
 
     pub fn log(&self, level: LogLevel, message: &str) {
-        let _ = self.send(&WorkerMsg::Log { level, message: message.to_owned() });
+        let _ = self.send(&WorkerMsg::Log {
+            level,
+            message: message.to_owned(),
+        });
     }
 
     /// 다음 호스트 메시지. EOF 는 None. 깨진 줄은 경고만 남기고 건너뛴다
@@ -68,37 +80,70 @@ impl Io {
 
     /// 호스트 함수 호출 — 응답이 올 때까지 막는다. 기다린 시간은 CPU 시간에서 뺀다. 반환: `{"ok":..}` 봉투 JSON 문자열
     pub fn host_call(&self, meter: &Meter, method: &str, params_json: &str) -> String {
-        let envelope = |ok: bool, key: &str, v: Value| serde_json::json!({ "ok": ok, key: v }).to_string();
+        let envelope =
+            |ok: bool, key: &str, v: Value| serde_json::json!({ "ok": ok, key: v }).to_string();
         // 파싱(Value 로 부풀림) 전에 크기부터 — 상한을 넘는 인자는 할당 없이 즉시 거절
         let max = self.max_line.get();
         if max > 0 && params_json.len() > max {
-            let m = format!("params of {} bytes exceed the {max} byte limit", params_json.len());
-            return envelope(false, "error", serde_json::json!({"code": CODE_TOO_LARGE, "message": m}));
+            let m = format!(
+                "params of {} bytes exceed the {max} byte limit",
+                params_json.len()
+            );
+            return envelope(
+                false,
+                "error",
+                serde_json::json!({"code": CODE_TOO_LARGE, "message": m}),
+            );
         }
         let params: Value = match serde_json::from_str(params_json) {
             Ok(p) => p,
-            Err(e) => return envelope(false, "error", serde_json::json!({"code": "bad_request", "message": e.to_string()})),
+            Err(e) => {
+                return envelope(
+                    false,
+                    "error",
+                    serde_json::json!({"code": "bad_request", "message": e.to_string()}),
+                );
+            }
         };
         let id = self.next_id.get();
         self.next_id.set(id + 1);
         let began = std::time::Instant::now();
-        if let Err(m) = self.send(&WorkerMsg::HostCall { id, method: method.to_owned(), params }) {
-            return envelope(false, "error", serde_json::json!({"code": CODE_TOO_LARGE, "message": m}));
+        if let Err(m) = self.send(&WorkerMsg::HostCall {
+            id,
+            method: method.to_owned(),
+            params,
+        }) {
+            return envelope(
+                false,
+                "error",
+                serde_json::json!({"code": CODE_TOO_LARGE, "message": m}),
+            );
         }
         let reply = match self.read() {
             None | Some(HostMsg::Quit) => gone(),
-            Some(HostMsg::HostResult { id: rid, ok, value, error }) if rid == id => (ok, value, error),
+            Some(HostMsg::HostResult {
+                id: rid,
+                ok,
+                value,
+                error,
+            }) if rid == id => (ok, value, error),
             // 호출 중에 다른 메시지(또는 다른 id)가 오면 호스트 버그 — 계속 진행할 수 없다
             Some(_) => std::process::exit(3),
         };
         meter.add_blocked(began.elapsed());
         match reply {
             (true, value, _) => envelope(true, "value", value.unwrap_or(Value::Null)),
-            (false, _, error) => envelope(false, "error", error.map_or_else(|| serde_json::json!({"code": "host", "message": "host call failed"}), |e| serde_json::json!({"code": e.code, "message": e.message}))),
+            (false, _, error) => envelope(
+                false,
+                "error",
+                error.map_or_else(
+                    || serde_json::json!({"code": "host", "message": "host call failed"}),
+                    |e| serde_json::json!({"code": e.code, "message": e.message}),
+                ),
+            ),
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -114,7 +159,8 @@ mod tests {
         let meter = Meter::new(0);
         let broken = "{".repeat(2048);
         // Act
-        let out: Value = serde_json::from_str(&io.host_call(&meter, "echo", &broken)).expect("envelope");
+        let out: Value =
+            serde_json::from_str(&io.host_call(&meter, "echo", &broken)).expect("envelope");
         // Assert
         assert_eq!(out["ok"], false);
         assert_eq!(out["error"]["code"], CODE_TOO_LARGE);
@@ -125,7 +171,8 @@ mod tests {
     fn t_pwrk_io_02_in_limit_broken_params_stay_bad_request() {
         let io = Io::new();
         io.set_max_line(1024);
-        let out: Value = serde_json::from_str(&io.host_call(&Meter::new(0), "echo", "{")).expect("envelope");
+        let out: Value =
+            serde_json::from_str(&io.host_call(&Meter::new(0), "echo", "{")).expect("envelope");
         assert_eq!(out["error"]["code"], "bad_request");
     }
 }

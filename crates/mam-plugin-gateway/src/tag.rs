@@ -17,17 +17,25 @@ impl Gateway {
         let id = asset_id(&p.asset_id)?;
         Self::in_scope(cx, id)?;
         let names: Vec<String> = match p.tags {
-            Value::Array(items) if (1..=MAX_TAGS_PER_CALL).contains(&items.len()) => {
-                items.into_iter().map(|v| v.as_str().map(str::to_owned)).collect::<Option<_>>().ok_or(GwError::BadRequest("invalid tag list"))?
-            }
+            Value::Array(items) if (1..=MAX_TAGS_PER_CALL).contains(&items.len()) => items
+                .into_iter()
+                .map(|v| v.as_str().map(str::to_owned))
+                .collect::<Option<_>>()
+                .ok_or(GwError::BadRequest("invalid tag list"))?,
             _ => return Err(GwError::BadRequest("invalid tag list")),
         };
         for n in &names {
             clean_tag_name(n).map_err(|_| GwError::BadRequest("invalid tag name"))?;
         }
         let used = cx.scope.new_tags.load(Ordering::Acquire);
-        let limits = PluginTagLimits { max_per_asset: self.cfg.max_asset_tags, max_new_names: self.cfg.max_new_tags_per_call.saturating_sub(used) };
-        match self.userdata.add_tags_low(id, &names, limits, self.write_deadline(cx)) {
+        let limits = PluginTagLimits {
+            max_per_asset: self.cfg.max_asset_tags,
+            max_new_names: self.cfg.max_new_tags_per_call.saturating_sub(used),
+        };
+        match self
+            .userdata
+            .add_tags_low(id, &names, limits, self.write_deadline(cx))
+        {
             Ok(out) => {
                 cx.scope.new_tags.fetch_add(out.new_names, Ordering::AcqRel);
                 Ok(json!({ "added": out.added }))

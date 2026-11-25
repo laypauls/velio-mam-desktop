@@ -126,14 +126,20 @@ impl HealthBoard {
         let now = self.clock.now_ms();
         let g = self.slots();
         let s = g.get(&folder_id)?;
-        Some(match s.degraded.as_ref().filter(|d| d.until.is_none_or(|u| now < u)) {
-            Some(d) => SourceHealth::Degraded {
-                since: d.since,
-                reason_key: d.reason_key,
+        Some(
+            match s
+                .degraded
+                .as_ref()
+                .filter(|d| d.until.is_none_or(|u| now < u))
+            {
+                Some(d) => SourceHealth::Degraded {
+                    since: d.since,
+                    reason_key: d.reason_key,
+                },
+                None => SourceHealth::Ok {
+                    last_signal_at: s.last_signal_at,
+                },
             },
-            None => SourceHealth::Ok {
-                last_signal_at: s.last_signal_at,
-            },
-        })
+        )
     }
 }

@@ -102,7 +102,10 @@ pub fn is_noise(path: &str) -> bool {
     }
     let p = path.replace('\\', "/");
     for seg in p.split('/').filter(|s| !s.is_empty()) {
-        if seg.starts_with(['.', '^']) || seg == "$RECYCLE.BIN" || seg == "System Volume Information" {
+        if seg.starts_with(['.', '^'])
+            || seg == "$RECYCLE.BIN"
+            || seg == "System Volume Information"
+        {
             return true;
         }
     }
@@ -115,41 +118,128 @@ mod tests {
     //! watch_folder `parse_test.go` 의 입력·기대값 이식.
     use super::*;
 
-    struct Case(&'static str, &'static str, &'static str, &'static str, &'static str, bool);
+    struct Case(
+        &'static str,
+        &'static str,
+        &'static str,
+        &'static str,
+        &'static str,
+        bool,
+    );
 
     #[test]
     fn t_ddp_01_documented_and_real_sample_lines_parse_into_kind_who_path_newpath() {
         // 벤더 문서 그림 1 + 실기 DDP 가 남긴 줄 (DDP_원격접속_스토리지모니터링.pdf 그림 2·4·6)
         let cases = [
-            Case("2021-05-25 15:03:22.210453132  READ         iqn.mini-ibc-2  |/test1.mov", "READ", "iqn.mini-ibc-2", "/test1.mov", "", false),
-            Case("2021-05-25 15:13:06.139037187  CREATE       iqn.mini-ibc-2  |/cp1.png", "CREATE", "iqn.mini-ibc-2", "/cp1.png", "", true),
-            Case("2021-05-25 15:13:06.145854866  WRITE        iqn.mini-ibc-2  |/cp1.png", "WRITE", "iqn.mini-ibc-2", "/cp1.png", "", true),
-            Case("2021-05-25 15:03:44.727854721  READ         iqn.mini-ibc-2  |/Protools/mov3.mov", "READ", "iqn.mini-ibc-2", "/Protools/mov3.mov", "", false),
-            Case("2021-05-25 15:13:06.139037187  RENAME       iqn.mini-ibc-2  |/tmp/a.mxf|/1TV/a.mxf", "RENAME", "iqn.mini-ibc-2", "/tmp/a.mxf", "/1TV/a.mxf", true),
-            Case("2021-05-25 15:02:32.799029007  CONNECT      iqn.mini-ibc-2  MOUNT volume 'foldervol2' to iqn.mini-ibc-2 (172.16.4.16) user 'test' conn_id 11", "CONNECT", "iqn.mini-ibc-2", "", "", false),
-            Case("2021-05-25 15:01:50.779328107  DISCONNECT   ------          UNMOUNT volume 'foldervol2' from iqn.mini-ibc-2 (172.16.4.16) user 'test' conn_id 9", "DISCONNECT", "------", "", "", false),
-            Case("2026-10-12 11:23:02.913798994  RENAME  iqn.win10test  |/New folder|/New folder/test", "RENAME", "iqn.win10test", "/New folder", "/New folder/test", true),
-            Case("2026-10-12 13:01:50.916844350  DELETE  iqn.win10test  |/blue.png", "DELETE", "iqn.win10test", "/blue.png", "", false),
+            Case(
+                "2021-05-25 15:03:22.210453132  READ         iqn.mini-ibc-2  |/test1.mov",
+                "READ",
+                "iqn.mini-ibc-2",
+                "/test1.mov",
+                "",
+                false,
+            ),
+            Case(
+                "2021-05-25 15:13:06.139037187  CREATE       iqn.mini-ibc-2  |/cp1.png",
+                "CREATE",
+                "iqn.mini-ibc-2",
+                "/cp1.png",
+                "",
+                true,
+            ),
+            Case(
+                "2021-05-25 15:13:06.145854866  WRITE        iqn.mini-ibc-2  |/cp1.png",
+                "WRITE",
+                "iqn.mini-ibc-2",
+                "/cp1.png",
+                "",
+                true,
+            ),
+            Case(
+                "2021-05-25 15:03:44.727854721  READ         iqn.mini-ibc-2  |/Protools/mov3.mov",
+                "READ",
+                "iqn.mini-ibc-2",
+                "/Protools/mov3.mov",
+                "",
+                false,
+            ),
+            Case(
+                "2021-05-25 15:13:06.139037187  RENAME       iqn.mini-ibc-2  |/tmp/a.mxf|/1TV/a.mxf",
+                "RENAME",
+                "iqn.mini-ibc-2",
+                "/tmp/a.mxf",
+                "/1TV/a.mxf",
+                true,
+            ),
+            Case(
+                "2021-05-25 15:02:32.799029007  CONNECT      iqn.mini-ibc-2  MOUNT volume 'foldervol2' to iqn.mini-ibc-2 (172.16.4.16) user 'test' conn_id 11",
+                "CONNECT",
+                "iqn.mini-ibc-2",
+                "",
+                "",
+                false,
+            ),
+            Case(
+                "2021-05-25 15:01:50.779328107  DISCONNECT   ------          UNMOUNT volume 'foldervol2' from iqn.mini-ibc-2 (172.16.4.16) user 'test' conn_id 9",
+                "DISCONNECT",
+                "------",
+                "",
+                "",
+                false,
+            ),
+            Case(
+                "2026-10-12 11:23:02.913798994  RENAME  iqn.win10test  |/New folder|/New folder/test",
+                "RENAME",
+                "iqn.win10test",
+                "/New folder",
+                "/New folder/test",
+                true,
+            ),
+            Case(
+                "2026-10-12 13:01:50.916844350  DELETE  iqn.win10test  |/blue.png",
+                "DELETE",
+                "iqn.win10test",
+                "/blue.png",
+                "",
+                false,
+            ),
         ];
         for Case(line, kind, who, path, new_path, change) in cases {
             let ev = parse_line(line).unwrap_or_else(|| panic!("not parsed: {line}"));
-            assert_eq!((ev.kind.as_str(), ev.who.as_str(), ev.path.as_str(), ev.new_path.as_str()), (kind, who, path, new_path), "{line}");
+            assert_eq!(
+                (
+                    ev.kind.as_str(),
+                    ev.who.as_str(),
+                    ev.path.as_str(),
+                    ev.new_path.as_str()
+                ),
+                (kind, who, path, new_path),
+                "{line}"
+            );
             assert_eq!(ev.is_change(), change, "{line}");
         }
     }
 
     #[test]
     fn t_ddp_02_names_with_spaces_are_kept_whole() {
-        let ev = parse_line("2026-10-23 09:30:00.123456789  CREATE       iqn.kbs-01     |/1TV/뉴스 특보 001.mxf").unwrap();
+        let ev = parse_line(
+            "2026-10-23 09:30:00.123456789  CREATE       iqn.kbs-01     |/1TV/뉴스 특보 001.mxf",
+        )
+        .unwrap();
         assert_eq!(ev.path, "/1TV/뉴스 특보 001.mxf");
-        let ev = parse_line("2026-10-12 11:25:33.603700762  CREATE  iqn.win10test  |/New folder (2)").unwrap();
+        let ev =
+            parse_line("2026-10-12 11:25:33.603700762  CREATE  iqn.win10test  |/New folder (2)")
+                .unwrap();
         assert_eq!(ev.path, "/New folder (2)");
     }
 
     #[test]
     fn t_ddp_03_time_is_read_with_nanosecond_precision() {
         let ev = parse_line("2021-05-25 15:13:06.139037187  CREATE  iqn.x  |/a.png").unwrap();
-        assert_eq!(ev.time.format("%Y-%m-%d %H:%M:%S%.9f").to_string(), "2021-05-25 15:13:06.139037187");
+        assert_eq!(
+            ev.time.format("%Y-%m-%d %H:%M:%S%.9f").to_string(),
+            "2021-05-25 15:13:06.139037187"
+        );
     }
 
     #[test]
@@ -168,18 +258,36 @@ mod tests {
 
     #[test]
     fn t_ddp_05_targets_give_both_ends_of_a_rename_and_none_for_pathless_lines() {
-        let ev = parse_line("2021-05-25 15:13:06.139037187  RENAME  iqn.x  |/a.mxf|/b.mxf").unwrap();
+        let ev =
+            parse_line("2021-05-25 15:13:06.139037187  RENAME  iqn.x  |/a.mxf|/b.mxf").unwrap();
         assert_eq!(ev.targets(), vec!["/a.mxf", "/b.mxf"]);
-        let ev = parse_line("2021-05-25 15:02:32.799029007  CONNECT  iqn.x  MOUNT volume 'v'").unwrap();
+        let ev =
+            parse_line("2021-05-25 15:02:32.799029007  CONNECT  iqn.x  MOUNT volume 'v'").unwrap();
         assert!(ev.targets().is_empty());
     }
 
     #[test]
     fn t_ddp_06_noise_paths_are_hidden_internal_trash_folder_or_empty() {
-        for p in ["/.DS_Store", "/1TV/._a.mxf", "/^51647.fseventsd/fseventsd-uuid", "/.fseventsd/0001", "/1TV/.Trashes/x.mxf", "", "  ", "/1TV/", "/$RECYCLE.BIN/x", "/System Volume Information/y"] {
+        for p in [
+            "/.DS_Store",
+            "/1TV/._a.mxf",
+            "/^51647.fseventsd/fseventsd-uuid",
+            "/.fseventsd/0001",
+            "/1TV/.Trashes/x.mxf",
+            "",
+            "  ",
+            "/1TV/",
+            "/$RECYCLE.BIN/x",
+            "/System Volume Information/y",
+        ] {
             assert!(is_noise(p), "{p:?}");
         }
-        for p in ["/a.mxf", "/1TV/2026/뉴스 001.mxf", "/Protools/mov3.mov", "/New folder"] {
+        for p in [
+            "/a.mxf",
+            "/1TV/2026/뉴스 001.mxf",
+            "/Protools/mov3.mov",
+            "/New folder",
+        ] {
             assert!(!is_noise(p), "{p:?}");
         }
     }

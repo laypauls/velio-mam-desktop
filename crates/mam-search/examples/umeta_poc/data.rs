@@ -89,7 +89,9 @@ pub fn kw_value(mut k: usize) -> String {
 }
 
 pub fn gen_values(asset_id: u64, specs: &[Spec], salt: u64) -> Vec<(u32, Val)> {
-    let mut r = Rng::new(asset_id.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ salt.wrapping_mul(0xD6E8_FEB8_6659_FD93));
+    let mut r = Rng::new(
+        asset_id.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ salt.wrapping_mul(0xD6E8_FEB8_6659_FD93),
+    );
     let mut out = Vec::with_capacity(specs.len());
     for s in specs {
         if !r.chance(s.fill) {
@@ -162,6 +164,10 @@ pub fn rating(asset_id: u64) -> u64 {
 pub fn sortable_i64(x: f64) -> i64 {
     let x = if x == 0.0 { 0.0 } else { x }; // -0.0 정규화
     let bits = x.to_bits();
-    let u = if bits >> 63 == 1 { !bits } else { bits | (1 << 63) };
+    let u = if bits >> 63 == 1 {
+        !bits
+    } else {
+        bits | (1 << 63)
+    };
     (u ^ (1 << 63)) as i64
 }

@@ -64,7 +64,11 @@ impl ReleaseTracker {
             if left.is_zero() {
                 return false;
             }
-            s = self.cv.wait_timeout(s, left).unwrap_or_else(|p| p.into_inner()).0;
+            s = self
+                .cv
+                .wait_timeout(s, left)
+                .unwrap_or_else(|p| p.into_inner())
+                .0;
         }
     }
 

@@ -141,7 +141,9 @@ fn t_ipc_14_responses_have_exactly_the_contract_shapes() {
     );
     assert_eq!(
         keys(&summary["counts"]),
-        ["ai", "hash", "index", "meta", "plugin", "scan", "scene", "thumb"]
+        [
+            "ai", "hash", "index", "meta", "plugin", "scan", "scene", "thumb"
+        ]
     );
     assert_eq!(
         keys(&summary["counts"]["scan"]),
@@ -297,6 +299,12 @@ fn t_ipc_19_pick_directory_default_path_is_used_only_for_existing_absolute_dirs(
     assert_eq!(existing_dir(None), None);
     assert_eq!(existing_dir(Some(r"Z:\definitely\missing")), None);
     assert_eq!(existing_dir(Some("media")), None);
-    assert_eq!(existing_dir(Some(fx.media.join("a.jpg").to_str().unwrap())), None);
-    assert_eq!(existing_dir(Some(fx.media.to_str().unwrap())), Some(fx.media.clone()));
+    assert_eq!(
+        existing_dir(Some(fx.media.join("a.jpg").to_str().unwrap())),
+        None
+    );
+    assert_eq!(
+        existing_dir(Some(fx.media.to_str().unwrap())),
+        Some(fx.media.clone())
+    );
 }

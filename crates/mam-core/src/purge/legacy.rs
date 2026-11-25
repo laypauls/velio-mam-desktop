@@ -11,7 +11,11 @@ use super::linked::purge_assets;
 
 /// `after` 보다 큰 asset_id 중 "활성인데 활성 위치가 없는" 후보를 오름차순으로 최대 `limit` 개 (읽기 전용, 키셋 페이지).
 /// 관리 폴더 범위 판정은 쓰기 단계에서 다시 한다.
-pub fn legacy_candidates(conn: &Connection, after: i64, limit: usize) -> rusqlite::Result<Vec<i64>> {
+pub fn legacy_candidates(
+    conn: &Connection,
+    after: i64,
+    limit: usize,
+) -> rusqlite::Result<Vec<i64>> {
     let mut stmt = conn.prepare_cached(
         "SELECT a.asset_id FROM media_assets a
          WHERE a.asset_id > ?1 AND a.status = 'active'
@@ -27,7 +31,9 @@ fn covered(folders: &[(i64, String)], volume_id: i64, key: &str) -> bool {
         *v == volume_id
             && (root.is_empty()
                 || key == root
-                || key.strip_prefix(root.as_str()).is_some_and(|r| r.starts_with('/')))
+                || key
+                    .strip_prefix(root.as_str())
+                    .is_some_and(|r| r.starts_with('/')))
     })
 }
 
@@ -56,8 +62,9 @@ pub fn purge_legacy_batch(
             continue;
         }
         let rows: Vec<(i64, String)> = {
-            let mut stmt =
-                tx.prepare_cached("SELECT volume_id, path_key FROM file_locations WHERE asset_id = ?1")?;
+            let mut stmt = tx.prepare_cached(
+                "SELECT volume_id, path_key FROM file_locations WHERE asset_id = ?1",
+            )?;
             let it = stmt.query_map([asset_id], |r| Ok((r.get(0)?, r.get(1)?)))?;
             it.collect::<Result<_, _>>()?
         };

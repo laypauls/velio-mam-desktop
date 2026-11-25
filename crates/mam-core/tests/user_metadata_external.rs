@@ -7,7 +7,8 @@ use common::umeta::{Fx, fixture};
 use mam_core::userdata::{FieldValue, ValueType, load_external_user_fields};
 
 fn load(fx: &Fx, asset: i64) -> Vec<(String, String)> {
-    fx.env.read(|c| load_external_user_fields(c, asset).unwrap())
+    fx.env
+        .read(|c| load_external_user_fields(c, asset).unwrap())
 }
 
 #[test]
@@ -77,8 +78,12 @@ fn t_ext_umeta_03_deleted_field_and_option_are_excluded() {
     );
     // Act
     fx.ud.delete_metadata_field(a.field_id).unwrap();
-    fx.ud.delete_metadata_option(e.options[0].option_id).unwrap();
-    fx.ud.delete_metadata_option(m.options[0].option_id).unwrap();
+    fx.ud
+        .delete_metadata_option(e.options[0].option_id)
+        .unwrap();
+    fx.ud
+        .delete_metadata_option(m.options[0].option_id)
+        .unwrap();
     // Assert: 필드·선택지가 삭제 중이면 이름도 값도 나가지 않는다
     assert_eq!(load(&fx, 1), vec![("태그".to_string(), "나".to_string())]);
 }

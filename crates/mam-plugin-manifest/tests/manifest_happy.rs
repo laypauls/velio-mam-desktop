@@ -20,7 +20,10 @@ fn t_pmanifest_01_full_manifest_parses() {
     assert_eq!(m.version, Version::new(1, 0, 0));
     assert_eq!(m.main.as_str(), "dist/main.js");
     assert_eq!(m.display_name.as_str(), "plugin.name");
-    assert_eq!(m.description.as_ref().map(|d| d.as_str()), Some("plugin.description"));
+    assert_eq!(
+        m.description.as_ref().map(|d| d.as_str()),
+        Some("plugin.description")
+    );
     assert_eq!(m.permissions.len(), 5);
     assert!(m.permissions.contains(&Permission::TagWrite));
     assert_eq!(
@@ -28,14 +31,23 @@ fn t_pmanifest_01_full_manifest_parses() {
         ActivationEvent::OnCommand(CommandId::try_from("summarize").expect("id"))
     );
     assert_eq!(m.activation_events.len(), 2);
-    assert_eq!(m.contributes.commands[0].title.as_str(), "command.summarize");
-    let when = m.contributes.menus.asset_context[0].when.as_ref().expect("when");
+    assert_eq!(
+        m.contributes.commands[0].title.as_str(),
+        "command.summarize"
+    );
+    let when = m.contributes.menus.asset_context[0]
+        .when
+        .as_ref()
+        .expect("when");
     let ctx = WhenContext::new()
         .with("selection.count", WhenValue::Num(2.0))
         .with("asset.kind", WhenValue::Str("image".into()))
         .with("asset.offline", WhenValue::Bool(false));
     assert!(when.eval(&ctx));
-    assert_eq!(m.contributes.providers.metadata[0].asset_kinds, vec![AssetKind::Image]);
+    assert_eq!(
+        m.contributes.providers.metadata[0].asset_kinds,
+        vec![AssetKind::Image]
+    );
     assert!(m.contributes.providers.analysis.is_empty());
     assert_eq!(m.contributes.providers.export[0].file_extension, "csv");
 }
@@ -64,9 +76,21 @@ fn t_pmanifest_03_serialize_is_camel_case_with_string_enums() {
     assert_eq!(v["main"], "dist/main.js");
     assert_eq!(v["activationEvents"][0], "onCommand:summarize");
     assert_eq!(v["activationEvents"][1], "onProvider:exif");
-    assert!(v["permissions"].as_array().expect("array").iter().any(|p| p == "kv.read"));
-    assert_eq!(v["contributes"]["providers"]["metadata"][0]["assetKinds"][0], "image");
-    assert_eq!(v["contributes"]["providers"]["export"][0]["fileExtension"], "csv");
+    assert!(
+        v["permissions"]
+            .as_array()
+            .expect("array")
+            .iter()
+            .any(|p| p == "kv.read")
+    );
+    assert_eq!(
+        v["contributes"]["providers"]["metadata"][0]["assetKinds"][0],
+        "image"
+    );
+    assert_eq!(
+        v["contributes"]["providers"]["export"][0]["fileExtension"],
+        "csv"
+    );
     assert_eq!(
         v["contributes"]["menus"]["assetContext"][0]["when"],
         "selection.count >= 1 && asset.kind == 'image' && !asset.offline"
@@ -87,7 +111,10 @@ fn t_pmanifest_05_main_dot_slash_is_normalized() {
     let m = parse_manifest(FULL).expect("full");
 
     assert_eq!(m.main.as_str(), "dist/main.js");
-    assert_eq!(m.main.to_relative_path(), std::path::PathBuf::from("dist").join("main.js"));
+    assert_eq!(
+        m.main.to_relative_path(),
+        std::path::PathBuf::from("dist").join("main.js")
+    );
 }
 
 #[test]

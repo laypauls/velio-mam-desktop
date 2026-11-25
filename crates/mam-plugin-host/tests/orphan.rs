@@ -17,7 +17,9 @@ use std::time::Duration;
 use common::{new_host, ok_echo};
 use mam_plugin_host::HostState;
 use windows_sys::Win32::Foundation::{CloseHandle, WAIT_OBJECT_0};
-use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_SYNCHRONIZE, WaitForSingleObject};
+use windows_sys::Win32::System::Threading::{
+    OpenProcess, PROCESS_SYNCHRONIZE, WaitForSingleObject,
+};
 
 const ROLE_ENV: &str = "MAM_ORPHAN_ROLE";
 /// 자식이 워커를 띄워 PID 를 보고하기까지(첫 실행은 워커 빌드 포함)
@@ -34,7 +36,9 @@ fn t_phost_orph_child_role_host_that_aborts() {
     }
     let (host, _, _) = new_host(common::PLUGIN, |_| {});
     ok_echo(&host); // 워커 시작
-    let HostState::Running { pid } = host.state() else { std::process::abort() };
+    let HostState::Running { pid } = host.state() else {
+        std::process::abort()
+    };
     println!("WORKER_PID={pid}");
     std::io::stdout().flush().ok();
     // 부모가 워커 핸들을 연 뒤에만 죽는다. 신호가 안 와도 상한 뒤에는 죽는다 (영구 대기 없음)
@@ -54,7 +58,13 @@ fn t_phost_orph_01_worker_dies_when_host_process_aborts() {
     // Arrange: 자식 호스트를 띄우고 워커 PID 를 (제한 시간 안에) 받는다
     let exe = std::env::current_exe().expect("test exe");
     let mut child = Command::new(exe)
-        .args(["--ignored", "--exact", "t_phost_orph_child_role_host_that_aborts", "--nocapture", "--test-threads=1"])
+        .args([
+            "--ignored",
+            "--exact",
+            "t_phost_orph_child_role_host_that_aborts",
+            "--nocapture",
+            "--test-threads=1",
+        ])
         .env(ROLE_ENV, "host")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -66,7 +76,10 @@ fn t_phost_orph_01_worker_dies_when_host_process_aborts() {
     std::thread::spawn(move || {
         for line in BufReader::new(out).lines().map_while(Result::ok) {
             // libtest 가 "test 이름 ... " 를 같은 줄에 먼저 찍으므로 접두 일치가 아니라 마커 위치로 찾는다
-            if let Some(p) = line.split_once("WORKER_PID=").and_then(|(_, p)| p.trim().parse().ok()) {
+            if let Some(p) = line
+                .split_once("WORKER_PID=")
+                .and_then(|(_, p)| p.trim().parse().ok())
+            {
                 let _ = pid_tx.send(p);
                 return;
             }
@@ -86,7 +99,12 @@ fn t_phost_orph_01_worker_dies_when_host_process_aborts() {
     }
 
     // Act: 자식 호스트를 정리 없이 종료시킨다
-    child.stdin.take().expect("stdin").write_all(b"go\n").expect("signal child");
+    child
+        .stdin
+        .take()
+        .expect("stdin")
+        .write_all(b"go\n")
+        .expect("signal child");
     let (st_tx, st_rx) = mpsc::channel();
     let mut waiter = child;
     let kill_handle = waiter.id();
@@ -101,9 +119,19 @@ fn t_phost_orph_01_worker_dies_when_host_process_aborts() {
     unsafe { CloseHandle(handle) };
     if exited.is_err() {
         // 자식이 안 죽었다 — 이 시험이 띄운 PID 만 정리하고 실패한다
-        let _ = Command::new("taskkill").args(["/PID", &kill_handle.to_string(), "/T", "/F"]).stdout(Stdio::null()).stderr(Stdio::null()).status();
+        let _ = Command::new("taskkill")
+            .args(["/PID", &kill_handle.to_string(), "/T", "/F"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
         panic!("child host {kill_handle} did not exit within {CHILD_EXIT_WAIT:?}");
     }
-    assert!(!exited.unwrap().expect("wait child host").success(), "child host should have aborted");
-    assert_eq!(waited, WAIT_OBJECT_0, "worker {pid} survived its host (orphan)");
+    assert!(
+        !exited.unwrap().expect("wait child host").success(),
+        "child host should have aborted"
+    );
+    assert_eq!(
+        waited, WAIT_OBJECT_0,
+        "worker {pid} survived its host (orphan)"
+    );
 }

@@ -225,10 +225,12 @@ pub fn jobs_indexes(conn: &Connection) -> Vec<(String, String)> {
     let mut stmt = conn
         .prepare("SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'jobs' AND sql IS NOT NULL ORDER BY name")
         .unwrap();
-    stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, norm_sql(&r.get::<_, String>(1)?))))
-        .unwrap()
-        .map(Result::unwrap)
-        .collect()
+    stmt.query_map([], |r| {
+        Ok((r.get::<_, String>(0)?, norm_sql(&r.get::<_, String>(1)?)))
+    })
+    .unwrap()
+    .map(Result::unwrap)
+    .collect()
 }
 
 pub fn jobs_dump(conn: &Connection) -> Vec<String> {
@@ -244,11 +246,26 @@ pub fn jobs_dump(conn: &Connection) -> Vec<String> {
 // --- 플러그인 정수 키 시드 (테스트는 문자열 ID 로 쓰고 레지스트리가 정수 키를 준다) -----------------
 
 /// `plugin_tasks` 행 하나를 레지스트리를 거쳐 넣는다 (`done_revision` 은 0)
-pub fn seed_task(conn: &Connection, plugin: &str, provider: &str, asset_id: i64, revision: i64, status: &str) {
+pub fn seed_task(
+    conn: &Connection,
+    plugin: &str,
+    provider: &str,
+    asset_id: i64,
+    revision: i64,
+    status: &str,
+) {
     seed_task_done(conn, plugin, provider, asset_id, revision, 0, status);
 }
 
-pub fn seed_task_done(conn: &Connection, plugin: &str, provider: &str, asset_id: i64, revision: i64, done: i64, status: &str) {
+pub fn seed_task_done(
+    conn: &Connection,
+    plugin: &str,
+    provider: &str,
+    asset_id: i64,
+    revision: i64,
+    done: i64,
+    status: &str,
+) {
     let pr = mam_db::plugin_registry::ensure(conn, plugin).unwrap();
     let vr = mam_db::plugin_registry::ensure_provider(conn, pr, provider).unwrap();
     conn.execute(

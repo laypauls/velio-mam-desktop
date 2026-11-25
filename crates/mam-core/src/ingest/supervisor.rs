@@ -8,10 +8,10 @@ use mam_db::{Priority, settings};
 
 use super::Ingest;
 use super::rescan_policy::SlotCtx;
+use crate::VolumeKind;
 use crate::processing::{BackfillReport, backfill_jobs};
 use crate::registry::{set_volume_online, sync_volumes_holding};
 use crate::scan::Guarded;
-use crate::VolumeKind;
 use crate::scan::{IngestError, load_all};
 
 /// 한 번의 점검 결과 (시험·로그용).
@@ -127,7 +127,10 @@ impl Ingest {
         // 붙들린 디스크가 실제로 빠졌다 - 붙들기를 푼다 (다시 꽂으면 일반 재연결 처리)
         for id in &local.released {
             if self.release_held(*id) {
-                tracing::info!(volume_id = *id, "ejected volume is gone; eject hold released");
+                tracing::info!(
+                    volume_id = *id,
+                    "ejected volume is gone; eject hold released"
+                );
             }
         }
         report.went_online.extend(local.went_online);

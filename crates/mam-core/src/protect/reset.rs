@@ -53,7 +53,12 @@ pub fn plan_reset(
         .parent()
         .map(Path::to_path_buf)
         .ok_or_else(|| ProtectError::Internal("unexpected index layout".into()))?;
-    let delete = vec![paths.database_dir(), indexes, paths.cache(), paths.plugins()];
+    let delete = vec![
+        paths.database_dir(),
+        indexes,
+        paths.cache(),
+        paths.plugins(),
+    ];
     if protected.iter().any(|p| is_within(paths.root(), p)) {
         return Err(ProtectError::InvalidInput(
             "MAMData is inside a protected path".into(),

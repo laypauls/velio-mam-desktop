@@ -14,7 +14,11 @@ fn short(s: &str) -> String {
     let cleaned = mam_plugin_runtime::clean_text(s);
     let mut it = cleaned.chars();
     let head: String = it.by_ref().take(64).collect();
-    if it.next().is_some() { format!("{head}…") } else { head }
+    if it.next().is_some() {
+        format!("{head}…")
+    } else {
+        head
+    }
 }
 
 fn is_disk_full(e: &std::io::Error) -> bool {
@@ -24,15 +28,17 @@ fn is_disk_full(e: &std::io::Error) -> bool {
 
 impl From<InstallError> for CommandError {
     fn from(e: InstallError) -> Self {
-        use ErrorCode::{Busy, DiskFull, Io, InvalidInput, NotFound, PluginIncompatible, PluginInvalid};
+        use ErrorCode::{
+            Busy, DiskFull, InvalidInput, Io, NotFound, PluginIncompatible, PluginInvalid,
+        };
         match e {
-            InstallError::Manifest(ManifestError::UnsupportedApiVersion { .. }) | InstallError::Engine(_) => {
-                Self::new(PluginIncompatible, INCOMPATIBLE)
-            }
+            InstallError::Manifest(ManifestError::UnsupportedApiVersion { .. })
+            | InstallError::Engine(_) => Self::new(PluginIncompatible, INCOMPATIBLE),
             InstallError::Manifest(m) => Self::new(PluginInvalid, m.to_string()),
-            InstallError::Locale { file_stem, source } => {
-                Self::new(PluginInvalid, format!("invalid locale file `{}`: {source}", short(&file_stem)))
-            }
+            InstallError::Locale { file_stem, source } => Self::new(
+                PluginInvalid,
+                format!("invalid locale file `{}`: {source}", short(&file_stem)),
+            ),
             InstallError::ManifestMissing
             | InstallError::MainMissing
             | InstallError::MainEscapes
@@ -41,12 +47,20 @@ impl From<InstallError> for CommandError {
             | InstallError::TooManyLocaleFiles => Self::new(PluginInvalid, e.to_string()),
             InstallError::NotAbsolute => Self::new(InvalidInput, "path must be absolute"),
             InstallError::NotADirectory => Self::new(InvalidInput, "path is not a directory"),
-            InstallError::OverlapsDataDir => Self::new(InvalidInput, "path overlaps the app data folder"),
-            InstallError::PreviewMismatch => Self::new(InvalidInput, "plugin changed since it was inspected"),
-            InstallError::UnknownPermission => Self::new(InvalidInput, "unknown or undeclared permission"),
+            InstallError::OverlapsDataDir => {
+                Self::new(InvalidInput, "path overlaps the app data folder")
+            }
+            InstallError::PreviewMismatch => {
+                Self::new(InvalidInput, "plugin changed since it was inspected")
+            }
+            InstallError::UnknownPermission => {
+                Self::new(InvalidInput, "unknown or undeclared permission")
+            }
             InstallError::NotInstalled => Self::new(NotFound, "plugin not installed"),
             InstallError::Busy => Self::new(Busy, "another plugin operation is in progress"),
-            InstallError::Io(io) if is_disk_full(&io) => Self::logged(DiskFull, "not enough disk space", &io),
+            InstallError::Io(io) if is_disk_full(&io) => {
+                Self::logged(DiskFull, "not enough disk space", &io)
+            }
             InstallError::Io(io) => Self::logged(Io, "file operation failed", &io),
             InstallError::Db(p) => p.into(),
         }
@@ -55,14 +69,23 @@ impl From<InstallError> for CommandError {
 
 impl From<RunError> for CommandError {
     fn from(e: RunError) -> Self {
-        use ErrorCode::{InvalidInput, NotFound, PluginDisabled, PluginError, PluginPermissionDenied, PluginTimeout};
+        use ErrorCode::{
+            InvalidInput, NotFound, PluginDisabled, PluginError, PluginPermissionDenied,
+            PluginTimeout,
+        };
         match e {
             RunError::NotInstalled => Self::new(NotFound, "plugin not installed"),
             RunError::UnknownTarget => Self::new(NotFound, "unknown command or provider"),
-            RunError::Disabled | RunError::Invoke(InvokeError::Disabled) => Self::new(PluginDisabled, "plugin is disabled"),
-            RunError::PermissionDenied(_) => Self::new(PluginPermissionDenied, "permission not granted"),
+            RunError::Disabled | RunError::Invoke(InvokeError::Disabled) => {
+                Self::new(PluginDisabled, "plugin is disabled")
+            }
+            RunError::PermissionDenied(_) => {
+                Self::new(PluginPermissionDenied, "permission not granted")
+            }
             RunError::Scope(_) => Self::new(InvalidInput, "too many assets"),
-            RunError::Invoke(InvokeError::Timeout) => Self::new(PluginTimeout, "plugin call timed out"),
+            RunError::Invoke(InvokeError::Timeout) => {
+                Self::new(PluginTimeout, "plugin call timed out")
+            }
             RunError::Invoke(other) => {
                 // 플러그인이 만든 텍스트는 로그에만 — 응답은 정적 i18n 키
                 tracing::warn!(error = %short(&other.to_string()), "plugin call failed");
@@ -81,8 +104,18 @@ mod tests {
     #[test]
     fn t_ipc_perr_01_short_neutralizes_control_and_format_chars() {
         let s = short("boom\nERROR forged line\r\u{202E}txt.exe\u{200B}");
-        assert!(!s.contains('\n') && !s.contains('\r') && !s.contains('\u{202E}') && !s.contains('\u{200B}'), "{s:?}");
+        assert!(
+            !s.contains('\n')
+                && !s.contains('\r')
+                && !s.contains('\u{202E}')
+                && !s.contains('\u{200B}'),
+            "{s:?}"
+        );
         assert!(s.starts_with("boom ERROR forged line"));
-        assert_eq!(short(&"a".repeat(70)).chars().count(), 65, "64 chars + ellipsis");
+        assert_eq!(
+            short(&"a".repeat(70)).chars().count(),
+            65,
+            "64 chars + ellipsis"
+        );
     }
 }

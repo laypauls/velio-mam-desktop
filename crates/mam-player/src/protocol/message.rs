@@ -44,7 +44,11 @@ pub struct ProbeData {
 #[serde(tag = "ev", rename_all = "kebab-case")]
 pub enum Message {
     /// 파이프 연결 + libmpv 초기화 직후 1회
-    Ready { mpv_api: u64, protocol: u32, render_path: RenderPath },
+    Ready {
+        mpv_api: u64,
+        protocol: u32,
+        render_path: RenderPath,
+    },
     /// 명령 응답 (`id != 0` 인 명령만)
     Reply {
         id: u64,
@@ -57,7 +61,13 @@ pub enum Message {
         data: Option<ProbeData>,
     },
     /// 파일 로드 완료 — `duration_ms` 는 **소스 전체 길이** (EDL 이어도 합계가 아니다)
-    FileLoaded { w: Option<i64>, h: Option<i64>, fps: Option<f64>, duration_ms: Option<i64>, video_format: Option<String> },
+    FileLoaded {
+        w: Option<i64>,
+        h: Option<i64>,
+        fps: Option<f64>,
+        duration_ms: Option<i64>,
+        video_format: Option<String>,
+    },
     /// seek/열기/프레임 이동 후 재생 재시작 (mpv PLAYBACK_RESTART) — 화면에 그려진 프레임의 보정된 소스 시각
     PlaybackRestart { time_ms: i64 },
     /// 일시정지 상태 변화
@@ -82,7 +92,12 @@ pub enum Message {
         render_done_ms: f64,
     },
     /// 하트비트 + 슬롯 통계 (약 0.5초마다, 세션이 없어도)
-    Stats { rendered: u64, skipped: u64, ignored: u64, cache_hits: u64 },
+    Stats {
+        rendered: u64,
+        skipped: u64,
+        ignored: u64,
+        cache_hits: u64,
+    },
 }
 
 #[cfg(test)]
@@ -95,38 +110,110 @@ mod tests {
     #[test]
     fn t_player_proto_20_message_round_trip() {
         let msgs = [
-            Message::Ready { mpv_api: 0x2_0000, protocol: 1, render_path: RenderPath::R2 },
-            Message::Reply { id: 9, ok: true, code: None, error: None, data: Some(ProbeData { time_pos: Some(2.5), paused: Some(true), edl: true, ..ProbeData::default() }) },
-            Message::Reply { id: 10, ok: false, code: Some(WorkerErrorCode::OpenFailed), error: Some("cannot open".into()), data: None },
-            Message::FileLoaded { w: Some(1920), h: Some(1080), fps: Some(29.97), duration_ms: Some(30_000), video_format: Some("h264".into()) },
+            Message::Ready {
+                mpv_api: 0x2_0000,
+                protocol: 1,
+                render_path: RenderPath::R2,
+            },
+            Message::Reply {
+                id: 9,
+                ok: true,
+                code: None,
+                error: None,
+                data: Some(ProbeData {
+                    time_pos: Some(2.5),
+                    paused: Some(true),
+                    edl: true,
+                    ..ProbeData::default()
+                }),
+            },
+            Message::Reply {
+                id: 10,
+                ok: false,
+                code: Some(WorkerErrorCode::OpenFailed),
+                error: Some("cannot open".into()),
+                data: None,
+            },
+            Message::FileLoaded {
+                w: Some(1920),
+                h: Some(1080),
+                fps: Some(29.97),
+                duration_ms: Some(30_000),
+                video_format: Some("h264".into()),
+            },
             Message::PlaybackRestart { time_ms: 1500 },
-            Message::Paused { paused: true, time_ms: 0 },
+            Message::Paused {
+                paused: true,
+                time_ms: 0,
+            },
             Message::Ended { time_ms: 29_967 },
             Message::Time { ms: 12 },
             Message::Buffering { on: true },
-            Message::Error { code: WorkerErrorCode::Internal, msg: "x".into() },
-            Message::FrameReady { epoch: 2, slot: 0, seq: 5, w: 1280, h: 720, stride: 5120, render_done_ms: 1.7e12 },
-            Message::Stats { rendered: 10, skipped: 2, ignored: 0, cache_hits: 3 },
+            Message::Error {
+                code: WorkerErrorCode::Internal,
+                msg: "x".into(),
+            },
+            Message::FrameReady {
+                epoch: 2,
+                slot: 0,
+                seq: 5,
+                w: 1280,
+                h: 720,
+                stride: 5120,
+                render_done_ms: 1.7e12,
+            },
+            Message::Stats {
+                rendered: 10,
+                skipped: 2,
+                ignored: 0,
+                cache_hits: 3,
+            },
         ];
         for m in msgs {
-            assert_eq!(decode_line::<Message>(&encode_line(&m).unwrap()).unwrap(), m);
+            assert_eq!(
+                decode_line::<Message>(&encode_line(&m).unwrap()).unwrap(),
+                m
+            );
         }
     }
 
     #[test]
     fn t_player_proto_21_wire_names_are_stable() {
-        let line = encode_line(&Message::FrameReady { epoch: 2, slot: 0, seq: 5, w: 4, h: 4, stride: 64, render_done_ms: 1.0 }).unwrap();
-        assert!(line.contains(r#""ev":"frame-ready""#) && line.contains(r#""renderDoneMs""#), "{line}");
+        let line = encode_line(&Message::FrameReady {
+            epoch: 2,
+            slot: 0,
+            seq: 5,
+            w: 4,
+            h: 4,
+            stride: 64,
+            render_done_ms: 1.0,
+        })
+        .unwrap();
+        assert!(
+            line.contains(r#""ev":"frame-ready""#) && line.contains(r#""renderDoneMs""#),
+            "{line}"
+        );
         let line = encode_line(&Message::PlaybackRestart { time_ms: 3 }).unwrap();
         assert_eq!(line.trim(), r#"{"ev":"playback-restart","time_ms":3}"#);
-        let line = encode_line(&Message::Ready { mpv_api: 1, protocol: 1, render_path: RenderPath::R1 }).unwrap();
+        let line = encode_line(&Message::Ready {
+            mpv_api: 1,
+            protocol: 1,
+            render_path: RenderPath::R1,
+        })
+        .unwrap();
         assert!(line.contains(r#""render_path":"r1""#), "{line}");
     }
 
     #[test]
     fn t_player_proto_22_unknown_or_truncated_messages_are_errors() {
         assert!(decode_line::<Message>(r#"{"ev":"mystery"}"#).is_err());
-        assert!(decode_line::<Message>(r#"{"ev":"playback-restart"}"#).is_err(), "필수 필드 누락");
-        assert!(decode_line::<Message>(r#"{"ev":"reply","id":1,"ok":true}"#).is_ok(), "선택 필드는 생략 가능");
+        assert!(
+            decode_line::<Message>(r#"{"ev":"playback-restart"}"#).is_err(),
+            "필수 필드 누락"
+        );
+        assert!(
+            decode_line::<Message>(r#"{"ev":"reply","id":1,"ok":true}"#).is_ok(),
+            "선택 필드는 생략 가능"
+        );
     }
 }

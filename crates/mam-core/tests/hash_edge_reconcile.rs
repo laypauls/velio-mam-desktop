@@ -10,9 +10,7 @@ mod common;
 use std::fs;
 
 use common::*;
-use mam_core::{
-    Blake3Hasher, Outcome, PendingHash, Reconciler, VolumeKind, WindowsFileIdentity,
-};
+use mam_core::{Blake3Hasher, Outcome, PendingHash, Reconciler, VolumeKind, WindowsFileIdentity};
 
 const ID: WindowsFileIdentity = WindowsFileIdentity;
 
@@ -31,7 +29,9 @@ fn unhashed(w: &mut World, vol: &Vol, rel: &str, bytes: &[u8]) -> (std::path::Pa
 fn edge_is_set(w: &World, id: i64) -> bool {
     count(
         &w.db.conn,
-        &format!("SELECT count(*) FROM media_assets WHERE asset_id = {id} AND edge_sig IS NOT NULL"),
+        &format!(
+            "SELECT count(*) FROM media_assets WHERE asset_id = {id} AND edge_sig IS NOT NULL"
+        ),
     ) == 1
 }
 
@@ -46,7 +46,10 @@ fn assert_superseded_with_relation(w: &World, old: i64, outcome: Outcome) -> i64
     assert_eq!(old_asset_id, old);
     assert_eq!(asset_state(&w.db.conn, old).status, "superseded");
     let n = asset_state(&w.db.conn, new_asset_id);
-    assert_eq!((n.status.as_str(), n.hash_state.as_str()), ("active", "pending"));
+    assert_eq!(
+        (n.status.as_str(), n.hash_state.as_str()),
+        ("active", "pending")
+    );
     assert_eq!(
         count(
             &w.db.conn,
@@ -60,11 +63,16 @@ fn assert_superseded_with_relation(w: &World, old: i64, outcome: Outcome) -> i64
     assert_eq!(
         count(
             &w.db.conn,
-            &format!("SELECT count(*) FROM file_locations WHERE asset_id = {old} AND detached_at IS NULL")
+            &format!(
+                "SELECT count(*) FROM file_locations WHERE asset_id = {old} AND detached_at IS NULL"
+            )
         ),
         0
     );
-    assert!(edge_is_set(w, new_asset_id), "scan fills the new asset's edge_sig");
+    assert!(
+        edge_is_set(w, new_asset_id),
+        "scan fills the new asset's edge_sig"
+    );
     new_asset_id
 }
 
@@ -83,7 +91,11 @@ fn t_hash_edge_13a_unhashed_asset_with_a_different_size_becomes_a_new_asset() {
 
     // Assert
     assert_superseded_with_relation(&w, old, outcome);
-    assert_eq!(guard, Snapshot::take(vol.dir.path()), "original must be untouched");
+    assert_eq!(
+        guard,
+        Snapshot::take(vol.dir.path()),
+        "original must be untouched"
+    );
 }
 
 #[test]
@@ -146,11 +158,17 @@ fn t_hash_edge_13d_user_data_stays_with_the_superseded_asset() {
     // Assert: 옛 내용의 태그가 새 내용에 붙지 않는다
     let new_id = assert_superseded_with_relation(&w, old, outcome);
     assert_eq!(
-        count(&w.db.conn, &format!("SELECT count(*) FROM asset_tags WHERE asset_id = {new_id}")),
+        count(
+            &w.db.conn,
+            &format!("SELECT count(*) FROM asset_tags WHERE asset_id = {new_id}")
+        ),
         0
     );
     assert_eq!(
-        count(&w.db.conn, &format!("SELECT count(*) FROM asset_tags WHERE asset_id = {old}")),
+        count(
+            &w.db.conn,
+            &format!("SELECT count(*) FROM asset_tags WHERE asset_id = {old}")
+        ),
         1
     );
 }
@@ -208,7 +226,8 @@ fn t_hash_edge_13e_file_changed_while_signing_defers_without_touching_the_db() {
 }
 
 #[test]
-fn t_hash_edge_14_hashed_asset_touch_keeps_the_same_asset_and_content_change_still_compares_hashes() {
+fn t_hash_edge_14_hashed_asset_touch_keeps_the_same_asset_and_content_change_still_compares_hashes()
+{
     // Arrange: 전체 해시가 있는 자산 (기존 동작 보호)
     let mut w = World::new();
     let vol = w.volume("vol-a", VolumeKind::Fixed);
@@ -274,7 +293,10 @@ fn t_hash_edge_12_r1_r2_r3_reconnect_without_any_full_hash() {
 
     // R3: 폴더 제거 후 재등록 (위치 detach -> 같은 경로·크기·수정 시각)
     let rec = reconciler(&w.clock, &w.cancel);
-    assert_eq!(rec.detach_under(&mut w.db.conn, vol.id, "", 100).unwrap(), 1);
+    assert_eq!(
+        rec.detach_under(&mut w.db.conn, vol.id, "", 100).unwrap(),
+        1
+    );
     let mut s3 = w.begin(&vol);
     assert_eq!(
         w.scan(&vol, &mut s3, &ID, &moved).unwrap(),
@@ -283,10 +305,16 @@ fn t_hash_edge_12_r1_r2_r3_reconnect_without_any_full_hash() {
 
     // Assert: 내내 같은 자산 하나, 전체 해시는 계산하지 않았다
     let st = asset_state(&w.db.conn, id);
-    assert_eq!((st.status.as_str(), st.hash_state.as_str()), ("active", "pending"));
+    assert_eq!(
+        (st.status.as_str(), st.hash_state.as_str()),
+        ("active", "pending")
+    );
     assert_eq!(count(&w.db.conn, "SELECT count(*) FROM media_assets"), 1);
     assert_eq!(
-        count(&w.db.conn, "SELECT count(*) FROM media_assets WHERE content_hash IS NOT NULL"),
+        count(
+            &w.db.conn,
+            "SELECT count(*) FROM media_assets WHERE content_hash IS NOT NULL"
+        ),
         0
     );
 }

@@ -19,8 +19,13 @@ fn queue(env: &Env) -> Arc<JobQueue> {
 
 fn rows(env: &Env) -> Vec<(i64, String)> {
     env.read(|c| {
-        let mut st = c.prepare("SELECT asset_id, status FROM jobs ORDER BY asset_id, job_id").unwrap();
-        st.query_map([], |r| Ok((r.get(0).unwrap(), r.get(1).unwrap()))).unwrap().map(Result::unwrap).collect()
+        let mut st = c
+            .prepare("SELECT asset_id, status FROM jobs ORDER BY asset_id, job_id")
+            .unwrap();
+        st.query_map([], |r| Ok((r.get(0).unwrap(), r.get(1).unwrap())))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
     })
 }
 
@@ -28,7 +33,10 @@ fn rows(env: &Env) -> Vec<(i64, String)> {
 fn running_with_twin(q: &JobQueue) -> mam_core::jobs::Job {
     q.enqueue(NewJob::for_asset(JobKind::Plugin, 7)).unwrap();
     let running = q.claim_next(&JobKind::ALL).unwrap().unwrap();
-    assert!(q.enqueue(NewJob::for_asset(JobKind::Plugin, 7)).unwrap(), "pending twin is allowed while the first is running");
+    assert!(
+        q.enqueue(NewJob::for_asset(JobKind::Plugin, 7)).unwrap(),
+        "pending twin is allowed while the first is running"
+    );
     running
 }
 
@@ -44,7 +52,11 @@ fn t_job_08_yielded_job_with_a_pending_twin_finishes_cleanly_and_leaves_one_pend
 
     // Assert: 예전에는 UNIQUE 위반 오류 + 행이 running 으로 굳음
     result.expect("finish must not fail on a pending twin");
-    assert_eq!(rows(&env), vec![(7, "pending".to_owned())], "the twin takes over, no stuck running row");
+    assert_eq!(
+        rows(&env),
+        vec![(7, "pending".to_owned())],
+        "the twin takes over, no stuck running row"
+    );
     assert_eq!(q.running_count(JobKind::Plugin), 0);
 }
 
@@ -61,7 +73,10 @@ fn t_job_08_retryable_error_with_a_pending_twin_finishes_cleanly_and_leaves_one_
     // Assert
     result.expect("finish must not fail on a pending twin");
     assert_eq!(rows(&env), vec![(7, "pending".to_owned())]);
-    let again = q.claim_next(&JobKind::ALL).unwrap().expect("the twin is claimable");
+    let again = q
+        .claim_next(&JobKind::ALL)
+        .unwrap()
+        .expect("the twin is claimable");
     assert_eq!(again.asset_id, Some(7));
 }
 
@@ -77,7 +92,14 @@ fn t_job_08_without_a_twin_yielded_and_retry_still_return_the_row_to_pending() {
 
     let j = q.claim_next(&JobKind::ALL).unwrap().unwrap();
     q.finish(&j, Err(JobError::retryable("transient"))).unwrap();
-    let attempts: i64 = env.read(|c| c.query_row("SELECT attempts FROM jobs WHERE job_id = ?1", [j.job_id], |r| r.get(0)).unwrap());
+    let attempts: i64 = env.read(|c| {
+        c.query_row(
+            "SELECT attempts FROM jobs WHERE job_id = ?1",
+            [j.job_id],
+            |r| r.get(0),
+        )
+        .unwrap()
+    });
     assert_eq!((rows(&env), attempts), (vec![(7, "pending".to_owned())], 1));
 }
 

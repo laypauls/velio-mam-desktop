@@ -6,11 +6,11 @@
 mod common;
 mod scene_support;
 
+use mam_db::open;
 use mam_db::scene_cuts::{
     self, CutSource, MAX_USER_CUTS, RequestOptions, SceneError, SceneState, add_user_tx,
     clear_auto_tx, remove_tx, replace_auto_tx, request_tx, set_outcome_tx,
 };
-use mam_db::open;
 use scene_support::{NOW, add_video, count};
 
 fn row(conn: &rusqlite::Connection, id: i64) -> scene_cuts::SceneRow {
@@ -84,7 +84,11 @@ fn t_scene_07_restore_suppressed_brings_hidden_cuts_back_on_the_next_detection()
     assert_eq!(row(&db.conn, 1).auto, vec![8000]);
 
     // Act: 되살리기 체크 + 재검출 요청 후 결과 교체
-    let opts = RequestOptions { redetect: true, restore_suppressed: true, sensitivity: None };
+    let opts = RequestOptions {
+        redetect: true,
+        restore_suppressed: true,
+        sensitivity: None,
+    };
     request_tx(&db.conn, &[1], &opts, 45, NOW).unwrap();
     assert!(row(&db.conn, 1).suppressed.is_empty());
     replace_auto_tx(&db.conn, 1, &[3000, 8000], "high", Some(25.0), NOW).unwrap();
@@ -118,7 +122,10 @@ fn t_scene_08_add_user_validates_range_and_creates_a_done_row_without_fingerprin
         let err = add_user_tx(&db.conn, 1, bad, Some(25.0), Some(10_000), NOW).unwrap_err();
         assert!(matches!(err, SceneError::InvalidInput("ms")), "{bad}");
     }
-    assert!(scene_cuts::get(&db.conn, 1).unwrap().is_none(), "거부된 입력은 행을 만들지 않는다");
+    assert!(
+        scene_cuts::get(&db.conn, 1).unwrap().is_none(),
+        "거부된 입력은 행을 만들지 않는다"
+    );
     // 길이를 모르면 u32 범위까지, 경계값 0·길이 그대로는 허용
     assert!(add_user_tx(&db.conn, 1, 0, Some(25.0), Some(10_000), NOW).unwrap());
     assert!(add_user_tx(&db.conn, 1, 10_000, Some(25.0), Some(10_000), NOW).unwrap());
@@ -126,7 +133,10 @@ fn t_scene_08_add_user_validates_range_and_creates_a_done_row_without_fingerprin
     let r = row(&db.conn, 1);
     assert_eq!(r.user, vec![0, 10_000, 4_000_000_000]);
     assert_eq!(r.state, SceneState::Done);
-    assert!(r.sensitivity.is_none() && r.detector_version.is_none(), "추출 전 표시 유지용");
+    assert!(
+        r.sensitivity.is_none() && r.detector_version.is_none(),
+        "추출 전 표시 유지용"
+    );
     assert!(r.auto.is_empty() && r.suppressed.is_empty());
 }
 
@@ -211,7 +221,15 @@ fn t_scene_09_clear_auto_hides_everything_and_a_redetect_does_not_revive_it() {
     // Act
     let cleared = clear_auto_tx(&db.conn, 1, NOW + 1).unwrap();
     let again = clear_auto_tx(&db.conn, 1, NOW + 2).unwrap();
-    replace_auto_tx(&db.conn, 1, &[2000, 4000, 6000, 7000], "high", Some(25.0), NOW + 3).unwrap();
+    replace_auto_tx(
+        &db.conn,
+        1,
+        &[2000, 4000, 6000, 7000],
+        "high",
+        Some(25.0),
+        NOW + 3,
+    )
+    .unwrap();
 
     // Assert
     assert_eq!((cleared, again), (3, 0));
@@ -232,17 +250,34 @@ fn t_scene_09_failed_and_unsupported_outcomes_keep_cuts_and_store_only_fixed_err
     // Act
     set_outcome_tx(&db.conn, 1, SceneState::Failed, Some("timeout"), NOW + 1).unwrap();
     let failed = row(&db.conn, 1);
-    set_outcome_tx(&db.conn, 1, SceneState::Failed, Some("C:\\secret\\a.mp4: boom"), NOW + 2).unwrap();
+    set_outcome_tx(
+        &db.conn,
+        1,
+        SceneState::Failed,
+        Some("C:\\secret\\a.mp4: boom"),
+        NOW + 2,
+    )
+    .unwrap();
     let sanitized = row(&db.conn, 1);
     set_outcome_tx(&db.conn, 1, SceneState::Unsupported, None, NOW + 3).unwrap();
     let unsupported = row(&db.conn, 1);
     let bad_state = set_outcome_tx(&db.conn, 1, SceneState::Done, None, NOW).unwrap_err();
 
     // Assert
-    assert_eq!((failed.state, failed.error.as_deref()), (SceneState::Failed, Some("timeout")));
+    assert_eq!(
+        (failed.state, failed.error.as_deref()),
+        (SceneState::Failed, Some("timeout"))
+    );
     assert_eq!(failed.auto, vec![3000], "실패해도 컷 유지");
-    assert_eq!(sanitized.error.as_deref(), Some("other"), "경로·메시지는 저장하지 않는다");
-    assert_eq!((unsupported.state, unsupported.error), (SceneState::Unsupported, None));
+    assert_eq!(
+        sanitized.error.as_deref(),
+        Some("other"),
+        "경로·메시지는 저장하지 않는다"
+    );
+    assert_eq!(
+        (unsupported.state, unsupported.error),
+        (SceneState::Unsupported, None)
+    );
     assert!(matches!(bad_state, SceneError::InvalidInput("state")));
 }
 
@@ -258,7 +293,15 @@ fn t_scene_10_replace_auto_keeps_a_user_edit_made_while_detection_was_running() 
     add_user_tx(&user_conn, 1, 10_000, Some(25.0), Some(60_000), NOW + 1).unwrap();
     add_user_tx(&user_conn, 1, 30_000, Some(25.0), Some(60_000), NOW + 1).unwrap();
     // 이후 검출 결과가 도착: 10,000 근처 자동 컷은 사용자 컷과 겹쳐 빠진다
-    let n = replace_auto_tx(&db.conn, 1, &[5000, 10_020, 20_000], "medium", Some(25.0), NOW + 2).unwrap();
+    let n = replace_auto_tx(
+        &db.conn,
+        1,
+        &[5000, 10_020, 20_000],
+        "medium",
+        Some(25.0),
+        NOW + 2,
+    )
+    .unwrap();
 
     // Assert
     let r = row(&db.conn, 1);
@@ -310,7 +353,10 @@ fn t_scene_10_concurrent_user_adds_and_auto_replacements_never_lose_user_cuts() 
     assert_eq!(r.state, SceneState::Done);
     assert_eq!(r.auto.len(), 30);
     for a in &r.auto {
-        assert!(r.user.iter().all(|u| (u - a).abs() > 100), "auto {a} overlaps a user cut");
+        assert!(
+            r.user.iter().all(|u| (u - a).abs() > 100),
+            "auto {a} overlaps a user cut"
+        );
     }
 }
 
@@ -330,7 +376,11 @@ fn t_scene_14_edits_never_touch_revision_or_the_search_outbox() {
     let before = snapshot(&db.conn);
 
     // Act: 쓰기 경로 전부
-    let opts = RequestOptions { redetect: true, restore_suppressed: true, sensitivity: Some(mam_db::SceneSensitivity::High) };
+    let opts = RequestOptions {
+        redetect: true,
+        restore_suppressed: true,
+        sensitivity: Some(mam_db::SceneSensitivity::High),
+    };
     request_tx(&db.conn, &[1, 2], &opts, 45, NOW).unwrap();
     scene_cuts::backfill_batch_tx(&db.conn, 0, 1000, NOW).unwrap();
     scene_cuts::requeue_pending_tx(&db.conn, NOW).unwrap();

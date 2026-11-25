@@ -14,7 +14,12 @@ pub struct Meter {
 impl Meter {
     /// `cpu_ms == 0` 이면 제한 없음
     pub fn new(cpu_ms: u64) -> Self {
-        Self { limit: Duration::from_millis(cpu_ms), start: Cell::new(Instant::now()), blocked: Cell::new(Duration::ZERO), tripped: Cell::new(false) }
+        Self {
+            limit: Duration::from_millis(cpu_ms),
+            start: Cell::new(Instant::now()),
+            blocked: Cell::new(Duration::ZERO),
+            tripped: Cell::new(false),
+        }
     }
 
     pub fn begin(&self) {
@@ -32,7 +37,11 @@ impl Meter {
         if self.limit.is_zero() {
             return false;
         }
-        let used = self.start.get().elapsed().saturating_sub(self.blocked.get());
+        let used = self
+            .start
+            .get()
+            .elapsed()
+            .saturating_sub(self.blocked.get());
         if used > self.limit {
             self.tripped.set(true);
         }

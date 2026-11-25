@@ -27,7 +27,8 @@ use crate::ingest_commands::run_blocking;
 pub(crate) const MAX_REQUEST_ASSETS: usize = 10_000;
 
 /// 백필 등록 스레드 실행 중 표시 (프로세스당 하나)
-static BACKFILL_RUNNING: LazyLock<Arc<AtomicBool>> = LazyLock::new(|| Arc::new(AtomicBool::new(false)));
+static BACKFILL_RUNNING: LazyLock<Arc<AtomicBool>> =
+    LazyLock::new(|| Arc::new(AtomicBool::new(false)));
 
 /// 계약 `SceneDetectOptions` — 모든 필드 생략 가능
 #[derive(Debug, Clone, Copy, Default, Deserialize)]

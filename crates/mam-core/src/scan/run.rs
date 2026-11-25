@@ -143,11 +143,16 @@ pub fn scan_folder(
     let root = folder.root_path();
 
     // 루트를 읽을 수 없으면 "전부 삭제됨" 이 아니라 오류다 — missing 처리하지 않는다. 응답이 없는 것(제한 시간 초과)도 같다
-    let root_failure: Option<(&'static str, &'static str, String)> = match env.root_readable_guarded(&folder) {
-        Guarded::Done(Ok(())) => None,
-        Guarded::Done(Err(f)) => Some((f.code, "root_unreadable", f.message)),
-        Guarded::TimedOut => Some((UNRESPONSIVE_CODE, UNRESPONSIVE_CODE, UNRESPONSIVE_MESSAGE.to_owned())),
-    };
+    let root_failure: Option<(&'static str, &'static str, String)> =
+        match env.root_readable_guarded(&folder) {
+            Guarded::Done(Ok(())) => None,
+            Guarded::Done(Err(f)) => Some((f.code, "root_unreadable", f.message)),
+            Guarded::TimedOut => Some((
+                UNRESPONSIVE_CODE,
+                UNRESPONSIVE_CODE,
+                UNRESPONSIVE_MESSAGE.to_owned(),
+            )),
+        };
     if let Some((code, error_type, message)) = root_failure {
         let network = folder.volume_kind == crate::VolumeKind::Network;
         let volume_id = folder.volume_id;
@@ -177,8 +182,12 @@ pub fn scan_folder(
     let Some(folder) = folder else {
         return Ok(ScanOutcome::Gone);
     };
-    env.progress
-        .start(folder_id, path_text(&root), counts.processed, env.clock.now_ms());
+    env.progress.start(
+        folder_id,
+        path_text(&root),
+        counts.processed,
+        env.clock.now_ms(),
+    );
 
     let mut walk = Walk::new(
         env,

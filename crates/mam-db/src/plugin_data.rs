@@ -25,8 +25,10 @@ pub fn tables_exist(conn: &Connection) -> rusqlite::Result<bool> {
 }
 
 /// 데이터 존재 확인 질의 (플러그인당 세 번 — 각각 첫 행에서 멈춘다)
-pub const HAS_KV_GLOBAL_SQL: &str = "SELECT 1 FROM plugin_kv WHERE plugin_ref = ?1 AND asset_id IS NULL LIMIT 1";
-pub const HAS_KV_ASSET_SQL: &str = "SELECT 1 FROM plugin_kv WHERE plugin_ref = ?1 AND asset_id IS NOT NULL LIMIT 1";
+pub const HAS_KV_GLOBAL_SQL: &str =
+    "SELECT 1 FROM plugin_kv WHERE plugin_ref = ?1 AND asset_id IS NULL LIMIT 1";
+pub const HAS_KV_ASSET_SQL: &str =
+    "SELECT 1 FROM plugin_kv WHERE plugin_ref = ?1 AND asset_id IS NOT NULL LIMIT 1";
 pub const HAS_TASKS_SQL: &str = "SELECT 1 FROM plugin_tasks WHERE plugin_ref = ?1 LIMIT 1";
 
 /// 두 표에 행이 있는 모든 플러그인 ID (설치 여부와 무관) — 레지스트리를 훑으며 플러그인마다 존재 확인
@@ -44,8 +46,14 @@ pub fn data_plugin_ids(conn: &Connection) -> rusqlite::Result<BTreeSet<String>> 
 }
 
 /// 한 플러그인의 행을 최대 `limit` 개씩(표마다) 지운다. 지운 행 수 합계 — 0 이면 더 없다 (레지스트리에 없으면 0).
-pub fn delete_plugin_batch(conn: &Connection, plugin_id: &str, limit: usize) -> rusqlite::Result<usize> {
-    let Some(plugin_ref) = plugin_registry::lookup(conn, plugin_id)? else { return Ok(0) };
+pub fn delete_plugin_batch(
+    conn: &Connection,
+    plugin_id: &str,
+    limit: usize,
+) -> rusqlite::Result<usize> {
+    let Some(plugin_ref) = plugin_registry::lookup(conn, plugin_id)? else {
+        return Ok(0);
+    };
     let limit = i64::try_from(limit).unwrap_or(i64::MAX);
     let mut total = 0;
     for sql in DELETE_SQLS {
@@ -66,7 +74,10 @@ pub const DELETE_SQLS: [&str; 3] = [
 
 /// `installed` 에 없는 플러그인의 KV·작업 행을 모두 지운다 (`BATCH` 행씩 배치마다 커밋 — 멱등, 중단 후 다시 호출해도 된다).
 /// 표가 없으면(구 스키마) 아무것도 하지 않는다. 지운 행 수를 돌려준다.
-pub fn purge_uninstalled(conn: &Connection, installed: &BTreeSet<String>) -> rusqlite::Result<usize> {
+pub fn purge_uninstalled(
+    conn: &Connection,
+    installed: &BTreeSet<String>,
+) -> rusqlite::Result<usize> {
     purge_uninstalled_with(conn, installed, BATCH)
 }
 

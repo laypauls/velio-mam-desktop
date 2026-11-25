@@ -7,7 +7,10 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use mam_plugin_gateway::Gateway;
-use mam_plugin_host::{CallCx, HostApi, HostError, HostState, InvokeError, InvokeKind, InvokeScope, LogLevel, PluginHost};
+use mam_plugin_host::{
+    CallCx, HostApi, HostError, HostState, InvokeError, InvokeKind, InvokeScope, LogLevel,
+    PluginHost,
+};
 use mam_plugin_runtime::{Permission, ProviderInvoker, ProviderKind, ProviderSpec, RunError};
 use serde_json::{Value, json};
 
@@ -20,19 +23,32 @@ pub struct TestApi {
 
 impl TestApi {
     pub fn new(gw: Arc<Gateway>) -> Self {
-        Self { gw, steps: Mutex::new(VecDeque::new()), kill_pid: AtomicU32::new(0) }
+        Self {
+            gw,
+            steps: Mutex::new(VecDeque::new()),
+            kill_pid: AtomicU32::new(0),
+        }
     }
 }
 
 impl HostApi for TestApi {
     fn call(&self, cx: &CallCx<'_>, method: &str, params: Value) -> Result<Value, HostError> {
         match method {
-            "test.step" => Ok(self.steps.lock().unwrap().pop_front().unwrap_or_else(|| json!({}))),
+            "test.step" => Ok(self
+                .steps
+                .lock()
+                .unwrap()
+                .pop_front()
+                .unwrap_or_else(|| json!({}))),
             "test.kill" => {
                 // 시험이 미리 알아 둔 워커 PID 만 PID 로 종료한다 (이미지 이름으로 종료하지 않는다)
                 let pid = self.kill_pid.load(Ordering::SeqCst);
                 assert!(pid != 0, "arm_kill must run first");
-                let st = std::process::Command::new("taskkill").args(["/PID", &pid.to_string(), "/F"]).stdout(std::process::Stdio::null()).status().expect("taskkill");
+                let st = std::process::Command::new("taskkill")
+                    .args(["/PID", &pid.to_string(), "/F"])
+                    .stdout(std::process::Stdio::null())
+                    .status()
+                    .expect("taskkill");
                 assert!(st.success());
                 Ok(Value::Null)
             }
@@ -93,7 +109,15 @@ impl TestInvoker {
     }
 
     pub fn add(&self, id: &str, host: Arc<PluginHost>, specs: Vec<ProviderSpec>) {
-        self.entries.lock().unwrap().insert(id.to_owned(), Entry { host, specs, enabled: true, installed: true });
+        self.entries.lock().unwrap().insert(
+            id.to_owned(),
+            Entry {
+                host,
+                specs,
+                enabled: true,
+                installed: true,
+            },
+        );
     }
 
     pub fn host(&self, id: &str) -> Arc<PluginHost> {
@@ -101,11 +125,21 @@ impl TestInvoker {
     }
 
     pub fn set_enabled(&self, id: &str, on: bool) {
-        self.entries.lock().unwrap().get_mut(id).expect("plugin").enabled = on;
+        self.entries
+            .lock()
+            .unwrap()
+            .get_mut(id)
+            .expect("plugin")
+            .enabled = on;
     }
 
     pub fn set_installed(&self, id: &str, on: bool) {
-        self.entries.lock().unwrap().get_mut(id).expect("plugin").installed = on;
+        self.entries
+            .lock()
+            .unwrap()
+            .get_mut(id)
+            .expect("plugin")
+            .installed = on;
     }
 
     /// 제품(P6)은 내보내기 provider 를 `auto_providers` 에 넣지 않는다 — 넣는 잘못된 호출자에게도 피드가 거르는지 시험한다
@@ -147,7 +181,13 @@ impl TestInvoker {
     /// 워커를 미리 띄워(`ping`) PID 를 알아 두고, 다음 `test.kill` 이 그 PID 를 종료하게 한다. PID 를 돌려준다
     pub fn arm_kill(&self, plugin: &str) -> u32 {
         let host = self.host(plugin);
-        host.invoke(InvokeKind::Provider, "ping", Value::Null, InvokeScope::empty()).expect("warm-up ping");
+        host.invoke(
+            InvokeKind::Provider,
+            "ping",
+            Value::Null,
+            InvokeScope::empty(),
+        )
+        .expect("warm-up ping");
         match host.state() {
             HostState::Running { pid } => {
                 self.api.kill_pid.store(pid, Ordering::SeqCst);
@@ -174,24 +214,42 @@ impl ProviderInvoker for TestInvoker {
         let g = self.entries.lock().unwrap();
         g.values()
             .filter(|e| e.installed && e.enabled)
-            .flat_map(|e| e.specs.iter().filter(move |s| leak || s.kind != ProviderKind::Export).cloned())
+            .flat_map(|e| {
+                e.specs
+                    .iter()
+                    .filter(move |s| leak || s.kind != ProviderKind::Export)
+                    .cloned()
+            })
             .collect()
     }
 
     fn provider(&self, plugin: &str, provider: &str) -> Result<ProviderSpec, RunError> {
         let g = self.entries.lock().unwrap();
-        let e = g.get(plugin).filter(|e| e.installed).ok_or(RunError::NotInstalled)?;
+        let e = g
+            .get(plugin)
+            .filter(|e| e.installed)
+            .ok_or(RunError::NotInstalled)?;
         if !e.enabled {
             return Err(RunError::Disabled);
         }
-        e.specs.iter().find(|s| s.provider == provider).cloned().ok_or(RunError::UnknownTarget)
+        e.specs
+            .iter()
+            .find(|s| s.provider == provider)
+            .cloned()
+            .ok_or(RunError::UnknownTarget)
     }
 
     fn allows(&self, plugin: &str, perm: Permission) -> bool {
         self.gw.grants().allows(plugin, perm)
     }
 
-    fn invoke_provider(&self, plugin: &str, provider: &str, assets: Vec<i64>, params: Value) -> Result<Value, RunError> {
+    fn invoke_provider(
+        &self,
+        plugin: &str,
+        provider: &str,
+        assets: Vec<i64>,
+        params: Value,
+    ) -> Result<Value, RunError> {
         let call = Call {
             n: self.seq.fetch_add(1, Ordering::SeqCst) + 1,
             plugin: plugin.to_owned(),
@@ -205,7 +263,10 @@ impl ProviderInvoker for TestInvoker {
         }
         let host = {
             let g = self.entries.lock().unwrap();
-            let e = g.get(plugin).filter(|e| e.installed).ok_or(RunError::NotInstalled)?;
+            let e = g
+                .get(plugin)
+                .filter(|e| e.installed)
+                .ok_or(RunError::NotInstalled)?;
             if !e.enabled {
                 return Err(RunError::Disabled);
             }

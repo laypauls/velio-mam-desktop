@@ -17,7 +17,9 @@ impl RescanTrigger for ManualTrigger {
 
     fn parse(&self, raw: &Map<String, Value>) -> Result<Box<dyn TriggerSpec>, PolicyError> {
         if raw.keys().any(|k| k != "kind") {
-            return Err(PolicyError { field: "rescanPolicy.trigger" });
+            return Err(PolicyError {
+                field: "rescanPolicy.trigger",
+            });
         }
         Ok(Box::new(ManualSpec))
     }

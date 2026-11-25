@@ -6,14 +6,14 @@
 mod common;
 
 use common::{FixedClock, T0, TestDb, migrated_db, shipped_migrations};
-use mam_db::{migrate, migrate_with, open, settings};
-use tempfile::TempDir;
 use mam_db::{
     CapturedAtFallback, DoubleClickAction, GalleryPaging, IndexRailMode, Settings, SettingsError,
     SortFieldsEnabled,
 };
+use mam_db::{migrate, migrate_with, open, settings};
 use rusqlite::Connection;
 use serde_json::{Map, Value, json};
+use tempfile::TempDir;
 
 fn patch(v: Value) -> Map<String, Value> {
     v.as_object().unwrap().clone()
@@ -42,7 +42,10 @@ fn t_vopt_01_defaults_when_keys_absent() {
     assert_eq!(s.double_click_action, DoubleClickAction::Preview);
     let v = serde_json::to_value(&s).unwrap();
     assert_eq!(v["titleEditEnabled"], json!(false));
-    assert_eq!(v["sortFieldsEnabled"], sorts(true, true, true, true, true, true));
+    assert_eq!(
+        v["sortFieldsEnabled"],
+        sorts(true, true, true, true, true, true)
+    );
     assert_eq!(v["doubleClickAction"], json!("preview"));
     assert!(warnings.is_empty());
 }
@@ -196,7 +199,10 @@ fn t_simset_02_round_trip_and_boundaries() {
             &patch(json!({"similarMaxResults": max, "similarMinSimilarity": min})),
         )
         .unwrap();
-        assert_eq!((s.similar_max_results, s.similar_min_similarity), (max, min));
+        assert_eq!(
+            (s.similar_max_results, s.similar_min_similarity),
+            (max, min)
+        );
         assert_eq!(settings::load(&db.conn).unwrap().0, s);
     }
 }
@@ -216,8 +222,12 @@ fn t_simset_03_out_of_range_and_wrong_types_are_rejected_and_change_nothing() {
         ("similarMinSimilarity", json!("0.5")),
         ("similarMinSimilarity", Value::Null),
     ] {
-        let err = settings::update(&mut db.conn, &patch(json!({ field: bad.clone() }))).unwrap_err();
-        assert!(matches!(err, SettingsError::Invalid(f) if f == field), "{field}={bad}");
+        let err =
+            settings::update(&mut db.conn, &patch(json!({ field: bad.clone() }))).unwrap_err();
+        assert!(
+            matches!(err, SettingsError::Invalid(f) if f == field),
+            "{field}={bad}"
+        );
     }
     assert_eq!(settings::load(&db.conn).unwrap().0, Settings::default());
 }
@@ -296,8 +306,12 @@ fn t_gpage_03_out_of_range_and_wrong_types_are_rejected_and_change_nothing() {
         ("indexRail", json!("Auto")),
         ("indexRail", json!(1)),
     ] {
-        let err = settings::update(&mut db.conn, &patch(json!({ field: bad.clone() }))).unwrap_err();
-        assert!(matches!(err, SettingsError::Invalid(f) if f == field), "{field}={bad}");
+        let err =
+            settings::update(&mut db.conn, &patch(json!({ field: bad.clone() }))).unwrap_err();
+        assert!(
+            matches!(err, SettingsError::Invalid(f) if f == field),
+            "{field}={bad}"
+        );
     }
     let n: i64 = db
         .conn
@@ -369,8 +383,11 @@ fn t_capfb_03_invalid_strings_and_wrong_types_are_rejected_and_change_nothing() 
         Value::Null,
         json!(["none"]),
     ] {
-        let err = settings::update(&mut db.conn, &patch(json!({"capturedAtFallback": bad.clone()})))
-            .unwrap_err();
+        let err = settings::update(
+            &mut db.conn,
+            &patch(json!({"capturedAtFallback": bad.clone()})),
+        )
+        .unwrap_err();
         assert!(
             matches!(&err, SettingsError::Invalid(f) if f == "capturedAtFallback"),
             "{bad}: {err:?}"
@@ -422,10 +439,22 @@ fn t_rating_set_02_sidebar_rating_menu_round_trips() {
 #[test]
 fn t_rating_set_03_non_boolean_sidebar_rating_menu_is_rejected_and_changes_nothing() {
     let mut db = migrated_db();
-    for bad in [json!("true"), json!(1), json!(0), Value::Null, json!([true])] {
-        let err =
-            settings::update(&mut db.conn, &patch(json!({"sidebarRatingMenu": bad.clone()}))).unwrap_err();
-        assert!(matches!(&err, SettingsError::Invalid(f) if f == "sidebarRatingMenu"), "{bad}");
+    for bad in [
+        json!("true"),
+        json!(1),
+        json!(0),
+        Value::Null,
+        json!([true]),
+    ] {
+        let err = settings::update(
+            &mut db.conn,
+            &patch(json!({"sidebarRatingMenu": bad.clone()})),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(&err, SettingsError::Invalid(f) if f == "sidebarRatingMenu"),
+            "{bad}"
+        );
     }
     let n: i64 = db
         .conn
@@ -463,7 +492,8 @@ fn t_vlcset_01_video_player_builtin_defaults_to_true_with_contract_name() {
 fn t_vlcset_02_video_player_builtin_round_trips() {
     let mut db = migrated_db();
     for flag in [false, true] {
-        let s = settings::update(&mut db.conn, &patch(json!({"videoPlayerBuiltIn": flag}))).unwrap();
+        let s =
+            settings::update(&mut db.conn, &patch(json!({"videoPlayerBuiltIn": flag}))).unwrap();
         assert_eq!(s.video_player_builtin, flag);
         assert_eq!(settings::load(&db.conn).unwrap().0, s);
     }
@@ -472,10 +502,22 @@ fn t_vlcset_02_video_player_builtin_round_trips() {
 #[test]
 fn t_vlcset_03_non_boolean_video_player_builtin_is_rejected_and_changes_nothing() {
     let mut db = migrated_db();
-    for bad in [json!("true"), json!(1), json!(0), Value::Null, json!([true])] {
-        let err =
-            settings::update(&mut db.conn, &patch(json!({"videoPlayerBuiltIn": bad.clone()}))).unwrap_err();
-        assert!(matches!(&err, SettingsError::Invalid(f) if f == "videoPlayerBuiltIn"), "{bad}");
+    for bad in [
+        json!("true"),
+        json!(1),
+        json!(0),
+        Value::Null,
+        json!([true]),
+    ] {
+        let err = settings::update(
+            &mut db.conn,
+            &patch(json!({"videoPlayerBuiltIn": bad.clone()})),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(&err, SettingsError::Invalid(f) if f == "videoPlayerBuiltIn"),
+            "{bad}"
+        );
     }
     let n: i64 = db
         .conn
@@ -505,13 +547,24 @@ fn v26_db() -> TestDb {
     let db_path = dir.path().join("mam.sqlite");
     let backup_dir = dir.path().join("backups");
     let mut conn = open(&db_path).unwrap();
-    let upto26: Vec<_> = shipped_migrations().into_iter().filter(|m| m.version() <= 26).collect();
+    let upto26: Vec<_> = shipped_migrations()
+        .into_iter()
+        .filter(|m| m.version() <= 26)
+        .collect();
     migrate_with(&mut conn, &upto26, &backup_dir, &FixedClock(T0)).unwrap();
-    TestDb { dir, db_path, backup_dir, conn }
+    TestDb {
+        dir,
+        db_path,
+        backup_dir,
+        conn,
+    }
 }
 
 fn raw_value(conn: &Connection, key: &str) -> Option<String> {
-    conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| r.get(0)).ok()
+    conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| {
+        r.get(0)
+    })
+    .ok()
 }
 
 #[test]
@@ -525,9 +578,15 @@ fn t_vlcset_05_old_false_row_is_carried_to_video_player_builtin_by_v27() {
     // Assert
     assert_eq!(report.applied, vec![27]);
     assert!(!s.video_player_builtin);
-    assert_eq!(serde_json::to_value(&s).unwrap()["videoPlayerBuiltIn"], json!(false));
+    assert_eq!(
+        serde_json::to_value(&s).unwrap()["videoPlayerBuiltIn"],
+        json!(false)
+    );
     assert!(warnings.is_empty());
-    assert_eq!(raw_value(&db.conn, "video_player_builtin").as_deref(), Some("false"));
+    assert_eq!(
+        raw_value(&db.conn, "video_player_builtin").as_deref(),
+        Some("false")
+    );
 }
 
 #[test]
@@ -540,7 +599,10 @@ fn t_vlcset_06_without_old_row_v27_adds_nothing_and_default_is_true() {
     // Assert
     assert!(s.video_player_builtin);
     assert!(warnings.is_empty());
-    let n: i64 = db.conn.query_row("SELECT COUNT(*) FROM settings", [], |r| r.get(0)).unwrap();
+    let n: i64 = db
+        .conn
+        .query_row("SELECT COUNT(*) FROM settings", [], |r| r.get(0))
+        .unwrap();
     assert_eq!(n, 0);
 }
 
@@ -551,8 +613,14 @@ fn t_vlcset_07_old_field_video_player_vlc_patch_is_rejected_and_changes_nothing(
     // Act
     let err = settings::update(&mut db.conn, &patch(json!({"videoPlayerVlc": false}))).unwrap_err();
     // Assert: 모르는 필드 -> Unknown, 아무 행도 쓰지 않는다
-    assert!(matches!(&err, SettingsError::Unknown(f) if f == "videoPlayerVlc"), "{err:?}");
-    let n: i64 = db.conn.query_row("SELECT COUNT(*) FROM settings", [], |r| r.get(0)).unwrap();
+    assert!(
+        matches!(&err, SettingsError::Unknown(f) if f == "videoPlayerVlc"),
+        "{err:?}"
+    );
+    let n: i64 = db
+        .conn
+        .query_row("SELECT COUNT(*) FROM settings", [], |r| r.get(0))
+        .unwrap();
     assert_eq!(n, 0);
     assert!(settings::load(&db.conn).unwrap().0.video_player_builtin);
 }
@@ -566,8 +634,14 @@ fn t_vlcset_08_v27_keeps_the_old_row_and_does_not_overwrite_an_existing_new_row(
     // Act
     migrate(&mut db.conn, &db.backup_dir, &FixedClock(T0 + 1)).unwrap();
     // Assert: 옛 행 보존(구 앱 롤백용), 새 행은 INSERT OR IGNORE 로 덮어쓰지 않음
-    assert_eq!(raw_value(&db.conn, "video_player_vlc").as_deref(), Some("false"));
-    assert_eq!(raw_value(&db.conn, "video_player_builtin").as_deref(), Some("true"));
+    assert_eq!(
+        raw_value(&db.conn, "video_player_vlc").as_deref(),
+        Some("false")
+    );
+    assert_eq!(
+        raw_value(&db.conn, "video_player_builtin").as_deref(),
+        Some("true")
+    );
     assert!(settings::load(&db.conn).unwrap().0.video_player_builtin);
 }
 
@@ -596,8 +670,8 @@ fn t_hidekey_set_02_round_trips_including_null() {
         json!("a".repeat(20)),
     ];
     for want in cases {
-        let s = settings::update(&mut db.conn, &patch(json!({"hideShortcut": want.clone()})))
-            .unwrap();
+        let s =
+            settings::update(&mut db.conn, &patch(json!({"hideShortcut": want.clone()}))).unwrap();
         assert_eq!(serde_json::to_value(&s).unwrap()["hideShortcut"], want);
         assert_eq!(settings::load(&db.conn).unwrap().0, s);
     }
@@ -622,7 +696,10 @@ fn t_hidekey_set_03_invalid_values_are_rejected_and_change_nothing() {
     for bad in bad_values {
         let err = settings::update(&mut db.conn, &patch(json!({"hideShortcut": bad.clone()})))
             .unwrap_err();
-        assert!(matches!(&err, SettingsError::Invalid(f) if f == "hideShortcut"), "{bad}");
+        assert!(
+            matches!(&err, SettingsError::Invalid(f) if f == "hideShortcut"),
+            "{bad}"
+        );
     }
     let n: i64 = db
         .conn
@@ -685,9 +762,15 @@ fn t_rating_set_06_sort_fields_rating_round_trips_and_validation_still_holds() {
         json!({"capturedAt": true, "modifiedAt": true, "name": true, "size": true, "duration": true, "rating": true, "extra": true}),
         json!({"modifiedAt": true, "name": true, "size": true, "duration": true, "rating": true}),
     ] {
-        let err = settings::update(&mut db.conn, &patch(json!({"sortFieldsEnabled": bad.clone()})))
-            .unwrap_err();
-        assert!(matches!(&err, SettingsError::Invalid(f) if f == "sortFieldsEnabled"), "{bad}");
+        let err = settings::update(
+            &mut db.conn,
+            &patch(json!({"sortFieldsEnabled": bad.clone()})),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(&err, SettingsError::Invalid(f) if f == "sortFieldsEnabled"),
+            "{bad}"
+        );
     }
 }
 
@@ -700,21 +783,40 @@ fn t_set_ss_01_default_is_5_bounds_round_trip_and_invalid_values_are_rejected() 
     let mut db = migrated_db();
     let (s, _) = settings::load(&db.conn).unwrap();
     assert_eq!(s.slideshow_image_seconds, 5);
-    assert_eq!(serde_json::to_value(&s).unwrap()["slideshowImageSeconds"], json!(5));
+    assert_eq!(
+        serde_json::to_value(&s).unwrap()["slideshowImageSeconds"],
+        json!(5)
+    );
 
     // Act + Assert: 경계값 1·60 은 통과
     for ok in [1, 60] {
-        let s = settings::update(&mut db.conn, &patch(json!({"slideshowImageSeconds": ok})))
-            .unwrap();
+        let s =
+            settings::update(&mut db.conn, &patch(json!({"slideshowImageSeconds": ok}))).unwrap();
         assert_eq!(s.slideshow_image_seconds, ok);
     }
     // 범위 밖·잘못된 타입은 거부하고 마지막 값(60)을 유지
-    for bad in [json!(0), json!(61), json!(-1), json!(2.5), json!("5"), Value::Null] {
-        let err = settings::update(&mut db.conn, &patch(json!({"slideshowImageSeconds": bad.clone()})))
-            .unwrap_err();
-        assert!(matches!(&err, SettingsError::Invalid(f) if f == "slideshowImageSeconds"), "{bad}");
+    for bad in [
+        json!(0),
+        json!(61),
+        json!(-1),
+        json!(2.5),
+        json!("5"),
+        Value::Null,
+    ] {
+        let err = settings::update(
+            &mut db.conn,
+            &patch(json!({"slideshowImageSeconds": bad.clone()})),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(&err, SettingsError::Invalid(f) if f == "slideshowImageSeconds"),
+            "{bad}"
+        );
     }
-    assert_eq!(settings::load(&db.conn).unwrap().0.slideshow_image_seconds, 60);
+    assert_eq!(
+        settings::load(&db.conn).unwrap().0.slideshow_image_seconds,
+        60
+    );
 }
 
 #[test]
@@ -725,5 +827,10 @@ fn t_set_ss_02_corrupt_stored_value_falls_back_to_5_with_a_warning() {
     let (s, warnings) = settings::load(&db.conn).unwrap();
 
     assert_eq!(s.slideshow_image_seconds, 5);
-    assert!(warnings.iter().any(|w| w.contains("slideshow_image_seconds")), "{warnings:?}");
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.contains("slideshow_image_seconds")),
+        "{warnings:?}"
+    );
 }

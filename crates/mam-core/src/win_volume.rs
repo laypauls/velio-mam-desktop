@@ -9,12 +9,13 @@ use windows_sys::Win32::Foundation::{
     CloseHandle, ERROR_NO_MORE_FILES, GetLastError, INVALID_HANDLE_VALUE, NO_ERROR,
 };
 use windows_sys::Win32::NetworkManagement::WNet::WNetGetConnectionW;
-use windows_sys::Win32::System::IO::DeviceIoControl;
 use windows_sys::Win32::Storage::FileSystem::{
-    CreateFileW, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING, FindFirstVolumeW, FindNextVolumeW, FindVolumeClose, GetDiskFreeSpaceExW, GetDriveTypeW,
-    GetVolumeInformationW, GetVolumeNameForVolumeMountPointW, GetVolumePathNameW,
-    GetVolumePathNamesForVolumeNameW,
+    CreateFileW, FILE_SHARE_READ, FILE_SHARE_WRITE, FindFirstVolumeW, FindNextVolumeW,
+    FindVolumeClose, GetDiskFreeSpaceExW, GetDriveTypeW, GetVolumeInformationW,
+    GetVolumeNameForVolumeMountPointW, GetVolumePathNameW, GetVolumePathNamesForVolumeNameW,
+    OPEN_EXISTING,
 };
+use windows_sys::Win32::System::IO::DeviceIoControl;
 
 use crate::error::CoreError;
 use crate::volume::{VolumeInfo, VolumeKind, VolumeProvider, strip_verbatim};

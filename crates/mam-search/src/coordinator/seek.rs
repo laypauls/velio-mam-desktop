@@ -9,7 +9,11 @@ use super::key::RankKey;
 use crate::error::Result;
 
 /// `(표시 순서의 키, total, start_offset, more)`. `at >= total` 이면 빈 페이지이고 `start_offset = total`.
-pub(super) fn page(run: &Run<'_>, at: usize, limit: usize) -> Result<(Vec<RankKey>, u64, u64, bool)> {
+pub(super) fn page(
+    run: &Run<'_>,
+    at: usize,
+    limit: usize,
+) -> Result<(Vec<RankKey>, u64, u64, bool)> {
     let total = run.count()?;
     let at64 = at as u64;
     if at64 >= total {

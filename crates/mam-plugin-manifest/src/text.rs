@@ -33,7 +33,13 @@ pub fn is_format_char(c: char) -> bool {
 pub fn clean_text(s: &str) -> String {
     s.chars()
         .filter(|c| !is_format_char(*c))
-        .map(|c| if c.is_control() || c == '\u{2028}' || c == '\u{2029}' { ' ' } else { c })
+        .map(|c| {
+            if c.is_control() || c == '\u{2028}' || c == '\u{2029}' {
+                ' '
+            } else {
+                c
+            }
+        })
         .collect()
 }
 

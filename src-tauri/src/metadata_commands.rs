@@ -34,7 +34,10 @@ where
 
 /// 삭제 요청 뒤 남은 값 정리를 별도 스레드에서 시작한다 (기다리지 않음). 끝나면 색인 워커를 깨운다.
 /// 반환 핸들은 테스트가 끝을 기다리는 데만 쓴다. 스레드를 못 만들면 다음 앱 시작 때 이어서 처리된다.
-pub(crate) fn kick_purge(user: Arc<UserData>, search: Option<Arc<SearchService>>) -> Option<JoinHandle<()>> {
+pub(crate) fn kick_purge(
+    user: Arc<UserData>,
+    search: Option<Arc<SearchService>>,
+) -> Option<JoinHandle<()>> {
     std::thread::Builder::new()
         .name("mam-umeta-purge".into())
         .spawn(move || {
@@ -51,7 +54,13 @@ pub(crate) fn kick_purge(user: Arc<UserData>, search: Option<Arc<SearchService>>
 
 #[tauri::command]
 pub async fn list_metadata_fields(svc: Shared<'_>) -> Result<Vec<MetadataFieldView>, CommandError> {
-    blocking(&svc, |u| Ok(u.list_metadata_fields()?.into_iter().map(Into::into).collect())).await
+    blocking(&svc, |u| {
+        Ok(u.list_metadata_fields()?
+            .into_iter()
+            .map(Into::into)
+            .collect())
+    })
+    .await
 }
 
 /// `options` 는 enum/multiEnum 에서만 허용(그 외 타입에 비어 있지 않으면 `invalid_input`).
@@ -62,7 +71,11 @@ pub async fn create_metadata_field(
     value_type: ValueType,
     options: Vec<String>,
 ) -> Result<MetadataFieldView, CommandError> {
-    blocking(&svc, move |u| u.create_metadata_field(&name, value_type, &options).map(Into::into)).await
+    blocking(&svc, move |u| {
+        u.create_metadata_field(&name, value_type, &options)
+            .map(Into::into)
+    })
+    .await
 }
 
 /// 이름만 바꾼다 — 재색인 없음.
@@ -72,12 +85,18 @@ pub async fn rename_metadata_field(
     field_id: i64,
     name: String,
 ) -> Result<MetadataFieldView, CommandError> {
-    blocking(&svc, move |u| u.rename_metadata_field(field_id, &name).map(Into::into)).await
+    blocking(&svc, move |u| {
+        u.rename_metadata_field(field_id, &name).map(Into::into)
+    })
+    .await
 }
 
 /// `field_ids` 는 현재 필드 전체의 새 순서(누락·중복·모르는 id 는 `invalid_input`).
 #[tauri::command]
-pub async fn reorder_metadata_fields(svc: Shared<'_>, field_ids: Vec<i64>) -> Result<(), CommandError> {
+pub async fn reorder_metadata_fields(
+    svc: Shared<'_>,
+    field_ids: Vec<i64>,
+) -> Result<(), CommandError> {
     blocking(&svc, move |u| u.reorder_metadata_fields(&field_ids)).await
 }
 
@@ -95,7 +114,10 @@ pub async fn delete_metadata_field(
 
 /// 이 필드에 값을 가진 자산 수 (삭제 확인창용)
 #[tauri::command]
-pub async fn metadata_field_value_count(svc: Shared<'_>, field_id: i64) -> Result<i64, CommandError> {
+pub async fn metadata_field_value_count(
+    svc: Shared<'_>,
+    field_id: i64,
+) -> Result<i64, CommandError> {
     blocking(&svc, move |u| u.metadata_field_asset_count(field_id)).await
 }
 
@@ -105,7 +127,10 @@ pub async fn add_metadata_option(
     field_id: i64,
     label: String,
 ) -> Result<FieldOptionView, CommandError> {
-    blocking(&svc, move |u| u.add_metadata_option(field_id, &label).map(Into::into)).await
+    blocking(&svc, move |u| {
+        u.add_metadata_option(field_id, &label).map(Into::into)
+    })
+    .await
 }
 
 /// 이름만 바꾼다 — 재색인 없음 (색인에는 optionId 만 들어간다).
@@ -115,7 +140,10 @@ pub async fn rename_metadata_option(
     option_id: i64,
     label: String,
 ) -> Result<FieldOptionView, CommandError> {
-    blocking(&svc, move |u| u.rename_metadata_option(option_id, &label).map(Into::into)).await
+    blocking(&svc, move |u| {
+        u.rename_metadata_option(option_id, &label).map(Into::into)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -124,7 +152,10 @@ pub async fn reorder_metadata_options(
     field_id: i64,
     option_ids: Vec<i64>,
 ) -> Result<(), CommandError> {
-    blocking(&svc, move |u| u.reorder_metadata_options(field_id, &option_ids)).await
+    blocking(&svc, move |u| {
+        u.reorder_metadata_options(field_id, &option_ids)
+    })
+    .await
 }
 
 /// 선택지 삭제 요청. 값을 가진 자산 수를 돌려주고 값 정리·재색인은 백그라운드에서 이어진다.
@@ -151,7 +182,13 @@ pub async fn get_asset_metadata(
     svc: Shared<'_>,
     asset_id: i64,
 ) -> Result<Vec<AssetFieldValueView>, CommandError> {
-    blocking(&svc, move |u| Ok(u.get_metadata_values(asset_id)?.into_iter().map(Into::into).collect())).await
+    blocking(&svc, move |u| {
+        Ok(u.get_metadata_values(asset_id)?
+            .into_iter()
+            .map(Into::into)
+            .collect())
+    })
+    .await
 }
 
 /// 자산 하나의 값을 지정한다. `patches` 에 없는 필드는 그대로, 하나라도 잘못되면 전체 거부.
@@ -163,7 +200,10 @@ pub async fn set_asset_metadata(
     patches: Vec<FieldPatchDto>,
 ) -> Result<(), CommandError> {
     let patches = to_patches(patches);
-    let out = blocking(&svc, move |u| u.set_metadata_values(asset_id, &patches).map(|_| ())).await;
+    let out = blocking(&svc, move |u| {
+        u.set_metadata_values(asset_id, &patches).map(|_| ())
+    })
+    .await;
     search.wake();
     out
 }
@@ -178,7 +218,10 @@ pub async fn bulk_set_asset_metadata(
     patches: Vec<FieldPatchDto>,
 ) -> Result<u64, CommandError> {
     let patches = to_patches(patches);
-    let out = blocking(&svc, move |u| u.bulk_set_metadata_values(&asset_ids, &patches)).await;
+    let out = blocking(&svc, move |u| {
+        u.bulk_set_metadata_values(&asset_ids, &patches)
+    })
+    .await;
     search.wake();
     out.map(|n| n as u64)
 }

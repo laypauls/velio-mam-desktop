@@ -62,7 +62,11 @@ fn t_hide_search_01_hidden_folder_is_excluded_including_nested_dirs_and_other_fo
     let h = SearchHandle::for_index(&idx);
 
     // Act + Assert
-    assert_eq!(ids(&h, &creq("common", hidden(&[7]))), [3, 4], "폴더 7 의 하위(a/b) 포함 제외");
+    assert_eq!(
+        ids(&h, &creq("common", hidden(&[7]))),
+        [3, 4],
+        "폴더 7 의 하위(a/b) 포함 제외"
+    );
     assert_eq!(ids(&h, &creq("common", hidden(&[8]))), [1, 2, 4]);
     assert_eq!(ids(&h, &creq("common", hidden(&[7, 8]))), [4], "여러 폴더");
     assert_eq!(h.search(&creq("common", hidden(&[7]))).unwrap().total, 2);
@@ -113,9 +117,21 @@ fn t_hide_search_04_combined_with_a_folder_filter_the_exclusion_still_applies_wh
         hidden_folder_ids: hidden_ids.to_vec(),
         ..Default::default()
     };
-    assert_eq!(ids(&h, &creq("common", f(&[7], 7))), Vec::<u64>::new(), "같은 폴더 범위 + 제외 = 없음");
-    assert_eq!(ids(&h, &creq("common", f(&[7], 8))), [3], "다른 폴더 범위는 영향 없음");
-    assert_eq!(ids(&h, &creq("common", f(&[], 7))), [1, 2], "목록 비움 = 범위 내용 표시");
+    assert_eq!(
+        ids(&h, &creq("common", f(&[7], 7))),
+        Vec::<u64>::new(),
+        "같은 폴더 범위 + 제외 = 없음"
+    );
+    assert_eq!(
+        ids(&h, &creq("common", f(&[7], 8))),
+        [3],
+        "다른 폴더 범위는 영향 없음"
+    );
+    assert_eq!(
+        ids(&h, &creq("common", f(&[], 7))),
+        [1, 2],
+        "목록 비움 = 범위 내용 표시"
+    );
 }
 
 #[test]

@@ -43,7 +43,10 @@ fn t_hide_db_01_upgrade_from_v13_defaults_existing_folder_to_visible() {
     let report = migrate(&mut db.conn, &db.backup_dir, &FixedClock(T0 + 1)).unwrap();
 
     // Assert
-    assert_eq!(report.applied, vec![14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]);
+    assert_eq!(
+        report.applied,
+        vec![14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
+    );
     let hidden: i64 = db
         .conn
         .query_row("SELECT hidden FROM managed_folders", [], |r| r.get(0))
@@ -68,7 +71,17 @@ fn t_hide_db_02_check_constraint_rejects_values_other_than_0_or_1() {
         .unwrap();
 
     // Act + Assert
-    assert!(db.conn.execute("UPDATE managed_folders SET hidden = 2", []).is_err());
-    assert!(db.conn.execute("UPDATE managed_folders SET hidden = NULL", []).is_err());
-    db.conn.execute("UPDATE managed_folders SET hidden = 1", []).unwrap();
+    assert!(
+        db.conn
+            .execute("UPDATE managed_folders SET hidden = 2", [])
+            .is_err()
+    );
+    assert!(
+        db.conn
+            .execute("UPDATE managed_folders SET hidden = NULL", [])
+            .is_err()
+    );
+    db.conn
+        .execute("UPDATE managed_folders SET hidden = 1", [])
+        .unwrap();
 }

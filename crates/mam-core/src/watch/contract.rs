@@ -41,8 +41,14 @@ pub(super) fn check_id(d: &dyn ChangeDetector) {
     let id = d.id();
     let mut chars = id.chars();
     assert!(chars.next().is_some_and(|c| c.is_ascii_lowercase()), "{id}");
-    assert!(chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'), "{id}");
-    assert!(SHIPPED_DETECTOR_IDS.contains(&id), "{id} must be listed in SHIPPED_DETECTOR_IDS");
+    assert!(
+        chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'),
+        "{id}"
+    );
+    assert!(
+        SHIPPED_DETECTOR_IDS.contains(&id),
+        "{id} must be listed in SHIPPED_DETECTOR_IDS"
+    );
 }
 
 pub(super) fn check_options(d: &dyn ChangeDetector) {
@@ -53,19 +59,31 @@ pub(super) fn check_options(d: &dyn ChangeDetector) {
 }
 
 pub(super) fn check_probe(d: &dyn ChangeDetector) {
-    for kind in [VolumeKind::Fixed, VolumeKind::Removable, VolumeKind::Network] {
+    for kind in [
+        VolumeKind::Fixed,
+        VolumeKind::Removable,
+        VolumeKind::Network,
+    ] {
         let t = target(1, PathBuf::from("."), kind);
         let started = Instant::now();
         let r = d.probe(&t);
-        assert!(started.elapsed() < Duration::from_millis(500), "probe must be cheap");
+        assert!(
+            started.elapsed() < Duration::from_millis(500),
+            "probe must be cheap"
+        );
         if let ProbeResult::Unavailable { reason_key } = r {
-            assert!(!COLLIDING_KEYS.contains(&reason_key), "{reason_key} collides");
+            assert!(
+                !COLLIDING_KEYS.contains(&reason_key),
+                "{reason_key} collides"
+            );
         }
     }
 }
 
 fn mtime(p: &std::path::Path) -> SystemTime {
-    std::fs::metadata(p).and_then(|m| m.modified()).expect("mtime")
+    std::fs::metadata(p)
+        .and_then(|m| m.modified())
+        .expect("mtime")
 }
 
 /// 불변 조건 2·3: 시작·중지가 원본을 바꾸지 않고, 중지 뒤 핸들이 유한 시간 안에 풀린다.
@@ -80,12 +98,18 @@ pub(super) fn check_release_and_original(d: Arc<dyn ChangeDetector>, emits: bool
     let out = m.start(&t, None, None);
     assert!(out.started_now);
     if emits {
-        assert!(m.live_tokens() >= 1, "an emitting detector holds a release token");
+        assert!(
+            m.live_tokens() >= 1,
+            "an emitting detector holds a release token"
+        );
     }
     std::fs::write(dir.path().join("new.txt"), b"x").expect("write");
     m.stop(1);
 
-    assert!(m.wait_released(Duration::from_secs(5)), "handle must be released after stop");
+    assert!(
+        m.wait_released(Duration::from_secs(5)),
+        "handle must be released after stop"
+    );
     let after = (std::fs::read(&fixture).expect("read"), mtime(&fixture));
     assert_eq!(before, after, "original must be untouched");
 }
@@ -94,7 +118,11 @@ pub(super) fn check_release_and_original(d: Arc<dyn ChangeDetector>, emits: bool
 pub(super) fn check_emits_path(d: Arc<dyn ChangeDetector>) {
     let dir = tempfile::tempdir().expect("tempdir");
     let (m, rx) = manager_for(d);
-    m.start(&target(1, dir.path().to_path_buf(), VolumeKind::Fixed), None, None);
+    m.start(
+        &target(1, dir.path().to_path_buf(), VolumeKind::Fixed),
+        None,
+        None,
+    );
     std::fs::write(dir.path().join("created.txt"), b"x").expect("write");
     let deadline = Instant::now() + Duration::from_secs(5);
     let mut got = false;
@@ -147,16 +175,25 @@ pub(super) fn check_message_semantics(d: Arc<dyn ChangeDetector>, emits: bool) {
     }
     m.stop_all();
     if !emits {
-        assert!(msgs.is_empty(), "a detector that does not emit must stay silent: {msgs:?}");
+        assert!(
+            msgs.is_empty(),
+            "a detector that does not emit must stay silent: {msgs:?}"
+        );
         return;
     }
-    assert!(!msgs.is_empty(), "an emitting detector must report the change");
+    assert!(
+        !msgs.is_empty(),
+        "an emitting detector must report the change"
+    );
     for msg in &msgs {
         assert_eq!(msg.folder_id(), 1, "{msg:?}");
         match msg {
             WatchMsg::Path { path, .. } => assert!(path.starts_with(&root), "{msg:?}"),
             WatchMsg::Subtree { dir, .. } => {
-                assert!(dir.starts_with(&root) && dir != &root, "subtree must be below the root: {msg:?}")
+                assert!(
+                    dir.starts_with(&root) && dir != &root,
+                    "subtree must be below the root: {msg:?}"
+                )
             }
             WatchMsg::Rescan { .. } => {}
         }

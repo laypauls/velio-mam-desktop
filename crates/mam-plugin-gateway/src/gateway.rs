@@ -79,7 +79,16 @@ impl Gateway {
     pub fn new(pool: Arc<DbPool>, clock: SharedClock, cfg: GatewayConfig) -> Self {
         let userdata = UserData::new(Arc::clone(&pool), Arc::clone(&clock));
         let limiter = LogLimiter::new(cfg.log_per_sec, cfg.log_burst);
-        Self { pool, clock, userdata, cfg, grants: Arc::new(GrantRegistry::default()), meters: Meters::default(), limiter, sink: Arc::new(TracingSink) }
+        Self {
+            pool,
+            clock,
+            userdata,
+            cfg,
+            grants: Arc::new(GrantRegistry::default()),
+            meters: Meters::default(),
+            limiter,
+            sink: Arc::new(TracingSink),
+        }
     }
 
     /// 로그 출력 대상을 바꾼다 (시험·진단)
@@ -116,7 +125,11 @@ impl Gateway {
 
     /// 호출 범위 안의 자산인가 — DB 접근 전에 한다. 범위 밖과 없는 자산은 같은 `not_found`
     pub(crate) fn in_scope(cx: &CallCx<'_>, asset_id: i64) -> Result<(), GwError> {
-        if cx.scope.contains(asset_id) { Ok(()) } else { Err(GwError::NotFound) }
+        if cx.scope.contains(asset_id) {
+            Ok(())
+        } else {
+            Err(GwError::NotFound)
+        }
     }
 
     fn dispatch(&self, cx: &CallCx<'_>, method: &str, params: Value) -> Result<Value, GwError> {
@@ -145,7 +158,8 @@ impl Gateway {
 
 impl HostApi for Gateway {
     fn call(&self, cx: &CallCx<'_>, method: &str, params: Value) -> Result<Value, HostError> {
-        self.dispatch(cx, method, params).map_err(|e| e.into_host(cx.plugin.as_str(), method))
+        self.dispatch(cx, method, params)
+            .map_err(|e| e.into_host(cx.plugin.as_str(), method))
     }
 
     fn log(&self, cx: &CallCx<'_>, level: LogLevel, message: &str) {
@@ -157,7 +171,10 @@ impl HostApi for Gateway {
         let id = cx.plugin.as_str();
         match self.limiter.admit(id, Instant::now()) {
             Admit::Drop => return,
-            Admit::Pass(Some(n)) => self.sink.emit(id, LogLevel::Warn, &format!("{n} messages dropped")),
+            Admit::Pass(Some(n)) => {
+                self.sink
+                    .emit(id, LogLevel::Warn, &format!("{n} messages dropped"))
+            }
             Admit::Pass(None) => {}
         }
         self.sink.emit(id, level, &sanitize(message));

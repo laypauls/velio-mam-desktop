@@ -17,12 +17,21 @@ pub(crate) fn remove_confined(root: &Path, target: &Path) -> io::Result<()> {
     if ft.is_symlink() {
         return fs::remove_file(target).or_else(|_| fs::remove_dir(target));
     }
-    let outside = || io::Error::new(io::ErrorKind::PermissionDenied, "path is outside the plugins folder");
+    let outside = || {
+        io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "path is outside the plugins folder",
+        )
+    };
     let (root_c, target_c) = (fs::canonicalize(root)?, fs::canonicalize(target)?);
     if !is_same_or_inside(&target_c, &root_c) || is_same_or_inside(&root_c, &target_c) {
         return Err(outside());
     }
-    if ft.is_dir() { fs::remove_dir_all(target) } else { fs::remove_file(target) }
+    if ft.is_dir() {
+        fs::remove_dir_all(target)
+    } else {
+        fs::remove_file(target)
+    }
 }
 
 #[cfg(test)]

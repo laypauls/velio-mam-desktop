@@ -53,13 +53,27 @@ struct FakeFs {
 impl FakeFs {
     fn new() -> Arc<Self> {
         let root = PathBuf::from("/lib");
-        let mut inner = Inner { clock: OLD, ..Inner::default() };
-        inner.dirs.insert(root.clone(), FDir { mtime: OLD, ..FDir::default() });
-        Arc::new(Self { root, inner: Mutex::new(inner) })
+        let mut inner = Inner {
+            clock: OLD,
+            ..Inner::default()
+        };
+        inner.dirs.insert(
+            root.clone(),
+            FDir {
+                mtime: OLD,
+                ..FDir::default()
+            },
+        );
+        Arc::new(Self {
+            root,
+            inner: Mutex::new(inner),
+        })
     }
 
     fn p(&self, rel: &str) -> PathBuf {
-        rel.split('/').filter(|s| !s.is_empty()).fold(self.root.clone(), |acc, s| acc.join(s))
+        rel.split('/')
+            .filter(|s| !s.is_empty())
+            .fold(self.root.clone(), |acc, s| acc.join(s))
     }
 
     fn with<T>(&self, f: impl FnOnce(&mut Inner) -> T) -> T {
@@ -79,10 +93,20 @@ impl FakeFs {
         let path = self.p(rel);
         self.with(|i| {
             let parent = path.parent().unwrap().to_path_buf();
-            i.dirs.get_mut(&parent).unwrap().dirs.insert(path.file_name().unwrap().to_string_lossy().into_owned());
+            i.dirs
+                .get_mut(&parent)
+                .unwrap()
+                .dirs
+                .insert(path.file_name().unwrap().to_string_lossy().into_owned());
             i.clock += MS;
             let t = i.clock;
-            i.dirs.insert(path, FDir { mtime: t, ..FDir::default() });
+            i.dirs.insert(
+                path,
+                FDir {
+                    mtime: t,
+                    ..FDir::default()
+                },
+            );
             Self::touch(i, &parent, true);
         });
     }
@@ -95,7 +119,11 @@ impl FakeFs {
         let path = self.p(rel);
         self.with(|i| {
             let dir = path.parent().unwrap().to_path_buf();
-            i.dirs.get_mut(&dir).unwrap().files.insert(path.file_name().unwrap().to_string_lossy().into_owned());
+            i.dirs
+                .get_mut(&dir)
+                .unwrap()
+                .files
+                .insert(path.file_name().unwrap().to_string_lossy().into_owned());
             Self::touch(i, &dir, bump);
         });
     }
@@ -104,7 +132,11 @@ impl FakeFs {
         let path = self.p(rel);
         self.with(|i| {
             let dir = path.parent().unwrap().to_path_buf();
-            i.dirs.get_mut(&dir).unwrap().files.remove(path.file_name().unwrap().to_string_lossy().as_ref());
+            i.dirs
+                .get_mut(&dir)
+                .unwrap()
+                .files
+                .remove(path.file_name().unwrap().to_string_lossy().as_ref());
             Self::touch(i, &dir, true);
         });
     }
@@ -118,7 +150,11 @@ impl FakeFs {
         let path = self.p(rel);
         self.with(|i| {
             let parent = path.parent().unwrap().to_path_buf();
-            i.dirs.get_mut(&parent).unwrap().dirs.remove(path.file_name().unwrap().to_string_lossy().as_ref());
+            i.dirs
+                .get_mut(&parent)
+                .unwrap()
+                .dirs
+                .remove(path.file_name().unwrap().to_string_lossy().as_ref());
             i.dirs.retain(|k, _| !k.starts_with(&path));
             Self::touch(i, &parent, true);
         });
@@ -165,7 +201,12 @@ impl PollFs for FakeFs {
 }
 
 fn rel(fs: &FakeFs, p: &Path) -> String {
-    p.strip_prefix(&fs.root).unwrap().components().map(|c| c.as_os_str().to_string_lossy().into_owned()).collect::<Vec<_>>().join("/")
+    p.strip_prefix(&fs.root)
+        .unwrap()
+        .components()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .collect::<Vec<_>>()
+        .join("/")
 }
 
 /// 변경을 "P:상대경로" / "S:상대경로" 집합으로 본다
@@ -219,7 +260,8 @@ fn t_poll_01_baseline_reports_nothing_and_an_unchanged_tick_only_stats_directori
 }
 
 #[test]
-fn t_poll_02_add_delete_and_rename_in_a_nested_directory_are_reported_as_paths_and_only_that_directory_is_listed() {
+fn t_poll_02_add_delete_and_rename_in_a_nested_directory_are_reported_as_paths_and_only_that_directory_is_listed()
+ {
     // Arrange
     let fs = tree();
     let mut snap = baseline(&fs);
@@ -232,8 +274,15 @@ fn t_poll_02_add_delete_and_rename_in_a_nested_directory_are_reported_as_paths_a
     let out = tick(&fs, &mut snap);
 
     // Assert
-    assert_eq!(set(&fs, &out.changes), strs(&["P:a/deep/z.txt", "P:a/deep/renamed.txt"]));
-    assert_eq!(fs.lists() - before, 1, "only the changed directory is listed");
+    assert_eq!(
+        set(&fs, &out.changes),
+        strs(&["P:a/deep/z.txt", "P:a/deep/renamed.txt"])
+    );
+    assert_eq!(
+        fs.lists() - before,
+        1,
+        "only the changed directory is listed"
+    );
     // 한 번 더 — 바뀐 폴더는 확인용으로 다시 읽지만 새 변경은 없다, 그다음엔 읽지 않는다
     let again = tick(&fs, &mut snap);
     assert!(again.changes.is_empty());
@@ -258,7 +307,10 @@ fn t_poll_03_new_directory_is_one_subtree_and_its_contents_join_the_snapshot_sil
     assert_eq!(snap.dir_count(), 6);
     // 새 폴더 안의 이후 변경은 스냅숏에 있어 Path 로 잡힌다
     fs.add_file("b/new/inner/g.txt");
-    assert_eq!(set(&fs, &tick(&fs, &mut snap).changes), strs(&["P:b/new/inner/g.txt"]));
+    assert_eq!(
+        set(&fs, &tick(&fs, &mut snap).changes),
+        strs(&["P:b/new/inner/g.txt"])
+    );
 }
 
 #[test]
@@ -276,12 +328,16 @@ fn t_poll_04_content_only_change_is_not_detected_documented_limitation() {
 }
 
 #[test]
-fn t_poll_05_a_change_in_the_same_timestamp_slot_after_a_listing_is_found_by_the_verification_read() {
+fn t_poll_05_a_change_in_the_same_timestamp_slot_after_a_listing_is_found_by_the_verification_read()
+{
     // Arrange
     let fs = tree();
     let mut snap = baseline(&fs);
     fs.add_file("b/first.txt");
-    assert_eq!(set(&fs, &tick(&fs, &mut snap).changes), strs(&["P:b/first.txt"]));
+    assert_eq!(
+        set(&fs, &tick(&fs, &mut snap).changes),
+        strs(&["P:b/first.txt"])
+    );
 
     // Act: 목록을 읽은 뒤 같은 시각 칸에서 또 생겼다 — 수정 시각이 그대로다
     fs.add_file_with("b/second.txt", false);
@@ -372,7 +428,12 @@ impl ChangeDetector for Parking {
     fn probe(&self, _t: &WatchTarget) -> ProbeResult {
         ProbeResult::Available
     }
-    fn start(&self, _t: &WatchTarget, _o: &DetectorOptions, sink: ChangeSink) -> Result<Box<dyn WatchHandle>, DetectError> {
+    fn start(
+        &self,
+        _t: &WatchTarget,
+        _o: &DetectorOptions,
+        sink: ChangeSink,
+    ) -> Result<Box<dyn WatchHandle>, DetectError> {
         *self.0.lock().unwrap() = Some(sink);
         Ok(Box::new(Handle))
     }
@@ -390,11 +451,24 @@ impl Rig {
     fn new(fs: Arc<FakeFs>) -> Self {
         let slot = Arc::new(Mutex::new(None));
         let (tx, rx) = std::sync::mpsc::channel();
-        let registry = Arc::new(DetectorRegistry::new(vec![Arc::new(Parking(Arc::clone(&slot)))], &["polling"]));
+        let registry = Arc::new(DetectorRegistry::new(
+            vec![Arc::new(Parking(Arc::clone(&slot)))],
+            &["polling"],
+        ));
         let m = WatchManager::new(tx, registry);
-        m.start(&target(1, fs.root.clone(), crate::volume::VolumeKind::Network), None, None);
+        m.start(
+            &target(1, fs.root.clone(), crate::volume::VolumeKind::Network),
+            None,
+            None,
+        );
         let sink = slot.lock().unwrap().take().unwrap();
-        Self { m, rx, sink, fs, poller: Poller::default() }
+        Self {
+            m,
+            rx,
+            sink,
+            fs,
+            poller: Poller::default(),
+        }
     }
 
     fn step(&mut self) -> Vec<WatchMsg> {
@@ -423,7 +497,12 @@ fn t_poll_09_first_step_builds_the_baseline_silently_and_health_stays_ok() {
     // Assert
     assert!(msgs.is_empty());
     assert!(rig.poller.snapshot().is_some());
-    assert!(matches!(rig.health(), SourceHealth::Ok { last_signal_at: None }));
+    assert!(matches!(
+        rig.health(),
+        SourceHealth::Ok {
+            last_signal_at: None
+        }
+    ));
 }
 
 #[test]
@@ -440,13 +519,25 @@ fn t_poll_10_changes_become_messages_for_the_folder_and_update_the_last_signal()
     // Assert
     assert_eq!(msgs.len(), 2);
     assert!(msgs.iter().all(|m| m.folder_id() == 1));
-    assert!(msgs.iter().any(|m| matches!(m, WatchMsg::Path { path, .. } if path.ends_with("new.txt"))));
-    assert!(msgs.iter().any(|m| matches!(m, WatchMsg::Subtree { dir, .. } if dir.ends_with("fresh"))));
-    assert!(matches!(rig.health(), SourceHealth::Ok { last_signal_at: Some(_) }));
+    assert!(
+        msgs.iter()
+            .any(|m| matches!(m, WatchMsg::Path { path, .. } if path.ends_with("new.txt")))
+    );
+    assert!(
+        msgs.iter()
+            .any(|m| matches!(m, WatchMsg::Subtree { dir, .. } if dir.ends_with("fresh")))
+    );
+    assert!(matches!(
+        rig.health(),
+        SourceHealth::Ok {
+            last_signal_at: Some(_)
+        }
+    ));
 }
 
 #[test]
-fn t_poll_11_unresponsive_tick_degrades_keeps_the_snapshot_and_recovery_sends_one_rescan_plus_the_gap_changes() {
+fn t_poll_11_unresponsive_tick_degrades_keeps_the_snapshot_and_recovery_sends_one_rescan_plus_the_gap_changes()
+ {
     // Arrange
     let mut rig = Rig::new(tree());
     rig.step();
@@ -458,7 +549,13 @@ fn t_poll_11_unresponsive_tick_degrades_keeps_the_snapshot_and_recovery_sends_on
 
     // Assert 1: 보고 없음(삭제로 오해해 아무것도 지우지 않는다), Degraded + 사유 키
     assert!(during.is_empty());
-    assert!(matches!(rig.health(), SourceHealth::Degraded { reason_key: HEALTH_TIMEOUT, .. }));
+    assert!(matches!(
+        rig.health(),
+        SourceHealth::Degraded {
+            reason_key: HEALTH_TIMEOUT,
+            ..
+        }
+    ));
     assert!(rig.poller.failing);
     assert_eq!(rig.poller.snapshot().unwrap().dir_count(), 4);
     // 계속 실패해도 Rescan 은 없다
@@ -470,7 +567,11 @@ fn t_poll_11_unresponsive_tick_degrades_keeps_the_snapshot_and_recovery_sends_on
 
     // Assert 2: 밀린 변경은 Path 로, 간격을 덮는 Rescan 은 정확히 한 번, 상태는 Ok
     assert_eq!(after.iter().filter(|m| is_rescan(m)).count(), 1);
-    assert!(after.iter().any(|m| matches!(m, WatchMsg::Path { path, .. } if path.ends_with("during.txt"))));
+    assert!(
+        after
+            .iter()
+            .any(|m| matches!(m, WatchMsg::Path { path, .. } if path.ends_with("during.txt")))
+    );
     assert!(matches!(rig.health(), SourceHealth::Ok { .. }));
     assert!(rig.step().is_empty(), "no second rescan");
 }
@@ -488,7 +589,13 @@ fn t_poll_12_baseline_failure_degrades_then_recovery_builds_it_with_one_rescan_a
     // Assert 1
     assert!(first.is_empty());
     assert!(rig.poller.snapshot().is_none());
-    assert!(matches!(rig.health(), SourceHealth::Degraded { reason_key: HEALTH_ERROR, .. }));
+    assert!(matches!(
+        rig.health(),
+        SourceHealth::Degraded {
+            reason_key: HEALTH_ERROR,
+            ..
+        }
+    ));
 
     // Act 2
     rig.fs.set_fail(None);
@@ -502,7 +609,8 @@ fn t_poll_12_baseline_failure_degrades_then_recovery_builds_it_with_one_rescan_a
 }
 
 #[test]
-fn t_poll_13_a_failure_in_one_directory_keeps_earlier_directories_reported_and_leaves_that_one_for_the_next_tick() {
+fn t_poll_13_a_failure_in_one_directory_keeps_earlier_directories_reported_and_leaves_that_one_for_the_next_tick()
+ {
     // Arrange
     let fs = tree();
     let mut snap = baseline(&fs);
@@ -522,10 +630,19 @@ fn t_poll_13_a_failure_in_one_directory_keeps_earlier_directories_reported_and_l
     // Act 2: 회복 — 남은 변경이 모두 한 번씩만 나온다
     fs.with(|i| i.fail_list_at = None);
     let rest = tick(&fs, &mut snap);
-    let all: Vec<_> = out.changes.iter().chain(rest.changes.iter()).cloned().collect();
+    let all: Vec<_> = out
+        .changes
+        .iter()
+        .chain(rest.changes.iter())
+        .cloned()
+        .collect();
 
     // Assert 2
-    assert_eq!(all.len(), 2, "each change is reported exactly once: {all:?}");
+    assert_eq!(
+        all.len(),
+        2,
+        "each change is reported exactly once: {all:?}"
+    );
     assert_eq!(set(&fs, &all), strs(&["P:a/early.txt", "P:b/late.txt"]));
     let _ = (a, b);
 }
@@ -548,7 +665,12 @@ fn t_poll_14_more_changes_than_the_cap_are_replaced_by_one_rescan() {
     let msgs = rig.step();
 
     // Assert
-    assert_eq!(msgs.iter().filter(|m| matches!(m, WatchMsg::Path { .. })).count(), MAX_CHANGES_PER_TICK);
+    assert_eq!(
+        msgs.iter()
+            .filter(|m| matches!(m, WatchMsg::Path { .. }))
+            .count(),
+        MAX_CHANGES_PER_TICK
+    );
     assert_eq!(msgs.iter().filter(|m| is_rescan(m)).count(), 1);
 }
 
@@ -563,11 +685,29 @@ fn t_poll_15_interval_option_range_type_and_default_are_validated_and_declared()
     assert_eq!(d.id(), "polling");
     assert!(d.experimental());
     assert_eq!(d.option_fields(), FIELDS);
-    assert_eq!((FIELDS[0].min, FIELDS[0].max, FIELDS[0].default), (60, 86_400, 300));
+    assert_eq!(
+        (FIELDS[0].min, FIELDS[0].max, FIELDS[0].default),
+        (60, 86_400, 300)
+    );
     // 경계는 포함, 기본값은 저장하지 않는다
-    assert_eq!(d.parse_options(Some(&json!({"intervalSec": 60}))).unwrap().get_i64("intervalSec"), Some(60));
-    assert_eq!(d.parse_options(Some(&json!({"intervalSec": 86_400}))).unwrap().get_i64("intervalSec"), Some(86_400));
-    assert_eq!(d.parse_options(Some(&json!({"intervalSec": 300}))).unwrap().to_stored(), None);
+    assert_eq!(
+        d.parse_options(Some(&json!({"intervalSec": 60})))
+            .unwrap()
+            .get_i64("intervalSec"),
+        Some(60)
+    );
+    assert_eq!(
+        d.parse_options(Some(&json!({"intervalSec": 86_400})))
+            .unwrap()
+            .get_i64("intervalSec"),
+        Some(86_400)
+    );
+    assert_eq!(
+        d.parse_options(Some(&json!({"intervalSec": 300})))
+            .unwrap()
+            .to_stored(),
+        None
+    );
     // 거부: 하한 미만·상한 초과·잘못된 형·알 수 없는 키
     for bad in [
         json!({"intervalSec": 59}),
@@ -579,7 +719,13 @@ fn t_poll_15_interval_option_range_type_and_default_are_validated_and_declared()
         json!({"intervalSec": null}),
         json!({"interval": 60}),
     ] {
-        assert!(matches!(d.parse_options(Some(&bad)), Err(DetectError::InvalidOptions { .. })), "{bad}");
+        assert!(
+            matches!(
+                d.parse_options(Some(&bad)),
+                Err(DetectError::InvalidOptions { .. })
+            ),
+            "{bad}"
+        );
     }
 }
 
@@ -588,20 +734,38 @@ fn t_poll_16_polling_is_registered_but_never_picked_by_automatic_selection() {
     // Arrange
     let registry = DetectorRegistry::platform_default();
 
-    for kind in [crate::volume::VolumeKind::Fixed, crate::volume::VolumeKind::Removable, crate::volume::VolumeKind::Network] {
+    for kind in [
+        crate::volume::VolumeKind::Fixed,
+        crate::volume::VolumeKind::Removable,
+        crate::volume::VolumeKind::Network,
+    ] {
         // Act: 자동 (저장된 방식 없음)
         let plan = registry.plan(&target(1, PathBuf::from("."), kind), None, None);
 
         // Assert
-        assert!(plan.candidates.iter().all(|c| c.detector.id() != "polling"), "{kind:?}");
+        assert!(
+            plan.candidates.iter().all(|c| c.detector.id() != "polling"),
+            "{kind:?}"
+        );
     }
     // 사용자가 고르면 쓴다 (옵션 포함)
-    let explicit = registry.plan(&target(1, PathBuf::from("."), crate::volume::VolumeKind::Network), Some("polling"), Some(r#"{"intervalSec":120}"#));
+    let explicit = registry.plan(
+        &target(1, PathBuf::from("."), crate::volume::VolumeKind::Network),
+        Some("polling"),
+        Some(r#"{"intervalSec":120}"#),
+    );
     assert_eq!(explicit.candidates[0].detector.id(), "polling");
-    assert_eq!(explicit.candidates[0].options.get_i64("intervalSec"), Some(120));
+    assert_eq!(
+        explicit.candidates[0].options.get_i64("intervalSec"),
+        Some(120)
+    );
     assert!(explicit.reason.is_none());
     // 저장된 옵션이 범위 밖이면 자동으로 폴백한다
-    let bad = registry.plan(&target(1, PathBuf::from("."), crate::volume::VolumeKind::Network), Some("polling"), Some(r#"{"intervalSec":5}"#));
+    let bad = registry.plan(
+        &target(1, PathBuf::from("."), crate::volume::VolumeKind::Network),
+        Some("polling"),
+        Some(r#"{"intervalSec":5}"#),
+    );
     assert!(bad.candidates.iter().all(|c| c.detector.id() != "polling") && bad.reason.is_some());
 }
 
@@ -616,14 +780,19 @@ struct Gate {
 
 impl Gate {
     fn new() -> Arc<Self> {
-        Arc::new(Self { open: Mutex::new(false), cv: Condvar::new(), entered: std::sync::atomic::AtomicUsize::new(0) })
+        Arc::new(Self {
+            open: Mutex::new(false),
+            cv: Condvar::new(),
+            entered: std::sync::atomic::AtomicUsize::new(0),
+        })
     }
     fn open(&self) {
         *self.open.lock().unwrap() = true;
         self.cv.notify_all();
     }
     fn wait(&self) {
-        self.entered.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.entered
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let g = self.open.lock().unwrap();
         let _g = self.cv.wait_while(g, |o| !*o).unwrap();
     }
@@ -657,7 +826,10 @@ fn guarded(gate: &Arc<Gate>, cfg: IoGuardConfig, stop: &Arc<StopSignal>) -> Guar
 fn t_poll_17_hung_call_times_out_without_piling_up_threads_and_recovers_when_released() {
     // Arrange
     let gate = Gate::new();
-    let cfg = IoGuardConfig { timeout: Duration::from_millis(150), max_per_volume: 1 };
+    let cfg = IoGuardConfig {
+        timeout: Duration::from_millis(150),
+        max_per_volume: 1,
+    };
     let g = guarded(&gate, cfg, &Arc::new(StopSignal::default()));
 
     // Act 1: 막힌 호출 -> 제한 시간 후 TimedOut (스레드 1개가 뒤에서 막혀 있다)
@@ -671,8 +843,15 @@ fn t_poll_17_hung_call_times_out_without_piling_up_threads_and_recovers_when_rel
     assert!(started.elapsed() < Duration::from_secs(3));
     assert_eq!(second, Err(PollError::TimedOut));
     // 시계가 아니라 호출 수로 확인한다: 상한에 닿은 두 번째 검사는 파일 호출을 시작하지 않았다
-    assert!(gate.entered.load(std::sync::atomic::Ordering::SeqCst) <= 1, "cap hit never starts a call");
-    assert_eq!(g.guard.live_checks(1), 1, "no extra threads for blocked calls");
+    assert!(
+        gate.entered.load(std::sync::atomic::Ordering::SeqCst) <= 1,
+        "cap hit never starts a call"
+    );
+    assert_eq!(
+        g.guard.live_checks(1),
+        1,
+        "no extra threads for blocked calls"
+    );
 
     // Act 2: 풀린다 -> 다음 호출은 성공
     gate.open();
@@ -686,12 +865,27 @@ fn t_poll_17_hung_call_times_out_without_piling_up_threads_and_recovers_when_rel
 fn t_poll_18_stop_ends_the_thread_promptly_even_while_the_volume_is_hung() {
     // Arrange: 막힌 네트워크 볼륨 + 아주 긴 간격
     let gate = Gate::new();
-    let cfg = IoGuardConfig { timeout: Duration::from_secs(30), max_per_volume: 4 };
-    let d = Arc::new(Polling::for_tests(Some(Arc::new(Hung(Arc::clone(&gate)))), Duration::from_secs(3600), cfg));
+    let cfg = IoGuardConfig {
+        timeout: Duration::from_secs(30),
+        max_per_volume: 4,
+    };
+    let d = Arc::new(Polling::for_tests(
+        Some(Arc::new(Hung(Arc::clone(&gate)))),
+        Duration::from_secs(3600),
+        cfg,
+    ));
     let (m, _rx) = manager_for(d);
     let dir = tempfile::tempdir().unwrap();
     let started = Instant::now();
-    m.start(&target(1, dir.path().to_path_buf(), crate::volume::VolumeKind::Network), None, None);
+    m.start(
+        &target(
+            1,
+            dir.path().to_path_buf(),
+            crate::volume::VolumeKind::Network,
+        ),
+        None,
+        None,
+    );
 
     // Act
     m.stop(1);
@@ -699,7 +893,11 @@ fn t_poll_18_stop_ends_the_thread_promptly_even_while_the_volume_is_hung() {
 
     // Assert: 막힌 호출이 30초 제한을 채우도록 기다리지 않는다
     assert!(released);
-    assert!(started.elapsed() < Duration::from_secs(3), "{:?}", started.elapsed());
+    assert!(
+        started.elapsed() < Duration::from_secs(3),
+        "{:?}",
+        started.elapsed()
+    );
     gate.open(); // 뒤에서 막혀 있던 검사 스레드를 정리한다
 }
 
@@ -707,9 +905,21 @@ fn t_poll_18_stop_ends_the_thread_promptly_even_while_the_volume_is_hung() {
 fn t_poll_19_stop_during_the_idle_wait_releases_immediately_for_a_local_folder() {
     // Arrange
     let dir = tempfile::tempdir().unwrap();
-    let d = Arc::new(Polling::for_tests(None, Duration::from_secs(3600), IoGuardConfig::default()));
+    let d = Arc::new(Polling::for_tests(
+        None,
+        Duration::from_secs(3600),
+        IoGuardConfig::default(),
+    ));
     let (m, _rx) = manager_for(d);
-    m.start(&target(1, dir.path().to_path_buf(), crate::volume::VolumeKind::Fixed), None, None);
+    m.start(
+        &target(
+            1,
+            dir.path().to_path_buf(),
+            crate::volume::VolumeKind::Fixed,
+        ),
+        None,
+        None,
+    );
     assert!(m.live_tokens() >= 1);
 
     // Act
@@ -718,13 +928,20 @@ fn t_poll_19_stop_during_the_idle_wait_releases_immediately_for_a_local_folder()
 
     // Assert
     assert!(m.wait_released(Duration::from_secs(2)));
-    assert!(started.elapsed() < Duration::from_secs(1), "{:?}", started.elapsed());
+    assert!(
+        started.elapsed() < Duration::from_secs(1),
+        "{:?}",
+        started.elapsed()
+    );
 }
 
 // ---- 실제 파일시스템 ----
 
 fn snapshot_of(p: &Path) -> (Vec<u8>, std::time::SystemTime) {
-    (std::fs::read(p).unwrap(), std::fs::metadata(p).unwrap().modified().unwrap())
+    (
+        std::fs::read(p).unwrap(),
+        std::fs::metadata(p).unwrap().modified().unwrap(),
+    )
 }
 
 #[test]
@@ -740,15 +957,39 @@ fn t_poll_20_real_directory_add_rename_delete_and_content_change_with_originals_
     let now = mam_db::Clock::now_ms(&mam_db::SystemClock);
     let mut snap = Snapshot::baseline(&StdFs, &root, now, &|| false).0.unwrap();
     let rel = |c: &Change| match c {
-        Change::Path(p) => format!("P:{}", p.strip_prefix(&root).unwrap().to_string_lossy().replace('\\', "/")),
-        Change::Subtree(p) => format!("S:{}", p.strip_prefix(&root).unwrap().to_string_lossy().replace('\\', "/")),
+        Change::Path(p) => format!(
+            "P:{}",
+            p.strip_prefix(&root)
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/")
+        ),
+        Change::Subtree(p) => format!(
+            "S:{}",
+            p.strip_prefix(&root)
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/")
+        ),
     };
     let run = |snap: &mut Snapshot| -> BTreeSet<String> {
-        snap.tick(&StdFs, &root, mam_db::Clock::now_ms(&mam_db::SystemClock), &|| false).changes.iter().map(rel).collect()
+        snap.tick(
+            &StdFs,
+            &root,
+            mam_db::Clock::now_ms(&mam_db::SystemClock),
+            &|| false,
+        )
+        .changes
+        .iter()
+        .map(rel)
+        .collect()
     };
 
     // Act / Assert: 내용만 바뀜 -> 미감지
-    let mut f = std::fs::OpenOptions::new().append(true).open(root.join("sub").join("grow.bin")).unwrap();
+    let mut f = std::fs::OpenOptions::new()
+        .append(true)
+        .open(root.join("sub").join("grow.bin"))
+        .unwrap();
     f.write_all(b"more-bytes").unwrap();
     drop(f);
     assert!(run(&mut snap).is_empty());
@@ -756,7 +997,11 @@ fn t_poll_20_real_directory_add_rename_delete_and_content_change_with_originals_
     std::fs::write(root.join("sub").join("new.txt"), b"x").unwrap();
     assert_eq!(run(&mut snap), strs(&["P:sub/new.txt"]));
     // 이름 변경 -> 옛 이름 + 새 이름
-    std::fs::rename(root.join("sub").join("new.txt"), root.join("sub").join("moved.txt")).unwrap();
+    std::fs::rename(
+        root.join("sub").join("new.txt"),
+        root.join("sub").join("moved.txt"),
+    )
+    .unwrap();
     assert_eq!(run(&mut snap), strs(&["P:sub/new.txt", "P:sub/moved.txt"]));
     // 삭제 -> Path, 새 폴더 -> Subtree
     std::fs::remove_file(root.join("sub").join("moved.txt")).unwrap();

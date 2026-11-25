@@ -3,7 +3,10 @@
 use super::*;
 
 fn add_media_folder(fx: &Fx) -> i64 {
-    fx.ingest.add_folder(fx.media.to_str().unwrap()).unwrap().folder_id
+    fx.ingest
+        .add_folder(fx.media.to_str().unwrap())
+        .unwrap()
+        .folder_id
 }
 
 #[test]
@@ -12,7 +15,11 @@ fn t_hide_cmd_01_unknown_folder_maps_to_the_not_found_code() {
     let fx = fixture();
 
     // Act
-    let err: CommandError = fx.ingest.set_folder_hidden(9999, true).map_err(CommandError::from).unwrap_err();
+    let err: CommandError = fx
+        .ingest
+        .set_folder_hidden(9999, true)
+        .map_err(CommandError::from)
+        .unwrap_err();
 
     // Assert
     assert_eq!(err.code(), ErrorCode::NotFound);
@@ -24,7 +31,9 @@ fn t_hide_cmd_02_toggle_is_idempotent_and_reflected_as_hidden_in_list_folders() 
     // Arrange
     let fx = fixture();
     let id = add_media_folder(&fx);
-    let hidden = |fx: &Fx| serde_json::to_value(fx.ingest.list_folders().unwrap()).unwrap()[0]["hidden"].clone();
+    let hidden = |fx: &Fx| {
+        serde_json::to_value(fx.ingest.list_folders().unwrap()).unwrap()[0]["hidden"].clone()
+    };
     assert_eq!(hidden(&fx), false);
 
     // Act + Assert
@@ -43,7 +52,11 @@ fn t_hide_cmd_03_removed_folder_maps_to_the_not_found_code() {
     fx.ingest.remove_folder(id).unwrap();
 
     // Act
-    let err = fx.ingest.set_folder_hidden(id, true).map_err(CommandError::from).unwrap_err();
+    let err = fx
+        .ingest
+        .set_folder_hidden(id, true)
+        .map_err(CommandError::from)
+        .unwrap_err();
 
     // Assert
     assert_eq!(err.code(), ErrorCode::NotFound);

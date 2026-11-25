@@ -25,13 +25,16 @@ fn register_and_scan(env: &Env) -> i64 {
 fn active_paths(env: &Env) -> Vec<String> {
     env.read(|c| {
         let mut stmt = c
-            .prepare("SELECT rel_path FROM file_locations WHERE detached_at IS NULL ORDER BY rel_path")
+            .prepare(
+                "SELECT rel_path FROM file_locations WHERE detached_at IS NULL ORDER BY rel_path",
+            )
             .unwrap();
         stmt.query_map([], |r| r.get::<_, String>(0))
             .unwrap()
             .map(|p| {
                 let p = p.unwrap();
-                p.strip_prefix("lib\\").map_or_else(|| p.clone(), str::to_owned)
+                p.strip_prefix("lib\\")
+                    .map_or_else(|| p.clone(), str::to_owned)
             })
             .collect()
     })

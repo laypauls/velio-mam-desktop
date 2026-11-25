@@ -22,7 +22,11 @@ fn pol(v: Value) -> RescanPolicy {
 }
 
 fn cx(now_ms: i64, last: Option<i64>) -> SlotCtx<'static> {
-    SlotCtx { now_ms, zone: &KST, last_full_scan_at: last }
+    SlotCtx {
+        now_ms,
+        zone: &KST,
+        last_full_scan_at: last,
+    }
 }
 
 #[test]
@@ -40,8 +44,14 @@ fn t_rpol_01_policy_is_normalized() {
             "onStart": true
         })
     );
-    let all = pol(json!({"trigger": {"kind": "schedule", "days": ["mon","tue","wed","thu","fri","sat","sun"], "at": "03:00"}}));
-    assert_eq!(all.to_json()["trigger"]["days"], json!([]), "all seven days collapse to daily");
+    let all = pol(
+        json!({"trigger": {"kind": "schedule", "days": ["mon","tue","wed","thu","fri","sat","sun"], "at": "03:00"}}),
+    );
+    assert_eq!(
+        all.to_json()["trigger"]["days"],
+        json!([]),
+        "all seven days collapse to daily"
+    );
     let again = parse_policy(&p.to_json()).unwrap();
     assert_eq!(again.to_json(), p.to_json());
 }
@@ -49,7 +59,8 @@ fn t_rpol_01_policy_is_normalized() {
 #[test]
 fn t_rpol_02_shared_fixture_matches_the_validation_table() {
     // 정본: Rust·TS 공유 픽스처 (`field` = 오류 필드 경로, null = 유효)
-    let text = include_str!("../../../tests/fixtures/rescan_policy_cases.json").replace("\r\n", "\n");
+    let text =
+        include_str!("../../../tests/fixtures/rescan_policy_cases.json").replace("\r\n", "\n");
     let cases: Vec<Value> = serde_json::from_str(&text).unwrap();
     assert!(!cases.is_empty());
     for case in &cases {
@@ -64,11 +75,20 @@ fn t_rpol_02_shared_fixture_matches_the_validation_table() {
 #[test]
 fn t_rpol_03_null_and_garbage_fall_back_to_the_global_default() {
     let (p, src) = effective_policy(None, 6);
-    assert_eq!((src, p.to_json()["trigger"].clone()), (PolicySource::Default, json!({"kind": "interval", "hours": 6})));
+    assert_eq!(
+        (src, p.to_json()["trigger"].clone()),
+        (
+            PolicySource::Default,
+            json!({"kind": "interval", "hours": 6})
+        )
+    );
     for garbage in ["not json", "[]", r#"{"trigger":{"kind":"weekly"}}"#, ""] {
         let (p, src) = effective_policy(Some(garbage), 24);
         assert_eq!(src, PolicySource::InvalidFallback, "{garbage}");
-        assert_eq!(p.to_json()["trigger"], json!({"kind": "interval", "hours": 24}));
+        assert_eq!(
+            p.to_json()["trigger"],
+            json!({"kind": "interval", "hours": 24})
+        );
     }
     let (_, src) = effective_policy(Some(r#"{"trigger":{"kind":"manual"}}"#), 6);
     assert_eq!(src, PolicySource::Folder);
@@ -82,7 +102,13 @@ fn t_rpol_10_default_policy_matches_the_old_interval_rule_exactly() {
         let interval = i64::from(h) * HOUR;
         let t = 1_700_000_000_000;
         let mut deltas: Vec<i64> = (-2 * HOUR..3 * interval).step_by(600_000).collect();
-        deltas.extend([interval - 1, interval, interval + 1, 2 * interval - 1, 2 * interval]);
+        deltas.extend([
+            interval - 1,
+            interval,
+            interval + 1,
+            2 * interval - 1,
+            2 * interval,
+        ]);
         for d in deltas {
             let c = cx(t + d, Some(t));
             assert_eq!(p.is_due(&c, false), d >= interval, "H={h} delta={d}");
@@ -121,12 +147,24 @@ fn t_rpol_13_empty_days_means_daily_and_weekday_filter_applies() {
     let mon = pol(json!({"trigger": {"kind": "schedule", "days": ["mon"], "at": "03:00"}}));
     let sat_noon = kst(2026, 11, 21, 12, 0); // 2026-11-21 은 토요일
 
-    assert_eq!(daily.trigger.last_slot(&cx(sat_noon, None)), Some(kst(2026, 11, 21, 3, 0)));
-    assert_eq!(mon.trigger.last_slot(&cx(sat_noon, None)), Some(kst(2026, 11, 16, 3, 0)));
-    assert_eq!(mon.trigger.next_slot(&cx(sat_noon, None)), Some(kst(2026, 11, 23, 3, 0)));
+    assert_eq!(
+        daily.trigger.last_slot(&cx(sat_noon, None)),
+        Some(kst(2026, 11, 21, 3, 0))
+    );
+    assert_eq!(
+        mon.trigger.last_slot(&cx(sat_noon, None)),
+        Some(kst(2026, 11, 16, 3, 0))
+    );
+    assert_eq!(
+        mon.trigger.next_slot(&cx(sat_noon, None)),
+        Some(kst(2026, 11, 23, 3, 0))
+    );
     let t = kst(2026, 11, 20, 12, 0);
     assert!(daily.is_due(&cx(sat_noon, Some(t)), false));
-    assert!(!mon.is_due(&cx(sat_noon, Some(t)), false), "no Monday slot since the last scan");
+    assert!(
+        !mon.is_due(&cx(sat_noon, Some(t)), false),
+        "no Monday slot since the last scan"
+    );
 }
 
 #[test]
@@ -153,7 +191,11 @@ fn slot_set(spec: &dyn TriggerSpec, zone: &dyn LocalZone, from: i64, to: i64) ->
     let mut slots = BTreeSet::new();
     let mut now = from;
     while now <= to {
-        let c = SlotCtx { now_ms: now, zone, last_full_scan_at: None };
+        let c = SlotCtx {
+            now_ms: now,
+            zone,
+            last_full_scan_at: None,
+        };
         slots.extend(spec.last_slot(&c));
         now += 5 * 60_000;
     }
@@ -167,11 +209,24 @@ fn t_rpol_15_dst_gap_and_overlap_give_one_slot_per_day() {
     let fall = DstZone(vec![(ms(2026, 11, 1, 6, 0), -5 * 3600)], -4 * 3600);
     let at = |hm: &str| pol(json!({"trigger": {"kind": "schedule", "days": [], "at": hm}}));
 
-    let s = slot_set(&*at("02:30").trigger, &spring, ms(2026, 3, 6, 12, 0), ms(2026, 3, 11, 12, 0));
-    let f = slot_set(&*at("01:30").trigger, &fall, ms(2026, 10, 30, 12, 0), ms(2026, 11, 3, 12, 0));
+    let s = slot_set(
+        &*at("02:30").trigger,
+        &spring,
+        ms(2026, 3, 6, 12, 0),
+        ms(2026, 3, 11, 12, 0),
+    );
+    let f = slot_set(
+        &*at("01:30").trigger,
+        &fall,
+        ms(2026, 10, 30, 12, 0),
+        ms(2026, 11, 3, 12, 0),
+    );
 
     assert_eq!(s.len(), 6);
-    assert!(s.contains(&ms(2026, 3, 8, 7, 0)), "the missing wall time maps to the transition instant");
+    assert!(
+        s.contains(&ms(2026, 3, 8, 7, 0)),
+        "the missing wall time maps to the transition instant"
+    );
     assert_eq!(f.len(), 5);
     assert!(f.contains(&ms(2026, 11, 1, 5, 30)) && !f.contains(&ms(2026, 11, 1, 6, 30)));
     for w in s.windows(2).chain(f.windows(2)) {
@@ -212,10 +267,16 @@ fn t_rpol_18_next_rescan_moves_to_the_window_start() {
     let now = kst(2026, 11, 21, 7, 0);
 
     // 슬롯 12:00 은 시간대 밖 -> 22:00
-    assert_eq!(p.next_rescan_at(&cx(now, Some(t))), Some(kst(2026, 11, 21, 22, 0)));
+    assert_eq!(
+        p.next_rescan_at(&cx(now, Some(t))),
+        Some(kst(2026, 11, 21, 22, 0))
+    );
     // 슬롯 23:00(t = 17:00) 은 시간대 안 -> 그대로
     let t2 = kst(2026, 11, 21, 17, 0);
-    assert_eq!(p.next_rescan_at(&cx(now, Some(t2))), Some(kst(2026, 11, 21, 23, 0)));
+    assert_eq!(
+        p.next_rescan_at(&cx(now, Some(t2))),
+        Some(kst(2026, 11, 21, 23, 0))
+    );
     // 이미 실행 대상이고 시간대 밖이면 다음 시작
     let due = cx(kst(2026, 11, 21, 15, 0), Some(t));
     assert!(!p.is_due(&due, false));
@@ -224,7 +285,8 @@ fn t_rpol_18_next_rescan_moves_to_the_window_start() {
 
 #[test]
 fn t_rpol_19_never_scanned_is_due_regardless_of_policy_and_window() {
-    let p = pol(json!({"trigger": {"kind": "manual"}, "window": {"start": "22:00", "end": "06:00"}}));
+    let p =
+        pol(json!({"trigger": {"kind": "manual"}, "window": {"start": "22:00", "end": "06:00"}}));
     let c = cx(kst(2026, 11, 21, 12, 0), None);
 
     assert!(p.is_due(&c, false));
@@ -252,7 +314,10 @@ fn t_rpol_21_window_gates_the_trigger() {
     }));
     let t = kst(2026, 11, 21, 8, 0);
 
-    assert!(!p.is_due(&cx(kst(2026, 11, 21, 12, 0), Some(t)), false), "due by interval but outside the window");
+    assert!(
+        !p.is_due(&cx(kst(2026, 11, 21, 12, 0), Some(t)), false),
+        "due by interval but outside the window"
+    );
     assert!(p.is_due(&cx(kst(2026, 11, 21, 23, 0), Some(t)), false));
 }
 
@@ -264,6 +329,12 @@ fn t_rpol_22_next_rescan_with_the_clock_behind_shows_a_slot_that_can_fire() {
     let daily = pol(json!({"trigger": {"kind": "schedule", "days": [], "at": "03:00"}}));
     let interval = pol(json!({"trigger": {"kind": "interval", "hours": 6}}));
 
-    assert_eq!(daily.next_rescan_at(&cx(now, Some(t))), Some(kst(2026, 11, 22, 3, 0)));
-    assert_eq!(interval.next_rescan_at(&cx(now, Some(t))), Some(t + 6 * HOUR));
+    assert_eq!(
+        daily.next_rescan_at(&cx(now, Some(t))),
+        Some(kst(2026, 11, 22, 3, 0))
+    );
+    assert_eq!(
+        interval.next_rescan_at(&cx(now, Some(t))),
+        Some(t + 6 * HOUR)
+    );
 }

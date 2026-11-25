@@ -26,7 +26,11 @@ fn scan(env: &Env, id: i64) {
 
 /// 폴더 `lib` 를 등록하고 한 번 스캔한다.
 fn registered(env: &Env) -> i64 {
-    let id = env.ingest.add_folder(env.path("lib").to_str().unwrap()).unwrap().folder_id;
+    let id = env
+        .ingest
+        .add_folder(env.path("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id;
     scan(env, id);
     env.clock.advance(5_000);
     id
@@ -46,7 +50,9 @@ fn rows(env: &Env) -> i64 {
 
 fn clear_jobs(env: &Env) {
     env.pool
-        .write(mam_db::Priority::Low, |c| Ok(c.execute("DELETE FROM jobs", [])?))
+        .write(mam_db::Priority::Low, |c| {
+            Ok(c.execute("DELETE FROM jobs", [])?)
+        })
         .unwrap();
 }
 
@@ -75,7 +81,9 @@ fn t_pending_01_same_path_reported_1000_times_is_one_row_and_a_rereport_restarts
 
     // Act: 1000 회 보고
     for _ in 0..1000 {
-        env.ingest.queue_watch_change(id, &p, PendingKind::Path).unwrap();
+        env.ingest
+            .queue_watch_change(id, &p, PendingKind::Path)
+            .unwrap();
     }
 
     // Assert: 1행
@@ -89,7 +97,9 @@ fn t_pending_01_same_path_reported_1000_times_is_one_row_and_a_rereport_restarts
     assert_eq!(env.count("SELECT stable_count FROM watch_pending"), 2);
     let due_before = env.count("SELECT due_at FROM watch_pending");
     env.clock.advance(50);
-    env.ingest.queue_watch_change(id, &p, PendingKind::Path).unwrap();
+    env.ingest
+        .queue_watch_change(id, &p, PendingKind::Path)
+        .unwrap();
     assert_eq!(rows(&env), 1);
     assert_eq!(env.count("SELECT stable_count FROM watch_pending"), 0);
     assert!(env.count("SELECT due_at FROM watch_pending") > due_before);
@@ -102,10 +112,15 @@ fn t_pending_02_copy_that_stalls_over_two_seconds_yields_exactly_one_asset_and_n
     let env = Env::with_config(prod_gate);
     let orig = env.write("lib/a.jpg", 1);
     let id = registered(&env);
-    let before = snapshot(&env.vol.join("lib")).into_iter().filter(|e| e.0 == "a.jpg").collect::<Vec<_>>();
+    let before = snapshot(&env.vol.join("lib"))
+        .into_iter()
+        .filter(|e| e.0 == "a.jpg")
+        .collect::<Vec<_>>();
     let copy = env.path("lib/big.jpg");
     fs::write(&copy, vec![9u8; 100]).unwrap();
-    env.ingest.queue_watch_change(id, &copy, PendingKind::Path).unwrap();
+    env.ingest
+        .queue_watch_change(id, &copy, PendingKind::Path)
+        .unwrap();
     let step = |ms: i64| {
         env.clock.advance(ms);
         pass(&env)
@@ -130,10 +145,19 @@ fn t_pending_02_copy_that_stalls_over_two_seconds_yields_exactly_one_asset_and_n
     // Assert: 자산 정확히 1개 추가, superseded 0, 행 삭제, 원본 불변
     assert_eq!(done.applied, 1);
     assert_eq!(assets(&env), 2);
-    assert_eq!(env.count("SELECT COUNT(*) FROM media_assets WHERE status = 'superseded'"), 0);
-    assert_eq!(env.count("SELECT COUNT(*) FROM media_assets WHERE file_size = 200"), 1);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM media_assets WHERE status = 'superseded'"),
+        0
+    );
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM media_assets WHERE file_size = 200"),
+        1
+    );
     assert_eq!(rows(&env), 0);
-    let after = snapshot(&env.vol.join("lib")).into_iter().filter(|e| e.0 == "a.jpg").collect::<Vec<_>>();
+    let after = snapshot(&env.vol.join("lib"))
+        .into_iter()
+        .filter(|e| e.0 == "a.jpg")
+        .collect::<Vec<_>>();
     assert_eq!(before, after, "original must be untouched");
     let _ = orig;
 }
@@ -152,7 +176,11 @@ fn second_ingest(env: &Env) -> Arc<Ingest> {
             auto_excludes: vec![env.data.clone()],
             debounce_ms: 150,
             pending: PendingConfig {
-                gate: SettleGate { samples: 3, min_gap_ms: 100, give_up_ms: 600_000 },
+                gate: SettleGate {
+                    samples: 3,
+                    min_gap_ms: 100,
+                    give_up_ms: 600_000,
+                },
                 ..PendingConfig::default()
             },
             ..IngestConfig::default()
@@ -166,7 +194,9 @@ fn t_pending_03_changes_recorded_before_a_clean_exit_are_applied_after_the_resta
     let env = Env::new();
     env.write("lib/a.jpg", 1);
     env.ingest.start().unwrap();
-    env.ingest.add_folder(env.path("lib").to_str().unwrap()).unwrap();
+    env.ingest
+        .add_folder(env.path("lib").to_str().unwrap())
+        .unwrap();
     assert!(wait_until(Duration::from_secs(30), || {
         assets(&env) == 1 && env.count("SELECT COUNT(*) FROM jobs") == 0
     }));
@@ -183,28 +213,48 @@ fn t_pending_03_changes_recorded_before_a_clean_exit_are_applied_after_the_resta
 
     // Assert 1: 자산은 아직 없고 행은 남았으며, 정상 종료라 표식은 지워졌다
     assert_eq!(assets(&env), 1);
-    assert_eq!(env.count("SELECT COUNT(*) FROM watch_pending WHERE abs_path LIKE '%new.jpg'"), 1);
-    assert_eq!(env.count("SELECT COUNT(*) FROM settings WHERE key = 'ingest_run_marker'"), 0);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM watch_pending WHERE abs_path LIKE '%new.jpg'"),
+        1
+    );
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM settings WHERE key = 'ingest_run_marker'"),
+        0
+    );
 
     // Act 2: 재시작 (같은 DB, 새 서비스) — 남은 행은 표본을 버리고 다시 확인한다
     env.pool
         .write(mam_db::Priority::Low, |c| {
-            c.execute("UPDATE watch_pending SET stable_count = 2, sample_size = 1, sample_mtime = 1", [])?;
+            c.execute(
+                "UPDATE watch_pending SET stable_count = 2, sample_size = 1, sample_mtime = 1",
+                [],
+            )?;
             Ok(())
         })
         .unwrap();
     let restarted = second_ingest(&env);
     let recovered = restarted.recover_pending().unwrap();
     assert!(recovered >= 1);
-    assert_eq!(env.count("SELECT MAX(stable_count) FROM watch_pending"), 0, "recovery drops the old samples");
+    assert_eq!(
+        env.count("SELECT MAX(stable_count) FROM watch_pending"),
+        0,
+        "recovery drops the old samples"
+    );
     for _ in 0..12 {
         env.clock.advance(200);
         restarted.process_pending_once().unwrap();
     }
 
     // Assert 2
-    assert_eq!(assets(&env), 2, "the pending file is applied after the restart");
-    assert_eq!(env.count("SELECT COUNT(*) FROM watch_pending WHERE abs_path LIKE '%new.jpg'"), 0);
+    assert_eq!(
+        assets(&env),
+        2,
+        "the pending file is applied after the restart"
+    );
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM watch_pending WHERE abs_path LIKE '%new.jpg'"),
+        0
+    );
 }
 
 #[test]
@@ -214,8 +264,13 @@ fn t_pending_04_failing_apply_backs_off_and_is_recorded_in_scan_errors_after_fiv
     env.write("lib/a.jpg", 1);
     let id = registered(&env);
     let p = env.write("lib/x.jpg", 2);
-    env.ingest.queue_watch_change(id, &p, PendingKind::Path).unwrap();
-    let fail = |_: &mam_core::scan::ScanEnv, _: i64, _: &std::path::Path| -> Result<PathAction, IngestError> {
+    env.ingest
+        .queue_watch_change(id, &p, PendingKind::Path)
+        .unwrap();
+    let fail = |_: &mam_core::scan::ScanEnv,
+                _: i64,
+                _: &std::path::Path|
+     -> Result<PathAction, IngestError> {
         Err(IngestError::Io(std::io::Error::other("share is flaky")))
     };
 
@@ -257,10 +312,13 @@ fn t_pending_05_unreadable_result_is_retried_but_not_recorded_twice() {
     env.write("lib/a.jpg", 1);
     let id = registered(&env);
     let p = env.write("lib/x.jpg", 2);
-    env.ingest.queue_watch_change(id, &p, PendingKind::Path).unwrap();
-    let failed = |_: &mam_core::scan::ScanEnv, _: i64, _: &std::path::Path| -> Result<PathAction, IngestError> {
-        Ok(PathAction::Failed)
-    };
+    env.ingest
+        .queue_watch_change(id, &p, PendingKind::Path)
+        .unwrap();
+    let failed = |_: &mam_core::scan::ScanEnv,
+                  _: i64,
+                  _: &std::path::Path|
+     -> Result<PathAction, IngestError> { Ok(PathAction::Failed) };
 
     // Act
     for _ in 0..14 {
@@ -270,7 +328,11 @@ fn t_pending_05_unreadable_result_is_retried_but_not_recorded_twice() {
 
     // Assert
     assert_eq!(rows(&env), 0, "dropped after the attempt limit");
-    assert_eq!(env.count("SELECT COUNT(*) FROM scan_errors"), 0, "no duplicate record from the processor");
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM scan_errors"),
+        0,
+        "no duplicate record from the processor"
+    );
 }
 
 #[test]
@@ -292,10 +354,18 @@ fn t_pending_06_rows_over_the_folder_cap_turn_into_one_rescan() {
     assert_eq!(rows(&env), 3);
     assert_eq!(pending_scans(&env), 1);
     clear_jobs(&env);
-    env.ingest.queue_watch_change(id, &env.path("lib/n0.jpg"), PendingKind::Path).unwrap();
-    env.ingest.queue_watch_change(id, &env.path("lib/n9.jpg"), PendingKind::Path).unwrap();
+    env.ingest
+        .queue_watch_change(id, &env.path("lib/n0.jpg"), PendingKind::Path)
+        .unwrap();
+    env.ingest
+        .queue_watch_change(id, &env.path("lib/n9.jpg"), PendingKind::Path)
+        .unwrap();
     assert_eq!(rows(&env), 3);
-    assert_eq!(pending_scans(&env), 0, "the fallback rescan is requested once per overflow episode");
+    assert_eq!(
+        pending_scans(&env),
+        0,
+        "the fallback rescan is requested once per overflow episode"
+    );
 
     // 행이 비어 상한 아래로 내려오면 다음 넘침은 다시 재스캔으로 바뀐다
     for _ in 0..4 {
@@ -318,7 +388,9 @@ fn t_pending_07_a_report_that_arrives_while_applying_is_not_lost() {
     env.write("lib/a.jpg", 1);
     let id = registered(&env);
     let p = env.write("lib/b.jpg", 2);
-    env.ingest.queue_watch_change(id, &p, PendingKind::Path).unwrap();
+    env.ingest
+        .queue_watch_change(id, &p, PendingKind::Path)
+        .unwrap();
     for _ in 0..2 {
         env.clock.advance(200);
         pass(&env);
@@ -327,7 +399,10 @@ fn t_pending_07_a_report_that_arrives_while_applying_is_not_lost() {
     let ingest = Arc::clone(&env.ingest);
     let clock = Arc::clone(&env.clock);
     let path = p.clone();
-    let rereport = move |e: &mam_core::scan::ScanEnv, f: i64, abs: &std::path::Path| -> Result<PathAction, IngestError> {
+    let rereport = move |e: &mam_core::scan::ScanEnv,
+                         f: i64,
+                         abs: &std::path::Path|
+          -> Result<PathAction, IngestError> {
         let action = mam_core::scan::apply_path(e, f, abs)?;
         clock.advance(1);
         ingest.queue_watch_change(f, &path, PendingKind::Path)?;
@@ -352,7 +427,9 @@ fn t_pending_08_a_delete_event_still_reaches_apply_path_and_marks_the_asset_miss
     let a = env.write("lib/a.jpg", 1);
     let id = registered(&env);
     fs::remove_file(&a).unwrap();
-    env.ingest.queue_watch_change(id, &a, PendingKind::Path).unwrap();
+    env.ingest
+        .queue_watch_change(id, &a, PendingKind::Path)
+        .unwrap();
 
     // Act: 삭제는 표본을 기다리지 않고 첫 확인에서 바로 반영한다
     env.clock.advance(200);
@@ -361,17 +438,24 @@ fn t_pending_08_a_delete_event_still_reaches_apply_path_and_marks_the_asset_miss
     // Assert
     assert_eq!(r.applied, 1);
     assert_eq!(
-        env.count("SELECT COUNT(*) FROM file_locations WHERE presence = 'missing' AND detached_at IS NULL"),
+        env.count(
+            "SELECT COUNT(*) FROM file_locations WHERE presence = 'missing' AND detached_at IS NULL"
+        ),
         1
     );
     assert_eq!(assets(&env), 1, "the asset is kept (missing, not deleted)");
     assert_eq!(rows(&env), 0);
     // 같은 삭제를 다시 받아도 멱등
     let revisions = env.count("SELECT SUM(revision) FROM media_assets");
-    env.ingest.queue_watch_change(id, &a, PendingKind::Path).unwrap();
+    env.ingest
+        .queue_watch_change(id, &a, PendingKind::Path)
+        .unwrap();
     env.clock.advance(200);
     pass(&env);
-    assert_eq!(env.count("SELECT SUM(revision) FROM media_assets"), revisions);
+    assert_eq!(
+        env.count("SELECT SUM(revision) FROM media_assets"),
+        revisions
+    );
 }
 
 #[test]
@@ -395,7 +479,10 @@ fn t_pending_09_subtree_rows_walk_the_directory_after_it_settles() {
     // Assert
     assert_eq!(assets(&env), 3);
     assert_eq!(rows(&env), 0);
-    assert_eq!(env.ingest.list_subfolders(id, None).unwrap()[0].name, "trip");
+    assert_eq!(
+        env.ingest.list_subfolders(id, None).unwrap()[0].name,
+        "trip"
+    );
 }
 
 fn plug_usb(env: &Env) -> (PathBuf, i64) {
@@ -403,7 +490,11 @@ fn plug_usb(env: &Env) -> (PathBuf, i64) {
     fs::create_dir_all(dir.join("lib")).unwrap();
     fs::write(dir.join("lib").join("u.jpg"), [7u8; 90]).unwrap();
     env.volumes.add("usb", VolumeKind::Removable, &dir);
-    let id = env.ingest.add_folder(dir.join("lib").to_str().unwrap()).unwrap().folder_id;
+    let id = env
+        .ingest
+        .add_folder(dir.join("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id;
     (dir, id)
 }
 
@@ -418,8 +509,12 @@ fn t_pending_10_rows_of_a_folder_held_for_eject_are_skipped_but_kept() {
     let u_new = dir.join("lib").join("u2.jpg");
     fs::write(&u_new, [5u8; 80]).unwrap();
     let a_new = env.write("lib/b.jpg", 2);
-    env.ingest.queue_watch_change(usb, &u_new, PendingKind::Path).unwrap();
-    env.ingest.queue_watch_change(a, &a_new, PendingKind::Path).unwrap();
+    env.ingest
+        .queue_watch_change(usb, &u_new, PendingKind::Path)
+        .unwrap();
+    env.ingest
+        .queue_watch_change(a, &a_new, PendingKind::Path)
+        .unwrap();
 
     // Act: usb 꺼내기 준비 중에 점검을 여러 번
     env.ingest.prepare_volume_eject(usb).unwrap();
@@ -432,9 +527,17 @@ fn t_pending_10_rows_of_a_folder_held_for_eject_are_skipped_but_kept() {
     // Assert: vol-a 의 행은 반영되고, 붙들린 usb 의 행은 건드리지 않고 남는다
     assert_eq!(env.ingest.pending_count(usb).unwrap(), 1);
     assert_eq!(env.ingest.pending_count(a).unwrap(), 0);
-    assert_eq!(env.count("SELECT COUNT(*) FROM media_assets"), 3, "a.jpg, u.jpg, b.jpg — not u2.jpg");
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM media_assets"),
+        3,
+        "a.jpg, u.jpg, b.jpg — not u2.jpg"
+    );
     assert!(examined >= 1);
-    assert_eq!(env.count("SELECT stable_count FROM watch_pending"), 0, "held rows are not even sampled");
+    assert_eq!(
+        env.count("SELECT stable_count FROM watch_pending"),
+        0,
+        "held rows are not even sampled"
+    );
 }
 
 #[test]
@@ -443,7 +546,9 @@ fn t_pending_11_removing_a_folder_deletes_its_pending_rows_by_cascade() {
     let env = Env::new();
     env.write("lib/a.jpg", 1);
     let id = registered(&env);
-    env.ingest.queue_watch_change(id, &env.path("lib/n.jpg"), PendingKind::Path).unwrap();
+    env.ingest
+        .queue_watch_change(id, &env.path("lib/n.jpg"), PendingKind::Path)
+        .unwrap();
     assert_eq!(rows(&env), 1);
 
     // Act
@@ -454,7 +559,11 @@ fn t_pending_11_removing_a_folder_deletes_its_pending_rows_by_cascade() {
         env.count("SELECT COUNT(*) FROM managed_folders") == 0
     }));
     assert_eq!(rows(&env), 0);
-    assert!(env.ingest.queue_watch_change(id, &env.path("lib/n2.jpg"), PendingKind::Path).is_ok());
+    assert!(
+        env.ingest
+            .queue_watch_change(id, &env.path("lib/n2.jpg"), PendingKind::Path)
+            .is_ok()
+    );
     assert_eq!(rows(&env), 0, "reports for a removed folder are dropped");
 }
 
@@ -467,8 +576,12 @@ fn t_pending_12_settling_never_changes_the_original_files() {
     let id = registered(&env);
     let b = env.write("lib/b.jpg", 2);
     let before = snapshot(&env.vol);
-    env.ingest.queue_watch_change(id, &b, PendingKind::Path).unwrap();
-    env.ingest.queue_watch_change(id, &env.path("lib/sub"), PendingKind::Subtree).unwrap();
+    env.ingest
+        .queue_watch_change(id, &b, PendingKind::Path)
+        .unwrap();
+    env.ingest
+        .queue_watch_change(id, &env.path("lib/sub"), PendingKind::Subtree)
+        .unwrap();
 
     // Act
     for _ in 0..6 {
@@ -478,5 +591,9 @@ fn t_pending_12_settling_never_changes_the_original_files() {
 
     // Assert
     assert_eq!(assets(&env), 3);
-    assert_eq!(snapshot(&env.vol), before, "content and mtime of every fixture are unchanged");
+    assert_eq!(
+        snapshot(&env.vol),
+        before,
+        "content and mtime of every fixture are unchanged"
+    );
 }

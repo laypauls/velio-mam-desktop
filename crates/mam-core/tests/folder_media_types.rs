@@ -76,10 +76,7 @@ fn tag(env: &Env, asset_id: i64, name: &str) {
     let name = name.to_string();
     env.pool
         .write(mam_db::Priority::High, move |c| {
-            c.execute(
-                "INSERT INTO tags (name, name_key) VALUES (?1, ?1)",
-                [&name],
-            )?;
+            c.execute("INSERT INTO tags (name, name_key) VALUES (?1, ?1)", [&name])?;
             let tag_id = c.last_insert_rowid();
             c.execute(
                 "INSERT INTO asset_tags (asset_id, tag_id, created_at) VALUES (?1, ?2, 1)",
@@ -136,9 +133,16 @@ fn t_mtype_02_add_with_all_off_is_rejected_and_registers_nothing() {
         .add_folder_with_types(env.path("lib").to_str().unwrap(), NONE)
         .unwrap_err();
 
-    assert!(matches!(err, IngestError::InvalidInput("mediaTypes")), "{err:?}");
+    assert!(
+        matches!(err, IngestError::InvalidInput("mediaTypes")),
+        "{err:?}"
+    );
     assert_eq!(env.count("SELECT COUNT(*) FROM managed_folders"), 0);
-    assert_eq!(env.count("SELECT COUNT(*) FROM jobs"), 0, "no scan scheduled");
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM jobs"),
+        0,
+        "no scan scheduled"
+    );
 }
 
 #[test]
@@ -171,14 +175,20 @@ fn t_mtype_04_keep_leaves_excluded_assets_present_after_rescan() {
     let a_id = loc(&env, "a.jpg").unwrap().0;
 
     // Act: 이미지·음성 제외(유지) 후 재스캔
-    let detached = env.ingest.set_folder_media_types(id, VIDEO_ONLY, false).unwrap();
+    let detached = env
+        .ingest
+        .set_folder_media_types(id, VIDEO_ONLY, false)
+        .unwrap();
     scan(&env, id);
 
     // Assert
     assert_eq!(detached, 0);
     assert_eq!(loc(&env, "a.jpg"), Some((a_id, "present".into())));
     assert_eq!(loc(&env, "c.wav").unwrap().1, "present");
-    assert_eq!(env.count("SELECT COUNT(*) FROM media_assets WHERE status = 'active'"), 3);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM media_assets WHERE status = 'active'"),
+        3
+    );
     assert_eq!(snapshot(&env.vol), before);
 }
 
@@ -188,7 +198,9 @@ fn t_mtype_05_kept_asset_becomes_missing_when_its_file_is_really_gone() {
     let env = Env::new();
     let id = setup(&env, ALL);
     scan(&env, id);
-    env.ingest.set_folder_media_types(id, VIDEO_ONLY, false).unwrap();
+    env.ingest
+        .set_folder_media_types(id, VIDEO_ONLY, false)
+        .unwrap();
 
     // Act
     fs::remove_file(env.path("lib/a.jpg")).unwrap();
@@ -206,7 +218,9 @@ fn t_mtype_06_kept_missing_asset_returns_to_present_when_the_file_reappears() {
     let env = Env::new();
     let id = setup(&env, ALL);
     scan(&env, id);
-    env.ingest.set_folder_media_types(id, VIDEO_ONLY, false).unwrap();
+    env.ingest
+        .set_folder_media_types(id, VIDEO_ONLY, false)
+        .unwrap();
     let a = env.path("lib/a.jpg");
     let bytes = fs::read(&a).unwrap();
     fs::remove_file(&a).unwrap();
@@ -220,7 +234,10 @@ fn t_mtype_06_kept_missing_asset_returns_to_present_when_the_file_reappears() {
 
     // Assert
     assert_eq!(loc(&env, "a.jpg").unwrap().1, "present");
-    assert!(outbox_and_revisions(&env).0 > outbox, "복귀는 색인에 알린다");
+    assert!(
+        outbox_and_revisions(&env).0 > outbox,
+        "복귀는 색인에 알린다"
+    );
 }
 
 #[test]
@@ -229,9 +246,13 @@ fn t_mtype_07_excluded_file_content_change_and_new_files_are_not_applied() {
     let env = Env::new();
     let id = setup(&env, ALL);
     scan(&env, id);
-    env.ingest.set_folder_media_types(id, VIDEO_ONLY, false).unwrap();
+    env.ingest
+        .set_folder_media_types(id, VIDEO_ONLY, false)
+        .unwrap();
     let (asset, _) = loc(&env, "a.jpg").unwrap();
-    let size_before = env.count(&format!("SELECT file_size FROM media_assets WHERE asset_id = {asset}"));
+    let size_before = env.count(&format!(
+        "SELECT file_size FROM media_assets WHERE asset_id = {asset}"
+    ));
 
     // Act: 제외 유형 내용 변경 + 새 파일
     fs::write(env.path("lib/a.jpg"), vec![9u8; 500]).unwrap();
@@ -240,7 +261,9 @@ fn t_mtype_07_excluded_file_content_change_and_new_files_are_not_applied() {
 
     // Assert: 동결된 스냅샷 — 크기 불변, 새 자산 없음
     assert_eq!(
-        env.count(&format!("SELECT file_size FROM media_assets WHERE asset_id = {asset}")),
+        env.count(&format!(
+            "SELECT file_size FROM media_assets WHERE asset_id = {asset}"
+        )),
         size_before
     );
     assert!(loc(&env, "new.jpg").is_none());
@@ -253,7 +276,9 @@ fn t_mtype_08_watch_events_follow_the_same_rules() {
     let env = Env::new();
     let id = setup(&env, ALL);
     scan(&env, id);
-    env.ingest.set_folder_media_types(id, VIDEO_ONLY, false).unwrap();
+    env.ingest
+        .set_folder_media_types(id, VIDEO_ONLY, false)
+        .unwrap();
     env.clock.advance(5_000);
 
     // Act / Assert 1: 제외 유형 새 파일 -> 등록하지 않는다
@@ -316,15 +341,31 @@ fn t_mtype_09_purge_deletes_linked_data_of_only_excluded_types_and_writes_delete
     assert!(loc(&env, "e.png").is_none());
     assert_eq!(loc(&env, "b.mp4").unwrap(), (b_id, "present".into()));
     assert!(loc(&env, "c.wav").is_some());
-    assert_eq!(env.count("SELECT COUNT(*) FROM media_assets"), 4, "자산 행은 번호 재사용 방지로 남는다");
-    assert_eq!(env.count("SELECT COUNT(*) FROM media_assets WHERE status = 'deleted' AND media_type = 'image'"), 2);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM media_assets"),
+        4,
+        "자산 행은 번호 재사용 방지로 남는다"
+    );
+    assert_eq!(
+        env.count(
+            "SELECT COUNT(*) FROM media_assets WHERE status = 'deleted' AND media_type = 'image'"
+        ),
+        2
+    );
     assert_eq!(tags_of(&env, a_id), 0, "태그 연결 삭제");
     assert_eq!(tags_of(&env, b_id), 1, "제외하지 않은 유형은 보존");
-    assert_eq!(env.count("SELECT COUNT(*) FROM tags WHERE name = '여행'"), 1, "태그 이름은 남는다");
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM tags WHERE name = '여행'"),
+        1,
+        "태그 이름은 남는다"
+    );
     let (outbox1, rev1) = outbox_and_revisions(&env);
     assert_eq!(outbox1 - outbox0, 2);
     assert_eq!(rev1 - rev0, 2);
-    assert_eq!(env.count("SELECT COUNT(*) FROM search_outbox WHERE event_type = 'delete'"), 2);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM search_outbox WHERE event_type = 'delete'"),
+        2
+    );
     assert_eq!(snapshot(&env.vol), before);
     assert_eq!(view_types(&env, id), types);
 }
@@ -336,15 +377,24 @@ fn t_mtype_10_keep_changes_nothing_but_the_setting_and_schedules_a_rescan() {
     let id = setup(&env, ALL);
     scan(&env, id);
     let before = outbox_and_revisions(&env);
-    env.ingest.jobs().pause(Some(mam_core::jobs::JobKind::Scan)).unwrap();
+    env.ingest
+        .jobs()
+        .pause(Some(mam_core::jobs::JobKind::Scan))
+        .unwrap();
 
     // Act
-    let detached = env.ingest.set_folder_media_types(id, VIDEO_ONLY, false).unwrap();
+    let detached = env
+        .ingest
+        .set_folder_media_types(id, VIDEO_ONLY, false)
+        .unwrap();
 
     // Assert
     assert_eq!(detached, 0);
     assert_eq!(outbox_and_revisions(&env), before);
-    assert_eq!(env.count("SELECT COUNT(*) FROM file_locations WHERE detached_at IS NOT NULL"), 0);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM file_locations WHERE detached_at IS NOT NULL"),
+        0
+    );
     assert_eq!(
         env.count("SELECT COUNT(*) FROM jobs WHERE kind = 'scan' AND status = 'pending'"),
         1
@@ -352,7 +402,10 @@ fn t_mtype_10_keep_changes_nothing_but_the_setting_and_schedules_a_rescan() {
     // purge 지정이어도 제외되는 유형이 없으면(새로 켜기만) 아무것도 정리하지 않는다
     let detached = env.ingest.set_folder_media_types(id, ALL, true).unwrap();
     assert_eq!(detached, 0);
-    assert_eq!(env.count("SELECT COUNT(*) FROM file_locations WHERE detached_at IS NOT NULL"), 0);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM file_locations WHERE detached_at IS NOT NULL"),
+        0
+    );
 }
 
 #[test]
@@ -380,9 +433,14 @@ fn t_mtype_12_purge_then_reenable_registers_a_new_asset_and_the_tags_do_not_retu
     scan(&env, id);
     let (a_id, _) = loc(&env, "a.jpg").unwrap();
     tag(&env, a_id, "보관");
-    env.ingest.set_folder_media_types(id, VIDEO_ONLY, true).unwrap();
+    env.ingest
+        .set_folder_media_types(id, VIDEO_ONLY, true)
+        .unwrap();
     scan(&env, id);
-    assert!(loc(&env, "a.jpg").is_none(), "purge 뒤 스캔도 다시 등록하지 않는다");
+    assert!(
+        loc(&env, "a.jpg").is_none(),
+        "purge 뒤 스캔도 다시 등록하지 않는다"
+    );
 
     // Act
     env.ingest.set_folder_media_types(id, ALL, false).unwrap();
@@ -392,7 +450,11 @@ fn t_mtype_12_purge_then_reenable_registers_a_new_asset_and_the_tags_do_not_retu
     let (new_id, presence) = loc(&env, "a.jpg").unwrap();
     assert_eq!(presence, "present");
     assert_ne!(new_id, a_id);
-    assert_eq!(env.count("SELECT COUNT(*) FROM media_assets"), 5, "3 old (2 purged, 1 video kept) + 2 new (image, audio)");
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM media_assets"),
+        5,
+        "3 old (2 purged, 1 video kept) + 2 new (image, audio)"
+    );
     assert_eq!(tags_of(&env, a_id), 0);
     assert_eq!(tags_of(&env, new_id), 0);
 }
@@ -403,11 +465,20 @@ fn t_mtype_13_changing_to_all_off_is_rejected_and_keeps_the_previous_setting() {
     let id = setup(&env, VIDEO_ONLY);
     scan(&env, id);
 
-    let err = env.ingest.set_folder_media_types(id, NONE, true).unwrap_err();
+    let err = env
+        .ingest
+        .set_folder_media_types(id, NONE, true)
+        .unwrap_err();
 
-    assert!(matches!(err, IngestError::InvalidInput("mediaTypes")), "{err:?}");
+    assert!(
+        matches!(err, IngestError::InvalidInput("mediaTypes")),
+        "{err:?}"
+    );
     assert_eq!(view_types(&env, id), VIDEO_ONLY);
-    assert_eq!(env.count("SELECT COUNT(*) FROM file_locations WHERE detached_at IS NOT NULL"), 0);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM file_locations WHERE detached_at IS NOT NULL"),
+        0
+    );
 }
 
 #[test]
@@ -486,7 +557,10 @@ fn t_mtype_16_relocate_keeps_the_media_types() {
     let id = setup(&env, VIDEO_ONLY);
     scan(&env, id);
     env.write("lib2/keep.txt", 1);
-    env.ingest.jobs().pause(Some(mam_core::jobs::JobKind::Scan)).unwrap();
+    env.ingest
+        .jobs()
+        .pause(Some(mam_core::jobs::JobKind::Scan))
+        .unwrap();
 
     let out = env
         .ingest
@@ -509,7 +583,10 @@ fn t_mtype_17_nested_managed_folders_are_rejected_so_types_never_conflict() {
         .add_folder_with_types(env.path("lib").to_str().unwrap(), ALL)
         .unwrap_err();
 
-    assert!(matches!(parent, IngestError::NestedFolder { .. }), "{parent:?}");
+    assert!(
+        matches!(parent, IngestError::NestedFolder { .. }),
+        "{parent:?}"
+    );
     assert_eq!(env.count("SELECT COUNT(*) FROM managed_folders"), 1);
 }
 
@@ -530,19 +607,31 @@ fn t_mtype_18_changing_types_cancels_unfinished_scan_runs_so_the_next_scan_start
 
     // Act: 같은 값 재설정은 취소하지 않는다
     env.ingest.set_folder_media_types(id, ALL, false).unwrap();
-    assert_eq!(env.count("SELECT COUNT(*) FROM scan_runs WHERE status = 'paused'"), 1);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM scan_runs WHERE status = 'paused'"),
+        1
+    );
     // 값이 바뀌면 취소한다
-    env.ingest.set_folder_media_types(id, VIDEO_ONLY, false).unwrap();
+    env.ingest
+        .set_folder_media_types(id, VIDEO_ONLY, false)
+        .unwrap();
 
     // Assert
-    assert_eq!(env.count("SELECT COUNT(*) FROM scan_runs WHERE status = 'cancelled'"), 1);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM scan_runs WHERE status = 'cancelled'"),
+        1
+    );
     scan(&env, id);
     assert_eq!(
         env.count("SELECT COUNT(*) FROM scan_runs WHERE status = 'done' AND cursor IS NOT NULL"),
         1,
         "새 실행이 처음부터 돌아 cursor 를 새로 만든다"
     );
-    assert_eq!(env.count("SELECT COUNT(*) FROM media_assets"), 1, "동영상 1건");
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM media_assets"),
+        1,
+        "동영상 1건"
+    );
 }
 
 #[test]
@@ -556,7 +645,9 @@ fn t_mtype_19_scan_started_with_old_types_stops_when_types_change_mid_walk() {
         calls.set(calls.get() + 1);
         if calls.get() == 2 {
             env.pool
-                .write(mam_db::Priority::High, move |c| Ok(set_media_types(c, 1, id, VIDEO_ONLY)))
+                .write(mam_db::Priority::High, move |c| {
+                    Ok(set_media_types(c, 1, id, VIDEO_ONLY))
+                })
                 .unwrap()
                 .unwrap();
         }

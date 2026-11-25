@@ -77,7 +77,12 @@ impl State {
             .baseline
             .get_or_insert_with(|| keys.iter().map(|k| (*k).to_owned()).collect());
         baseline.retain(|k| keys.contains(k.as_str()));
-        baseline.extend(managed.iter().filter(|k| keys.contains(k.as_str())).cloned());
+        baseline.extend(
+            managed
+                .iter()
+                .filter(|k| keys.contains(k.as_str()))
+                .cloned(),
+        );
         self.dismissed.retain(|k| keys.contains(k.as_str()));
 
         let known: HashMap<&str, Option<u64>> = self
@@ -255,9 +260,9 @@ impl Ingest {
     pub fn unignore_volume(&self, volume_key: &str) -> Result<(), IngestError> {
         let _g = lock(&self.newvol.serialize);
         let key = volume_key.to_owned();
-        let removed = self.env.write(Priority::High, move |c| {
-            Ok(remove_ignored_volume(c, &key)?)
-        })?;
+        let removed = self
+            .env
+            .write(Priority::High, move |c| Ok(remove_ignored_volume(c, &key)?))?;
         if !removed {
             return Ok(());
         }
@@ -295,7 +300,9 @@ mod tests {
     fn t_newvol_unit_01_first_update_seeds_baseline_and_reports_nothing() {
         let mut st = State::default();
 
-        let changed = st.update(&[vol("c", VolumeKind::Fixed)], &set(&[]), &set(&[]), |_| None);
+        let changed = st.update(&[vol("c", VolumeKind::Fixed)], &set(&[]), &set(&[]), |_| {
+            None
+        });
 
         assert!(!changed);
         assert!(st.pending.is_empty());
@@ -333,7 +340,12 @@ mod tests {
         let mut st = State::default();
         st.update(&[], &set(&[]), &set(&[]), |_| None);
 
-        st.update(&[vol("n", VolumeKind::Network)], &set(&[]), &set(&[]), |_| None);
+        st.update(
+            &[vol("n", VolumeKind::Network)],
+            &set(&[]),
+            &set(&[]),
+            |_| None,
+        );
 
         assert!(st.pending.is_empty());
     }

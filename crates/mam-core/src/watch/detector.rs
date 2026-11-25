@@ -129,7 +129,11 @@ pub trait ChangeDetector: Send + Sync {
         self.probe(target)
     }
     /// 옵션이 이 폴더에 맞는지 저장 전에 확인한다 (예: 원격 접속의 경로 변환이 폴더 루트에 닿는가). 기본은 항상 통과.
-    fn validate_target(&self, _target: &WatchTarget, _opts: &DetectorOptions) -> Result<(), DetectError> {
+    fn validate_target(
+        &self,
+        _target: &WatchTarget,
+        _opts: &DetectorOptions,
+    ) -> Result<(), DetectError> {
         Ok(())
     }
     /// 실험 기능 표시 (UI 가 "실험" 으로 보여 준다) — 실측·실기 검증 전 감지기
@@ -246,7 +250,10 @@ mod tests {
 
     #[test]
     fn t_chgdet_opt_01_none_null_and_empty_object_give_defaults() {
-        assert_eq!(parse_integer_options(FIELDS, None).unwrap().to_stored(), None);
+        assert_eq!(
+            parse_integer_options(FIELDS, None).unwrap().to_stored(),
+            None
+        );
         let null = parse_integer_options(FIELDS, Some(&Value::Null)).unwrap();
         assert_eq!(null.to_stored(), None);
         let empty = parse_integer_options(FIELDS, Some(&json!({}))).unwrap();
@@ -275,7 +282,12 @@ mod tests {
         ] {
             let err = parse_integer_options(FIELDS, Some(&bad));
             assert!(
-                matches!(err, Err(DetectError::InvalidOptions { field: "watchOptions" })),
+                matches!(
+                    err,
+                    Err(DetectError::InvalidOptions {
+                        field: "watchOptions"
+                    })
+                ),
                 "{bad}"
             );
         }
@@ -285,17 +297,32 @@ mod tests {
     fn t_chgdet_opt_05_common_exclusive_open_check_is_accepted_by_any_detector_and_must_be_bool() {
         // Happy: 감지기 고유 필드가 없어도 공통 옵션은 받고, false 만 저장한다 (true = 기본값)
         let off = parse_integer_options(&[], Some(&json!({"exclusiveOpenCheck": false}))).unwrap();
-        assert_eq!(off.to_stored().as_deref(), Some(r#"{"exclusiveOpenCheck":false}"#));
+        assert_eq!(
+            off.to_stored().as_deref(),
+            Some(r#"{"exclusiveOpenCheck":false}"#)
+        );
         assert_eq!(off.get_bool(EXCLUSIVE_OPEN_CHECK), Some(false));
         let on = parse_integer_options(FIELDS, Some(&json!({"exclusiveOpenCheck": true}))).unwrap();
         assert_eq!(on.to_stored(), None);
         // Validation: 불리언이 아닌 값은 거부
-        for bad in [json!({"exclusiveOpenCheck": 1}), json!({"exclusiveOpenCheck": "true"}), json!({"exclusiveOpenCheck": null})] {
+        for bad in [
+            json!({"exclusiveOpenCheck": 1}),
+            json!({"exclusiveOpenCheck": "true"}),
+            json!({"exclusiveOpenCheck": null}),
+        ] {
             assert!(parse_integer_options(FIELDS, Some(&bad)).is_err(), "{bad}");
         }
         // 저장 텍스트 읽기: 명시적 false 만 꺼짐, 없음·깨진 값·다른 형 = 기본값(켜짐)
-        assert!(!exclusive_open_check_of(Some(r#"{"exclusiveOpenCheck":false}"#)));
-        for t in [None, Some("{}"), Some("garbage"), Some(r#"{"exclusiveOpenCheck":1}"#), Some(r#"{"exclusiveOpenCheck":true}"#)] {
+        assert!(!exclusive_open_check_of(Some(
+            r#"{"exclusiveOpenCheck":false}"#
+        )));
+        for t in [
+            None,
+            Some("{}"),
+            Some("garbage"),
+            Some(r#"{"exclusiveOpenCheck":1}"#),
+            Some(r#"{"exclusiveOpenCheck":true}"#),
+        ] {
             assert!(exclusive_open_check_of(t), "{t:?}");
         }
     }

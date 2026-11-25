@@ -15,7 +15,9 @@ use crate::call_loop::{CallCtx, run_call};
 use crate::error::InvokeError;
 use crate::host_api::{HostApi, InvokeScope};
 use crate::line_reader::LineEvent;
-use crate::protocol::{HostMsg, InvokeKind, Limits, PROTOCOL_VERSION, WorkerMsg, parse_worker_line};
+use crate::protocol::{
+    HostMsg, InvokeKind, Limits, PROTOCOL_VERSION, WorkerMsg, parse_worker_line,
+};
 use crate::worker_proc::WorkerProc;
 
 #[derive(Debug, Clone)]
@@ -37,7 +39,12 @@ impl HostConfig {
         Self {
             worker_exe,
             source,
-            limits: Limits { memory_bytes: 64 << 20, stack_bytes: 512 << 10, cpu_ms: 2000, max_line_bytes: 4 << 20 },
+            limits: Limits {
+                memory_bytes: 64 << 20,
+                stack_bytes: 512 << 10,
+                cpu_ms: 2000,
+                max_line_bytes: 4 << 20,
+            },
             start_timeout: Duration::from_secs(10),
             call_timeout: Duration::from_secs(10),
             max_messages_per_call: 10_000,
@@ -50,7 +57,9 @@ impl HostConfig {
 pub enum HostState {
     /// 워커 없음(다음 호출에서 시작)
     Idle,
-    Running { pid: u32 },
+    Running {
+        pid: u32,
+    },
     Disabled,
 }
 
@@ -71,9 +80,26 @@ pub struct PluginHost {
 }
 
 impl PluginHost {
-    pub fn new(id: PluginId, cfg: HostConfig, api: Arc<dyn HostApi>, clock: Arc<dyn Clock>) -> Self {
+    pub fn new(
+        id: PluginId,
+        cfg: HostConfig,
+        api: Arc<dyn HostApi>,
+        clock: Arc<dyn Clock>,
+    ) -> Self {
         let breaker = Breaker::new(cfg.breaker);
-        Self { id, cfg, api, clock, state: Mutex::new(State { live: None, next_id: 1, breaker, starts: 0 }), activity: ActivityLog::default() }
+        Self {
+            id,
+            cfg,
+            api,
+            clock,
+            state: Mutex::new(State {
+                live: None,
+                next_id: 1,
+                breaker,
+                starts: 0,
+            }),
+            activity: ActivityLog::default(),
+        }
     }
 
     /// 시험 전용 — 호출 진입·종료 요청 횟수
@@ -99,7 +125,11 @@ impl PluginHost {
         }
         match s.live.as_mut() {
             Some(w) => {
-                if w.has_exited() { HostState::Idle } else { HostState::Running { pid: w.pid() } }
+                if w.has_exited() {
+                    HostState::Idle
+                } else {
+                    HostState::Running { pid: w.pid() }
+                }
             }
             None => HostState::Idle,
         }
@@ -123,11 +153,24 @@ impl PluginHost {
         }
     }
 
-    pub fn invoke(&self, kind: InvokeKind, target: &str, params: Value, scope: InvokeScope) -> Result<Value, InvokeError> {
+    pub fn invoke(
+        &self,
+        kind: InvokeKind,
+        target: &str,
+        params: Value,
+        scope: InvokeScope,
+    ) -> Result<Value, InvokeError> {
         self.invoke_with_timeout(kind, target, params, scope, self.cfg.call_timeout)
     }
 
-    pub fn invoke_with_timeout(&self, kind: InvokeKind, target: &str, params: Value, scope: InvokeScope, timeout: Duration) -> Result<Value, InvokeError> {
+    pub fn invoke_with_timeout(
+        &self,
+        kind: InvokeKind,
+        target: &str,
+        params: Value,
+        scope: InvokeScope,
+        timeout: Duration,
+    ) -> Result<Value, InvokeError> {
         let mut st = self.lock();
         self.activity.bump(|a| a.invokes_started += 1);
         if st.breaker.is_disabled() {
@@ -146,7 +189,15 @@ impl PluginHost {
         result
     }
 
-    fn invoke_locked(&self, st: &mut State, kind: InvokeKind, target: &str, params: Value, mut scope: InvokeScope, timeout: Duration) -> Result<Value, InvokeError> {
+    fn invoke_locked(
+        &self,
+        st: &mut State,
+        kind: InvokeKind,
+        target: &str,
+        params: Value,
+        mut scope: InvokeScope,
+        timeout: Duration,
+    ) -> Result<Value, InvokeError> {
         // 유휴 중 워커가 죽었으면(외부 종료·크래시) 결함으로 기록하고 새로 시작한다
         if st.live.as_mut().is_some_and(|w| w.has_exited()) {
             st.live = None;
@@ -162,7 +213,9 @@ impl PluginHost {
         }
         let id = st.next_id;
         st.next_id += 1;
-        let Some(w) = st.live.as_mut() else { return Err(InvokeError::Crashed) };
+        let Some(w) = st.live.as_mut() else {
+            return Err(InvokeError::Crashed);
+        };
         let known = match kind {
             InvokeKind::Command => &w.handlers.commands,
             InvokeKind::Provider => &w.handlers.providers,
@@ -170,32 +223,57 @@ impl PluginHost {
         if !known.contains(target) {
             return Err(InvokeError::NotRegistered(target.to_owned()));
         }
-        w.send(&HostMsg::Invoke { id, kind, target: target.to_owned(), params }).map_err(|_| InvokeError::Crashed)?;
+        w.send(&HostMsg::Invoke {
+            id,
+            kind,
+            target: target.to_owned(),
+            params,
+        })
+        .map_err(|_| InvokeError::Crashed)?;
         // 호출자가 만든 범위의 마감을 호출 타임아웃으로 찍는다 — 호스트 함수의 DB 대기가 이 시각을 넘지 않는다
         scope.deadline = Instant::now() + timeout;
-        let ctx = CallCtx { plugin: &self.id, api: self.api.as_ref(), scope: &scope, max_messages: self.cfg.max_messages_per_call };
+        let ctx = CallCtx {
+            plugin: &self.id,
+            api: self.api.as_ref(),
+            scope: &scope,
+            max_messages: self.cfg.max_messages_per_call,
+        };
         run_call(w, &ctx, id)
     }
 
     /// 워커를 띄우고 `init` -> `ready` 핸드셰이크. 실패 시 워커는 정리하고(Drop) 오류를 돌려준다
     fn start_worker(&self) -> Result<WorkerProc, InvokeError> {
         let max_line = usize::try_from(self.cfg.limits.max_line_bytes).unwrap_or(usize::MAX);
-        let mut w = WorkerProc::spawn(&self.cfg.worker_exe, max_line, self.cfg.limits.memory_bytes).map_err(|e| InvokeError::Start(e.kind().to_string()))?;
-        let init = HostMsg::Init { v: PROTOCOL_VERSION, plugin_id: self.id.as_str().to_owned(), source: self.cfg.source.clone(), limits: self.cfg.limits };
+        let mut w = WorkerProc::spawn(&self.cfg.worker_exe, max_line, self.cfg.limits.memory_bytes)
+            .map_err(|e| InvokeError::Start(e.kind().to_string()))?;
+        let init = HostMsg::Init {
+            v: PROTOCOL_VERSION,
+            plugin_id: self.id.as_str().to_owned(),
+            source: self.cfg.source.clone(),
+            limits: self.cfg.limits,
+        };
         w.send(&init).map_err(|_| InvokeError::Crashed)?;
-        let ev = w.rx.recv_timeout(self.cfg.start_timeout).map_err(|_| InvokeError::Timeout)?;
+        let ev =
+            w.rx.recv_timeout(self.cfg.start_timeout)
+                .map_err(|_| InvokeError::Timeout)?;
         let line = match ev {
             LineEvent::Line(l) => l,
             LineEvent::Oversize => return Err(InvokeError::Oversize),
             LineEvent::Eof => return Err(InvokeError::Crashed),
         };
         match parse_worker_line(&line).map_err(InvokeError::Protocol)? {
-            WorkerMsg::Ready { v, commands, providers } if v == PROTOCOL_VERSION => {
+            WorkerMsg::Ready {
+                v,
+                commands,
+                providers,
+            } if v == PROTOCOL_VERSION => {
                 w.handlers.commands = commands.into_iter().collect();
                 w.handlers.providers = providers.into_iter().collect();
                 Ok(w)
             }
-            WorkerMsg::Ready { v, .. } => Err(InvokeError::Protocol(format!("worker protocol version {v}"))),
+            WorkerMsg::Ready { v, .. } => Err(InvokeError::Protocol(format!(
+                "worker protocol version {v}"
+            ))),
             WorkerMsg::InitError { message } => Err(InvokeError::Init(message)),
             _ => Err(InvokeError::Protocol("expected ready".into())),
         }

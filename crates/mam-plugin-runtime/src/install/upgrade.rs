@@ -21,19 +21,39 @@ struct Done {
 
 impl PluginRuntime {
     /// `expected_*` 는 미리보기 때 본 값 — 그 사이 폴더가 바뀌었으면 `PreviewMismatch`. `granted` 는 정확히 이 집합으로 저장한다
-    pub fn install(&self, dir: &Path, expected_id: &str, expected_version: &str, granted: Vec<String>, locale: &str) -> Result<PluginInfo, InstallError> {
+    pub fn install(
+        &self,
+        dir: &Path,
+        expected_id: &str,
+        expected_version: &str,
+        granted: Vec<String>,
+        locale: &str,
+    ) -> Result<PluginInfo, InstallError> {
         let done = {
             let _guard = self.try_lifecycle()?;
             self.install_locked(dir, expected_id, expected_version, &granted)?
         };
         // 락 밖 — 훅은 설정 커밋 뒤, 항목이 보이는 시점
         self.current_hooks().installed(&done.pid, done.fresh);
-        self.emit(&done.id, if done.fresh { ChangeReason::Installed } else { ChangeReason::Upgraded });
+        self.emit(
+            &done.id,
+            if done.fresh {
+                ChangeReason::Installed
+            } else {
+                ChangeReason::Upgraded
+            },
+        );
         let current = self.entry(&done.id).ok_or(InstallError::NotInstalled)?;
         Ok(self.info_of(&current, locale))
     }
 
-    fn install_locked(&self, dir: &Path, expected_id: &str, expected_version: &str, granted: &[String]) -> Result<Done, InstallError> {
+    fn install_locked(
+        &self,
+        dir: &Path,
+        expected_id: &str,
+        expected_version: &str,
+        granted: &[String],
+    ) -> Result<Done, InstallError> {
         let pkg = self.read_source(dir)?;
         let m = &pkg.manifest;
         if m.id.as_str() != expected_id || m.version.to_string() != expected_version {
@@ -42,14 +62,21 @@ impl PluginRuntime {
         let granted = parse_granted_perms(granted, &m.permissions)?;
         let (id, version, pid) = (m.id.to_string(), m.version.to_string(), m.id.clone());
         let previous_raw = self.db_read(|c| Ok(get(c, INSTALLED, &id)?))?;
-        let previous_version = previous_raw.as_deref().and_then(parse_installed).map(|(v, _)| v);
+        let previous_version = previous_raw
+            .as_deref()
+            .and_then(parse_installed)
+            .map(|(v, _)| v);
 
         let plugins_dir = &self.deps.plugins_dir;
         let staged = write_staging(plugins_dir, &id, &pkg)?;
         let promoted = promote(plugins_dir, &id, &version, &staged)?;
 
         let now = self.deps.clock.now_ms();
-        let (key, installed, granted_text) = (id.clone(), installed_raw(&version, now), granted_raw(&granted));
+        let (key, installed, granted_text) = (
+            id.clone(),
+            installed_raw(&version, now),
+            granted_raw(&granted),
+        );
         let written = self.db_write(Priority::High, move |c| {
             let tx = c.transaction()?;
             put_row(&tx, INSTALLED, &key, &installed)?;
@@ -72,12 +99,18 @@ impl PluginRuntime {
             host.shutdown();
         }
         promoted.commit(plugins_dir);
-        if let Some(old_version) = previous_version.filter(|v| *v != version && Version::parse(v).is_ok()) {
+        if let Some(old_version) =
+            previous_version.filter(|v| *v != version && Version::parse(v).is_ok())
+        {
             let old_dir = plugins_dir.join(&id).join(old_version);
             if let Err(e) = remove_confined(plugins_dir, &old_dir) {
                 tracing::warn!(plugin = id.as_str(), error = %e, "old plugin version not removed; boot cleanup will retry");
             }
         }
-        Ok(Done { id, pid, fresh: previous_raw.is_none() })
+        Ok(Done {
+            id,
+            pid,
+            fresh: previous_raw.is_none(),
+        })
     }
 }

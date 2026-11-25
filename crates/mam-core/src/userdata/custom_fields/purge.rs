@@ -105,7 +105,12 @@ fn next_target(c: &rusqlite::Connection) -> Result<Option<Target>, IngestError> 
         "SELECT option_id, field_id FROM metadata_field_options WHERE deleting_at IS NOT NULL
          ORDER BY option_id LIMIT 1",
         [],
-        |r| Ok(Target::Option { option_id: r.get(0)?, field_id: r.get(1)? }),
+        |r| {
+            Ok(Target::Option {
+                option_id: r.get(0)?,
+                field_id: r.get(1)?,
+            })
+        },
     )
     .optional()?)
 }

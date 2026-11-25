@@ -13,15 +13,16 @@ mod imp {
     use std::cell::RefCell;
     use std::collections::HashMap;
     use std::ffi::c_void;
-    use std::sync::mpsc;
     use std::sync::Mutex;
+    use std::sync::mpsc;
     use std::time::Duration;
 
     use mam_player::host::{BankAttach, FrameSurface, RawProcessHandle, SurfaceError};
     use mam_player::protocol::{BufferInfo, FrameMsgOut, SLOT_COUNT};
     use tauri::{AppHandle, Manager};
     use webview2_com::Microsoft::Web::WebView2::Win32::{
-        COREWEBVIEW2_SHARED_BUFFER_ACCESS_READ_ONLY, ICoreWebView2, ICoreWebView2_2, ICoreWebView2_17, ICoreWebView2Environment12, ICoreWebView2SharedBuffer,
+        COREWEBVIEW2_SHARED_BUFFER_ACCESS_READ_ONLY, ICoreWebView2, ICoreWebView2_2,
+        ICoreWebView2_17, ICoreWebView2Environment12, ICoreWebView2SharedBuffer,
     };
     use windows::Win32::Foundation::{DUPLICATE_SAME_ACCESS, DuplicateHandle, HANDLE};
     use windows::Win32::System::Threading::GetCurrentProcess;
@@ -42,51 +43,107 @@ mod imp {
 
     impl TauriSurface {
         pub fn new(app: AppHandle) -> Self {
-            Self { app, supported: Mutex::new(None) }
+            Self {
+                app,
+                supported: Mutex::new(None),
+            }
         }
 
-        fn run_ui<T: Send + 'static>(&self, f: impl FnOnce(&ICoreWebView2) -> Result<T, String> + Send + 'static) -> Result<T, SurfaceError> {
-            let window = self.app.get_webview_window("main").ok_or_else(|| SurfaceError::Failed("main window not found".into()))?;
+        fn run_ui<T: Send + 'static>(
+            &self,
+            f: impl FnOnce(&ICoreWebView2) -> Result<T, String> + Send + 'static,
+        ) -> Result<T, SurfaceError> {
+            let window = self
+                .app
+                .get_webview_window("main")
+                .ok_or_else(|| SurfaceError::Failed("main window not found".into()))?;
             let (tx, rx) = mpsc::channel();
             window
                 .with_webview(move |pw| {
                     // SAFETY: with_webview 클로저는 UI 스레드에서 실행되고 controller 는 살아 있는 COM 포인터다
-                    let r = unsafe { pw.controller().CoreWebView2() }.map_err(|e| e.to_string()).and_then(|wv| f(&wv));
+                    let r = unsafe { pw.controller().CoreWebView2() }
+                        .map_err(|e| e.to_string())
+                        .and_then(|wv| f(&wv));
                     let _ = tx.send(r);
                 })
                 .map_err(|e| SurfaceError::Failed(e.to_string()))?;
-            rx.recv_timeout(UI_WAIT).map_err(|_| SurfaceError::Timeout)?.map_err(SurfaceError::Failed)
+            rx.recv_timeout(UI_WAIT)
+                .map_err(|_| SurfaceError::Timeout)?
+                .map_err(SurfaceError::Failed)
         }
-
     }
 
     /// UI 스레드 — 버퍼 3개를 만들어 읽기 전용으로 게시하고 워커로 핸들을 복제한다
-    fn create_on_ui(wv: &ICoreWebView2, epoch: u64, w: u32, h: u32, worker: RawProcessHandle) -> Result<BankAttach, String> {
+    fn create_on_ui(
+        wv: &ICoreWebView2,
+        epoch: u64,
+        w: u32,
+        h: u32,
+        worker: RawProcessHandle,
+    ) -> Result<BankAttach, String> {
         let wv2: ICoreWebView2_2 = wv.cast().map_err(|e| format!("ICoreWebView2_2: {e}"))?;
         // SAFETY: UI 스레드의 살아 있는 COM 객체들
         let env = unsafe { wv2.Environment() }.map_err(|e| format!("Environment: {e}"))?;
-        let env12: ICoreWebView2Environment12 = env.cast().map_err(|e| format!("Environment12 (runtime too old?): {e}"))?;
-        let wv17: ICoreWebView2_17 = wv.cast().map_err(|e| format!("ICoreWebView2_17 (runtime too old?): {e}"))?;
+        let env12: ICoreWebView2Environment12 = env
+            .cast()
+            .map_err(|e| format!("Environment12 (runtime too old?): {e}"))?;
+        let wv17: ICoreWebView2_17 = wv
+            .cast()
+            .map_err(|e| format!("ICoreWebView2_17 (runtime too old?): {e}"))?;
         let first = BufferInfo::new(epoch, 0, w, h);
         let mut buffers = Vec::with_capacity(SLOT_COUNT as usize);
         let mut handles = Vec::with_capacity(SLOT_COUNT as usize);
         for slot in 0..SLOT_COUNT {
-            let sb = unsafe { env12.CreateSharedBuffer(first.size) }.map_err(|e| format!("CreateSharedBuffer: {e}"))?;
-            let info = serde_json::to_string(&BufferInfo::new(epoch, slot, w, h)).map_err(|e| e.to_string())?;
-            unsafe { wv17.PostSharedBufferToScript(&sb, COREWEBVIEW2_SHARED_BUFFER_ACCESS_READ_ONLY, &HSTRING::from(info)) }.map_err(|e| format!("PostSharedBufferToScript: {e}"))?;
+            let sb = unsafe { env12.CreateSharedBuffer(first.size) }
+                .map_err(|e| format!("CreateSharedBuffer: {e}"))?;
+            let info = serde_json::to_string(&BufferInfo::new(epoch, slot, w, h))
+                .map_err(|e| e.to_string())?;
+            unsafe {
+                wv17.PostSharedBufferToScript(
+                    &sb,
+                    COREWEBVIEW2_SHARED_BUFFER_ACCESS_READ_ONLY,
+                    &HSTRING::from(info),
+                )
+            }
+            .map_err(|e| format!("PostSharedBufferToScript: {e}"))?;
             let mut src = HANDLE::default();
-            unsafe { sb.FileMappingHandle(&mut src) }.map_err(|e| format!("FileMappingHandle: {e}"))?;
+            unsafe { sb.FileMappingHandle(&mut src) }
+                .map_err(|e| format!("FileMappingHandle: {e}"))?;
             let mut dst = HANDLE::default();
-            unsafe { DuplicateHandle(GetCurrentProcess(), src, HANDLE(worker as *mut c_void), &mut dst, 0, false, DUPLICATE_SAME_ACCESS) }.map_err(|e| format!("DuplicateHandle: {e}"))?;
+            unsafe {
+                DuplicateHandle(
+                    GetCurrentProcess(),
+                    src,
+                    HANDLE(worker as *mut c_void),
+                    &mut dst,
+                    0,
+                    false,
+                    DUPLICATE_SAME_ACCESS,
+                )
+            }
+            .map_err(|e| format!("DuplicateHandle: {e}"))?;
             handles.push(dst.0 as usize as u64);
             buffers.push(sb);
         }
         BANKS.with(|b| b.borrow_mut().insert(epoch, buffers));
-        Ok(BankAttach { epoch, w, h, stride: first.stride, size: first.size, handles })
+        Ok(BankAttach {
+            epoch,
+            w,
+            h,
+            stride: first.stride,
+            size: first.size,
+            handles,
+        })
     }
 
     impl FrameSurface for TauriSurface {
-        fn create_bank(&self, epoch: u64, w: u32, h: u32, worker_process: RawProcessHandle) -> Result<BankAttach, SurfaceError> {
+        fn create_bank(
+            &self,
+            epoch: u64,
+            w: u32,
+            h: u32,
+            worker_process: RawProcessHandle,
+        ) -> Result<BankAttach, SurfaceError> {
             self.run_ui(move |wv| create_on_ui(wv, epoch, w, h, worker_process))
         }
 
@@ -109,7 +166,9 @@ mod imp {
         }
 
         fn post_frame(&self, msg: &FrameMsgOut) {
-            let Ok(json) = serde_json::to_string(msg) else { return };
+            let Ok(json) = serde_json::to_string(msg) else {
+                return;
+            };
             if let Some(window) = self.app.get_webview_window("main") {
                 let _ = window.with_webview(move |pw| {
                     // SAFETY: UI 스레드
@@ -130,7 +189,8 @@ mod imp {
             let r = self.run_ui(|wv| {
                 let wv2: ICoreWebView2_2 = wv.cast().map_err(|e| e.to_string())?;
                 let env = unsafe { wv2.Environment() }.map_err(|e| e.to_string())?;
-                env.cast::<ICoreWebView2Environment12>().map_err(|e| e.to_string())?;
+                env.cast::<ICoreWebView2Environment12>()
+                    .map_err(|e| e.to_string())?;
                 wv.cast::<ICoreWebView2_17>().map_err(|e| e.to_string())?;
                 Ok(())
             });
@@ -140,7 +200,11 @@ mod imp {
                     true
                 }
                 // 창이 아직 없거나 UI 가 바쁘면 캐시하지 않는다 (다음에 다시 본다)
-                Err(SurfaceError::Timeout) | Err(SurfaceError::Failed(_)) if self.app.get_webview_window("main").is_none() => false,
+                Err(SurfaceError::Timeout) | Err(SurfaceError::Failed(_))
+                    if self.app.get_webview_window("main").is_none() =>
+                {
+                    false
+                }
                 Err(e) => {
                     tracing::info!(%e, "player: WebView2 shared buffers are not supported");
                     *self.supported.lock().unwrap_or_else(|p| p.into_inner()) = Some(false);

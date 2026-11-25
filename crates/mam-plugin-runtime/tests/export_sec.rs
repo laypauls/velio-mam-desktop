@@ -20,20 +20,31 @@ fn t_pexpsec_01_backup_dir_changed_after_setup_is_protected_per_call() {
     let assets = vec![env.add_asset("image", "photo.jpg")];
     let current: Arc<Mutex<Option<PathBuf>>> = Arc::new(Mutex::new(None));
     let cur = Arc::clone(&current);
-    env.jobs.set_protected_source(Arc::new(move || cur.lock().unwrap().iter().cloned().collect()));
+    env.jobs.set_protected_source(Arc::new(move || {
+        cur.lock().unwrap().iter().cloned().collect()
+    }));
     let new_backups = env.tmp.path().join("NewBackups");
     fs::create_dir(&new_backups).unwrap();
     let dest = new_backups.join("out.csv");
-    env.invoker.script(vec![json!({"out": {"text": "a"}}), json!({"out": {"text": "b"}})]);
+    env.invoker.script(vec![
+        json!({"out": {"text": "a"}}),
+        json!({"out": {"text": "b"}}),
+    ]);
 
     // Act / Assert: 바꾸기 전에는 일반 폴더라 허용 (대조군)
-    env.export(EXPORTER, "exp.step", &assets, &dest).expect("not yet protected");
+    env.export(EXPORTER, "exp.step", &assets, &dest)
+        .expect("not yet protected");
     fs::remove_file(&dest).unwrap();
     // 설정이 바뀐 뒤: 같은 폴더가 거부되고 provider 는 호출되지 않는다
     *current.lock().unwrap() = Some(new_backups.clone());
     let calls = env.invoker.call_count();
-    let err = env.export(EXPORTER, "exp.step", &assets, &dest).expect_err("protected after the setting change");
-    assert!(matches!(err, ExportError::InvalidInput(m) if m.contains("app data folder")), "{err:?}");
+    let err = env
+        .export(EXPORTER, "exp.step", &assets, &dest)
+        .expect_err("protected after the setting change");
+    assert!(
+        matches!(err, ExportError::InvalidInput(m) if m.contains("app data folder")),
+        "{err:?}"
+    );
     assert!(!dest.exists());
     assert_eq!(env.invoker.call_count(), calls);
 }
@@ -44,12 +55,19 @@ fn t_pexpsec_02_oversized_raw_asset_list_is_rejected_before_sorting() {
     let env = Env::new();
     env.install(exporter());
     let dest = env.out_dir().join("n.csv");
-    let huge: Vec<i64> = (0..(MAX_EXPORT_ASSETS * 4 + 1) as i64).map(|i| i % 3 + 1).collect();
+    let huge: Vec<i64> = (0..(MAX_EXPORT_ASSETS * 4 + 1) as i64)
+        .map(|i| i % 3 + 1)
+        .collect();
 
     // Act
-    let err = env.export(EXPORTER, "exp.echo", &huge, &dest).expect_err("too many raw ids");
+    let err = env
+        .export(EXPORTER, "exp.echo", &huge, &dest)
+        .expect_err("too many raw ids");
 
     // Assert
-    assert!(matches!(err, ExportError::InvalidInput(m) if m.contains("1..=5000")), "{err:?}");
+    assert!(
+        matches!(err, ExportError::InvalidInput(m) if m.contains("1..=5000")),
+        "{err:?}"
+    );
     assert_eq!((env.invoker.call_count(), dest.exists()), (0, false));
 }

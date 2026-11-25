@@ -21,11 +21,17 @@ const CANCELLED: u8 = 2;
 
 impl DbPool {
     /// [`DbPool::read`] 와 같지만 읽기 연결을 `deadline` 까지만 기다린다. 이미 지났으면 연결을 건드리지 않고 `DeadlineExceeded`.
-    pub fn read_until<T>(&self, deadline: Instant, f: impl FnOnce(&Connection) -> Result<T, DbError>) -> Result<T, PoolError> {
+    pub fn read_until<T>(
+        &self,
+        deadline: Instant,
+        f: impl FnOnce(&Connection) -> Result<T, DbError>,
+    ) -> Result<T, PoolError> {
         if Instant::now() >= deadline {
             return Err(PoolError::DeadlineExceeded);
         }
-        let guard = self.acquire_reader(deadline).ok_or(PoolError::DeadlineExceeded)?;
+        let guard = self
+            .acquire_reader(deadline)
+            .ok_or(PoolError::DeadlineExceeded)?;
         let result = match guard.conn.as_ref() {
             Some(conn) => f(conn),
             None => return Err(PoolError::DeadlineExceeded), // 도달 불가: 가드는 Drop 전까지 연결을 가진다
@@ -36,7 +42,12 @@ impl DbPool {
 
     /// [`DbPool::write`] 와 같지만 `deadline` 까지 시작하지 못한 작업은 취소한다(`DeadlineExceeded`, 이후에도 실행되지 않음).
     /// 이미 실행 중이면 끝날 때까지 기다려 실제 결과를 돌려준다. 마감이 이미 지났으면 큐에 넣지 않는다.
-    pub fn write_until<T, F>(&self, priority: Priority, deadline: Instant, f: F) -> Result<T, PoolError>
+    pub fn write_until<T, F>(
+        &self,
+        priority: Priority,
+        deadline: Instant,
+        f: F,
+    ) -> Result<T, PoolError>
     where
         T: Send + 'static,
         F: FnOnce(&mut Connection) -> Result<T, DbError> + Send + 'static,
@@ -48,7 +59,10 @@ impl DbPool {
         let (tx, rx) = mpsc::sync_channel(1);
         let job_state = Arc::clone(&state);
         let job: Job = Box::new(move |conn| {
-            if job_state.compare_exchange(QUEUED, RUNNING, Ordering::AcqRel, Ordering::Acquire).is_err() {
+            if job_state
+                .compare_exchange(QUEUED, RUNNING, Ordering::AcqRel, Ordering::Acquire)
+                .is_err()
+            {
                 return; // 호출자가 이미 취소했다 — 실행하지 않는다
             }
             let outcome = match catch_unwind(AssertUnwindSafe(|| f(conn))) {
@@ -62,7 +76,10 @@ impl DbPool {
             Ok(outcome) => outcome,
             Err(mpsc::RecvTimeoutError::Disconnected) => Err(PoolError::WriterGone),
             Err(mpsc::RecvTimeoutError::Timeout) => {
-                if state.compare_exchange(QUEUED, CANCELLED, Ordering::AcqRel, Ordering::Acquire).is_ok() {
+                if state
+                    .compare_exchange(QUEUED, CANCELLED, Ordering::AcqRel, Ordering::Acquire)
+                    .is_ok()
+                {
                     Err(PoolError::DeadlineExceeded)
                 } else {
                     rx.recv().map_err(|_| PoolError::WriterGone)?
@@ -81,9 +98,16 @@ impl DbPool {
             if remain.is_zero() {
                 return None;
             }
-            pool = self.reader_free.wait_timeout(pool, remain).unwrap_or_else(|p| p.into_inner()).0;
+            pool = self
+                .reader_free
+                .wait_timeout(pool, remain)
+                .unwrap_or_else(|p| p.into_inner())
+                .0;
         };
         drop(pool);
-        Some(ReaderGuard { pool: self, conn: Some(conn) })
+        Some(ReaderGuard {
+            pool: self,
+            conn: Some(conn),
+        })
     }
 }

@@ -108,7 +108,10 @@ fn t_page_01_backward_pages_mirror_forward_pages_for_every_sort() {
             assert_eq!(b.total, 137);
         }
         assert_eq!(back.last().unwrap().start_offset, 0);
-        assert!(back.last().unwrap().prev_cursor.is_none(), "start has no prev");
+        assert!(
+            back.last().unwrap().prev_cursor.is_none(),
+            "start has no prev"
+        );
         assert!(forward[0].prev_cursor.is_none());
     }
 }
@@ -180,7 +183,22 @@ fn t_page_03_seek_equals_the_same_slice_of_sequential_paging() {
         let all = flat(&forward_all(&h, &creq(field, desc, 200)));
         let total = all.len();
         // 시작·1·경계(limit±1)·중간(68/69)·마지막 페이지·마지막 항목, 값 없음 구간(촬영일 정렬: 맨 뒤 15건)
-        let positions = [0, 1, limit - 1, limit, limit + 1, 67, 68, 69, 70, 100, total - limit, total - limit + 1, total - 3, total - 1];
+        let positions = [
+            0,
+            1,
+            limit - 1,
+            limit,
+            limit + 1,
+            67,
+            68,
+            69,
+            70,
+            100,
+            total - limit,
+            total - limit + 1,
+            total - 3,
+            total - 1,
+        ];
         for at in positions {
             // Act
             let mut r = creq(field, desc, limit);
@@ -192,7 +210,11 @@ fn t_page_03_seek_equals_the_same_slice_of_sequential_paging() {
             assert_eq!(page.ids, all[at..end], "{field:?} {desc} at={at}");
             assert_eq!(page.start_offset, at as u64);
             assert_eq!(page.total, total as u64);
-            assert_eq!(page.next_cursor.is_some(), end < total, "{field:?} {desc} at={at}");
+            assert_eq!(
+                page.next_cursor.is_some(),
+                end < total,
+                "{field:?} {desc} at={at}"
+            );
             assert_eq!(page.prev_cursor.is_some(), at > 0);
 
             // 이어서: next/prev 커서는 seek 페이지에서도 정확히 이어진다
@@ -200,7 +222,11 @@ fn t_page_03_seek_equals_the_same_slice_of_sequential_paging() {
                 let mut n = creq(field, desc, limit);
                 n.cursor = Some(c);
                 let next = h.search(&n).unwrap();
-                assert_eq!(next.ids, all[end..(end + limit).min(total)], "{field:?} {desc} next of at={at}");
+                assert_eq!(
+                    next.ids,
+                    all[end..(end + limit).min(total)],
+                    "{field:?} {desc} next of at={at}"
+                );
                 assert_eq!(next.start_offset, end as u64);
             }
             if let Some(c) = page.prev_cursor.clone() {
@@ -229,7 +255,11 @@ fn t_page_03b_seek_into_the_missing_value_region_keeps_nulls_last() {
         let page = h.search(&r).unwrap();
         // Assert: 이 페이지는 전부 값 없는 문서, asset_id 오름차순
         assert_eq!(page.ids.len(), 10);
-        assert!(page.ids.iter().all(|id| id % 9 == 0), "desc={desc}: {:?}", page.ids);
+        assert!(
+            page.ids.iter().all(|id| id % 9 == 0),
+            "desc={desc}: {:?}",
+            page.ids
+        );
         assert!(page.ids.windows(2).all(|w| w[0] < w[1]));
     }
 }
@@ -264,7 +294,11 @@ fn t_page_05_conflicting_or_incomplete_paging_arguments_are_invalid_input() {
     let dir = tempdir().unwrap();
     let idx = indexed(&dir, &dataset(30));
     let h = SearchHandle::for_index(&idx);
-    let cursor = h.search(&creq(SortField::Name, false, 10)).unwrap().next_cursor.unwrap();
+    let cursor = h
+        .search(&creq(SortField::Name, false, 10))
+        .unwrap()
+        .next_cursor
+        .unwrap();
 
     // cursor + at
     let mut both = creq(SortField::Name, false, 10);
@@ -281,8 +315,16 @@ fn t_page_05_conflicting_or_incomplete_paging_arguments_are_invalid_input() {
     bad.cursor = Some("garbage".into());
 
     // Act + Assert
-    for (name, r) in [("cursor+at", both), ("backward no cursor", no_cursor), ("backward+at", back_at), ("bad cursor", bad)] {
-        assert!(matches!(h.search(&r), Err(SearchError::InvalidInput(_))), "{name}");
+    for (name, r) in [
+        ("cursor+at", both),
+        ("backward no cursor", no_cursor),
+        ("backward+at", back_at),
+        ("bad cursor", bad),
+    ] {
+        assert!(
+            matches!(h.search(&r), Err(SearchError::InvalidInput(_))),
+            "{name}"
+        );
     }
     // limit 검사는 seek·backward 에도 적용된다
     let mut zero = creq(SortField::Name, false, 0);
@@ -303,15 +345,24 @@ fn t_page_06_cursors_from_another_generation_or_sort_are_stale_in_both_direction
     let next = page.next_cursor.unwrap();
     let other_gen = SearchHandle::for_index(&idx);
 
-    for (dir_, cursor) in [(Direction::Backward, prev.clone()), (Direction::Forward, next.clone())] {
+    for (dir_, cursor) in [
+        (Direction::Backward, prev.clone()),
+        (Direction::Forward, next.clone()),
+    ] {
         // 다른 세대
         let mut r = creq(SortField::Name, false, 10);
         r.cursor = Some(cursor.clone());
         r.direction = dir_;
-        assert!(matches!(other_gen.search(&r), Err(SearchError::StaleCursor)), "generation {dir_:?}");
+        assert!(
+            matches!(other_gen.search(&r), Err(SearchError::StaleCursor)),
+            "generation {dir_:?}"
+        );
         // 다른 정렬
         r.sort.field = SortField::Size;
-        assert!(matches!(h.search(&r), Err(SearchError::StaleCursor)), "sort {dir_:?}");
+        assert!(
+            matches!(h.search(&r), Err(SearchError::StaleCursor)),
+            "sort {dir_:?}"
+        );
     }
     assert_ne!(page.generation, other_gen.generation());
 }
@@ -387,6 +438,10 @@ fn t_page_09_relevance_paging_with_a_text_query_round_trips_and_seeks() {
     for at in [0, 4, all.len() / 2, all.len() - 1] {
         let mut s = base.clone();
         s.at = Some(at);
-        assert_eq!(h.search(&s).unwrap().ids, all[at..(at + 9).min(all.len())], "at={at}");
+        assert_eq!(
+            h.search(&s).unwrap().ids,
+            all[at..(at + 9).min(all.len())],
+            "at={at}"
+        );
     }
 }

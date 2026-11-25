@@ -39,37 +39,59 @@ pub enum ExportError {
     Folders(String),
 }
 
-pub(super) fn export(core: &Core, plugin: &str, provider: &str, mut asset_ids: Vec<i64>, dest: &str) -> Result<ExportResult, ExportError> {
+pub(super) fn export(
+    core: &Core,
+    plugin: &str,
+    provider: &str,
+    mut asset_ids: Vec<i64>,
+    dest: &str,
+) -> Result<ExportResult, ExportError> {
     // 정렬·중복 제거 전에 원본 길이를 먼저 막는다 (거대한 입력을 정렬하지 않는다)
     if asset_ids.len() > MAX_EXPORT_ASSETS.saturating_mul(4) {
-        return Err(ExportError::InvalidInput("assetIds must have 1..=5000 entries"));
+        return Err(ExportError::InvalidInput(
+            "assetIds must have 1..=5000 entries",
+        ));
     }
     asset_ids.sort_unstable();
     asset_ids.dedup();
     if asset_ids.is_empty() || asset_ids.len() > MAX_EXPORT_ASSETS {
-        return Err(ExportError::InvalidInput("assetIds must have 1..=5000 entries"));
+        return Err(ExportError::InvalidInput(
+            "assetIds must have 1..=5000 entries",
+        ));
     }
     let spec = core.invoker.provider(plugin, provider)?;
     if spec.kind != ProviderKind::Export {
-        return Err(ExportError::InvalidInput("provider is not an export provider"));
+        return Err(ExportError::InvalidInput(
+            "provider is not an export provider",
+        ));
     }
     if !core.invoker.allows(plugin, Permission::ExportWrite) {
         return Err(RunError::PermissionDenied(Permission::ExportWrite).into());
     }
-    let ext = spec.file_extension.ok_or(ExportError::InvalidInput("provider declares no file extension"))?;
+    let ext = spec.file_extension.ok_or(ExportError::InvalidInput(
+        "provider declares no file extension",
+    ))?;
     let dest = check_dest(core, dest, &ext)?;
     let params = json!({ "assetIds": asset_ids, "kind": "export" });
-    let out = core.invoker.invoke_provider(plugin, provider, asset_ids, params)?;
+    let out = core
+        .invoker
+        .invoke_provider(plugin, provider, asset_ids, params)?;
     let bytes = decode_output(out)?;
     write_atomic(core, &dest, &bytes)?;
-    Ok(ExportResult { bytes_written: bytes.len() as u64 })
+    Ok(ExportResult {
+        bytes_written: bytes.len() as u64,
+    })
 }
 
 /// `{ text: string }` 또는 `{ dataBase64: string }` 정확히 하나 -> 바이트 (≤ `MAX_EXPORT_BYTES`)
 pub(super) fn decode_output(out: Value) -> Result<Vec<u8>, ExportError> {
-    let Value::Object(mut map) = out else { return Err(ExportError::BadOutput("output must be an object")) };
+    let Value::Object(mut map) = out else {
+        return Err(ExportError::BadOutput("output must be an object"));
+    };
     if map.len() != 1 {
-        return Err(ExportError::BadOutput("output must have exactly one of text or dataBase64"));
+        return Err(ExportError::BadOutput(
+            "output must have exactly one of text or dataBase64",
+        ));
     }
     let bytes = if let Some(Value::String(text)) = map.remove("text") {
         text.into_bytes()
@@ -77,9 +99,13 @@ pub(super) fn decode_output(out: Value) -> Result<Vec<u8>, ExportError> {
         if b64.len() > MAX_EXPORT_BYTES.div_ceil(3) * 4 {
             return Err(ExportError::BadOutput("output too large"));
         }
-        STANDARD.decode(b64.as_bytes()).map_err(|_| ExportError::BadOutput("dataBase64 is not valid base64"))?
+        STANDARD
+            .decode(b64.as_bytes())
+            .map_err(|_| ExportError::BadOutput("dataBase64 is not valid base64"))?
     } else {
-        return Err(ExportError::BadOutput("output must have a string text or dataBase64"));
+        return Err(ExportError::BadOutput(
+            "output must have a string text or dataBase64",
+        ));
     };
     if bytes.len() > MAX_EXPORT_BYTES {
         return Err(ExportError::BadOutput("output too large"));
@@ -99,9 +125,18 @@ mod tests {
 
     #[test]
     fn t_pjob_export_01_decode_text_and_base64() {
-        assert_eq!(decode_output(json!({ "text": "héllo" })).unwrap(), "héllo".as_bytes());
-        assert_eq!(decode_output(json!({ "dataBase64": "AAEC/w==" })).unwrap(), vec![0, 1, 2, 255]);
-        assert_eq!(decode_output(json!({ "text": "" })).unwrap(), Vec::<u8>::new());
+        assert_eq!(
+            decode_output(json!({ "text": "héllo" })).unwrap(),
+            "héllo".as_bytes()
+        );
+        assert_eq!(
+            decode_output(json!({ "dataBase64": "AAEC/w==" })).unwrap(),
+            vec![0, 1, 2, 255]
+        );
+        assert_eq!(
+            decode_output(json!({ "text": "" })).unwrap(),
+            Vec::<u8>::new()
+        );
     }
 
     #[test]
@@ -118,8 +153,18 @@ mod tests {
     #[test]
     fn t_pjob_export_03_size_boundary() {
         let ok = vec![b'a'; MAX_EXPORT_BYTES];
-        assert_eq!(decode_output(json!({ "dataBase64": STANDARD.encode(&ok) })).unwrap().len(), MAX_EXPORT_BYTES);
-        assert_eq!(decode_output(json!({ "text": "a".repeat(MAX_EXPORT_BYTES) })).unwrap().len(), MAX_EXPORT_BYTES);
+        assert_eq!(
+            decode_output(json!({ "dataBase64": STANDARD.encode(&ok) }))
+                .unwrap()
+                .len(),
+            MAX_EXPORT_BYTES
+        );
+        assert_eq!(
+            decode_output(json!({ "text": "a".repeat(MAX_EXPORT_BYTES) }))
+                .unwrap()
+                .len(),
+            MAX_EXPORT_BYTES
+        );
         let over = vec![b'a'; MAX_EXPORT_BYTES + 1];
         assert!(bad(json!({ "dataBase64": STANDARD.encode(&over) })));
         assert!(bad(json!({ "text": "a".repeat(MAX_EXPORT_BYTES + 1) })));

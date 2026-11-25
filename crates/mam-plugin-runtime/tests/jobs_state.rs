@@ -12,7 +12,11 @@ use mam_plugin_runtime::{AssetKind, JobHooks, ProviderKind};
 const P: &str = "com.example.state";
 
 fn writer() -> Plugin {
-    Plugin::new(P, "ok_writer").provider("meta.extract", ProviderKind::Metadata, &[AssetKind::Image])
+    Plugin::new(P, "ok_writer").provider(
+        "meta.extract",
+        ProviderKind::Metadata,
+        &[AssetKind::Image],
+    )
 }
 
 fn queued_asset(env: &Env) -> i64 {
@@ -37,7 +41,10 @@ fn t_pjob_15_disabled_plugin_keeps_its_task_pending_and_the_enabled_hook_requeue
     assert!(matches!(done[0].outcome, Ok(JobOutcome::Done)));
     assert_eq!(env.invoker.call_count(), 0);
     let t = env.task(P, "meta.extract", asset).unwrap();
-    assert_eq!((t.status.as_str(), t.attempts, t.last_error), ("pending", 0, None));
+    assert_eq!(
+        (t.status.as_str(), t.attempts, t.last_error),
+        ("pending", 0, None)
+    );
     assert!(env.jobs_rows().is_empty());
 
     // Act 2: 다시 켠다 -> `enabled` 훅이 대기 작업을 `jobs` 에 다시 올린다
@@ -58,14 +65,18 @@ fn t_pjob_15_disabled_between_lookup_and_invoke_and_an_uninstalled_plugin_also_s
     env.install(writer());
     let first = queued_asset(&env);
     let invoker = env.invoker.clone();
-    env.invoker.set_before(move |_| invoker.set_enabled(P, false));
+    env.invoker
+        .set_before(move |_| invoker.set_enabled(P, false));
 
     // Act 1
     env.run(1);
 
     // Assert 1: `RunError::Disabled` -> 대기 유지, 시도·실패 없음
     let t = env.task(P, "meta.extract", first).unwrap();
-    assert_eq!((t.status.as_str(), t.attempts, t.last_error), ("pending", 0, None));
+    assert_eq!(
+        (t.status.as_str(), t.attempts, t.last_error),
+        ("pending", 0, None)
+    );
     assert_eq!(env.kv_rows(), 0);
 
     // Act 2: 런타임에서 항목이 사라진(`NotInstalled`) 플러그인
@@ -78,7 +89,11 @@ fn t_pjob_15_disabled_between_lookup_and_invoke_and_an_uninstalled_plugin_also_s
     // Assert 2
     let t = env.task(P, "meta.extract", first).unwrap();
     assert_eq!((t.status.as_str(), t.attempts), ("pending", 0));
-    assert_eq!(env.invoker.call_count(), 1, "only the first (disabled-at-invoke) call was made");
+    assert_eq!(
+        env.invoker.call_count(),
+        1,
+        "only the first (disabled-at-invoke) call was made"
+    );
 }
 
 #[test]
@@ -99,11 +114,17 @@ fn t_pjob_16_inactive_assets_are_closed_without_invoking_and_the_task_is_done_in
     let done = env.run(2);
 
     // Assert: 호출 없음, done(inactive) 로 닫힘 — 다시 대기하지 않는다
-    assert!(done.iter().all(|d| matches!(d.outcome, Ok(JobOutcome::Done))));
+    assert!(
+        done.iter()
+            .all(|d| matches!(d.outcome, Ok(JobOutcome::Done)))
+    );
     assert_eq!(env.invoker.call_count(), 0);
     for a in [merged, deleted] {
         let t = env.task(P, "meta.extract", a).unwrap();
-        assert_eq!((t.status.as_str(), t.last_error.as_deref(), t.done), ("done", Some("inactive"), t.target));
+        assert_eq!(
+            (t.status.as_str(), t.last_error.as_deref(), t.done),
+            ("done", Some("inactive"), t.target)
+        );
     }
     assert!(env.jobs_rows().is_empty());
 }
@@ -117,7 +138,13 @@ fn t_pjob_16_asset_turning_inactive_during_the_invoke_writes_nothing_and_closes_
     let pool = env.pool.clone();
     env.invoker.set_after(move |c| {
         let id = c.asset;
-        pool.write(mam_db::Priority::High, move |conn| Ok(conn.execute("UPDATE media_assets SET status = 'deleted' WHERE asset_id = ?1", [id])?)).unwrap();
+        pool.write(mam_db::Priority::High, move |conn| {
+            Ok(conn.execute(
+                "UPDATE media_assets SET status = 'deleted' WHERE asset_id = ?1",
+                [id],
+            )?)
+        })
+        .unwrap();
     });
 
     // Act
@@ -125,9 +152,15 @@ fn t_pjob_16_asset_turning_inactive_during_the_invoke_writes_nothing_and_closes_
 
     // Assert: 기록은 `AssetInactive` 로 막혀 KV·태그가 없고 작업은 done(inactive)
     assert!(matches!(done[0].outcome, Ok(JobOutcome::Done)));
-    assert_eq!((env.kv_rows(), env.plugin_tags(asset)), (0, Vec::<String>::new()));
+    assert_eq!(
+        (env.kv_rows(), env.plugin_tags(asset)),
+        (0, Vec::<String>::new())
+    );
     let t = env.task(P, "meta.extract", asset).unwrap();
-    assert_eq!((t.status.as_str(), t.last_error.as_deref()), ("done", Some("inactive")));
+    assert_eq!(
+        (t.status.as_str(), t.last_error.as_deref()),
+        ("done", Some("inactive"))
+    );
     assert!(env.jobs_rows().is_empty());
 }
 

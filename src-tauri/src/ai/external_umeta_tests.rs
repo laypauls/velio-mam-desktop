@@ -45,18 +45,32 @@ fn request(fx: &Fx, include_metadata: bool) -> ExternalRequest {
 fn seed(fx: &Fx) -> i64 {
     fx.insert_asset(1, "image", "photos/a.jpg");
     let ud = user_data(fx);
-    let dir = ud.create_metadata_field("촬영 감독", ValueType::Keyword, &[]).unwrap();
+    let dir = ud
+        .create_metadata_field("촬영 감독", ValueType::Keyword, &[])
+        .unwrap();
     let grade = ud
         .create_metadata_field("등급", ValueType::Enum, &["상".into(), "하".into()])
         .unwrap();
-    let gone = ud.create_metadata_field("지울필드", ValueType::Keyword, &[]).unwrap();
-    ud.create_metadata_field("값없음", ValueType::Number, &[]).unwrap();
+    let gone = ud
+        .create_metadata_field("지울필드", ValueType::Keyword, &[])
+        .unwrap();
+    ud.create_metadata_field("값없음", ValueType::Number, &[])
+        .unwrap();
     ud.set_metadata_values(
         1,
         &[
-            (dir.field_id, FieldPatch::Set(FieldValue::Keyword("김○○".into()))),
-            (grade.field_id, FieldPatch::Set(FieldValue::Enum(grade.options[1].option_id))),
-            (gone.field_id, FieldPatch::Set(FieldValue::Keyword("비밀값".into()))),
+            (
+                dir.field_id,
+                FieldPatch::Set(FieldValue::Keyword("김○○".into())),
+            ),
+            (
+                grade.field_id,
+                FieldPatch::Set(FieldValue::Enum(grade.options[1].option_id)),
+            ),
+            (
+                gone.field_id,
+                FieldPatch::Set(FieldValue::Keyword("비밀값".into())),
+            ),
         ],
     )
     .unwrap();
@@ -75,7 +89,9 @@ fn t_ext_umeta_40_no_consent_sends_nothing_even_with_user_fields() {
     // Arrange: 키는 있고 사용자 필드도 있지만 동의가 없다
     let fx = Fx::new();
     seed(&fx);
-    fx.service.set_api_key("openai", "sk-test-1234", false).unwrap();
+    fx.service
+        .set_api_key("openai", "sk-test-1234", false)
+        .unwrap();
     // Act
     let err = adapter(&fx).analyze(&request(&fx, true)).unwrap_err();
     // Assert
@@ -99,7 +115,10 @@ fn t_ext_umeta_41_user_fields_sent_only_with_value_and_option_label() {
     assert!(text.contains("촬영 감독") && text.contains("김○○"));
     assert!(text.contains(r#"등급\":\"하"#), "enum 은 선택지 이름");
     assert!(!text.contains("값없음"), "값 없는 필드 제외");
-    assert!(!text.contains("지울필드") && !text.contains("비밀값"), "삭제 중 필드 제외");
+    assert!(
+        !text.contains("지울필드") && !text.contains("비밀값"),
+        "삭제 중 필드 제외"
+    );
 }
 
 #[test]

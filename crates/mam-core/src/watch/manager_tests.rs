@@ -83,7 +83,8 @@ fn target(id: i64) -> WatchTarget {
 
 fn manager(fake: &Arc<Fake>, auto: &[&'static str]) -> WatchManager {
     let (tx, _rx) = channel();
-    let all: Vec<Arc<dyn ChangeDetector>> = vec![Arc::new(FakeDetector(Arc::clone(fake))), Arc::new(ScanOnly)];
+    let all: Vec<Arc<dyn ChangeDetector>> =
+        vec![Arc::new(FakeDetector(Arc::clone(fake))), Arc::new(ScanOnly)];
     WatchManager::new(tx, Arc::new(DetectorRegistry::new(all, auto)))
 }
 
@@ -157,7 +158,10 @@ fn t_wmgr_04_unavailable_mode_falls_back_with_probe_reason() {
     let out = m.start(&target(1), Some("fake"), None);
 
     assert_eq!(out.status.active, "scan_only");
-    assert_eq!(out.status.fallback, Some(FallbackReason::Unavailable("no_network")));
+    assert_eq!(
+        out.status.fallback,
+        Some(FallbackReason::Unavailable("no_network"))
+    );
     assert_eq!(fake.starts.load(Ordering::SeqCst), 0);
 }
 
@@ -169,8 +173,15 @@ fn t_wmgr_05_invalid_options_fall_back_to_auto() {
 
         let out = m.start(&target(1), Some("fake"), Some(raw));
 
-        assert_eq!(out.status.fallback, Some(FallbackReason::InvalidOptions), "{raw}");
-        assert_eq!(out.status.active, "fake", "auto order still starts the detector with defaults");
+        assert_eq!(
+            out.status.fallback,
+            Some(FallbackReason::InvalidOptions),
+            "{raw}"
+        );
+        assert_eq!(
+            out.status.active, "fake",
+            "auto order still starts the detector with defaults"
+        );
     }
 }
 
@@ -186,7 +197,10 @@ fn t_wmgr_06_scan_only_entry_does_not_hide_an_unreleased_handle() {
     m.stop(1);
 
     // Assert
-    assert!(!m.wait_released(Duration::from_millis(50)), "token of the stopped sink is still alive");
+    assert!(
+        !m.wait_released(Duration::from_millis(50)),
+        "token of the stopped sink is still alive"
+    );
     release_all(&fake);
     assert!(m.wait_released(Duration::from_millis(50)));
     assert!(m.is_watching(2));
@@ -225,7 +239,10 @@ fn t_wmgr_08_registry_rules() {
 fn t_wmgr_08_duplicate_ids_panic() {
     let fake = Fake::new();
     let _ = DetectorRegistry::new(
-        vec![Arc::new(FakeDetector(Arc::clone(&fake))), Arc::new(FakeDetector(fake))],
+        vec![
+            Arc::new(FakeDetector(Arc::clone(&fake))),
+            Arc::new(FakeDetector(fake)),
+        ],
         &["fake"],
     );
 }
@@ -249,7 +266,10 @@ fn t_wmgr_09_first_reason_wins_over_later_start_failure() {
     // Assert
     assert_eq!(out.status.active, "scan_only");
     assert_eq!(out.status.fallback, Some(FallbackReason::UnknownMode));
-    assert!(out.last_error.is_some() && !m.is_settled(1), "start failure is tracked apart from the displayed reason");
+    assert!(
+        out.last_error.is_some() && !m.is_settled(1),
+        "start failure is tracked apart from the displayed reason"
+    );
 }
 
 #[test]
@@ -272,7 +292,10 @@ fn t_wmgr_10_start_failure_behind_another_reason_is_still_retried() {
     // 복구되면 정착하고 표시 사유는 그대로
     fake.fail.store(false, Ordering::SeqCst);
     let ok = m.start(&target(1), Some("ghost"), None);
-    assert_eq!((ok.status.active, ok.status.fallback), ("fake", Some(FallbackReason::UnknownMode)));
+    assert_eq!(
+        (ok.status.active, ok.status.fallback),
+        ("fake", Some(FallbackReason::UnknownMode))
+    );
     assert!(m.is_settled(1));
 }
 
@@ -303,7 +326,12 @@ impl ChangeDetector for GateDetector {
     fn probe(&self, _t: &WatchTarget) -> ProbeResult {
         ProbeResult::Available
     }
-    fn start(&self, _t: &WatchTarget, _o: &DetectorOptions, sink: ChangeSink) -> Result<Box<dyn WatchHandle>, DetectError> {
+    fn start(
+        &self,
+        _t: &WatchTarget,
+        _o: &DetectorOptions,
+        sink: ChangeSink,
+    ) -> Result<Box<dyn WatchHandle>, DetectError> {
         self.parked.lock().unwrap().push(sink.release_token());
         let h = self.handle.lock().unwrap().take().expect("one start");
         Ok(Box::new(h))
@@ -318,20 +346,31 @@ fn t_wmgr_11_sink_is_closed_atomically_with_entry_removal() {
     let parked: Arc<Mutex<Vec<ReleaseToken>>> = Arc::default();
     let det = GateDetector {
         parked: Arc::clone(&parked),
-        handle: Mutex::new(Some(GateHandle { dropping: dropping_tx, gate: gate_rx })),
+        handle: Mutex::new(Some(GateHandle {
+            dropping: dropping_tx,
+            gate: gate_rx,
+        })),
     };
     let (tx, _rx) = channel();
-    let m = Arc::new(WatchManager::new(tx, Arc::new(DetectorRegistry::new(vec![Arc::new(det)], &["fake"]))));
+    let m = Arc::new(WatchManager::new(
+        tx,
+        Arc::new(DetectorRegistry::new(vec![Arc::new(det)], &["fake"])),
+    ));
     m.start(&target(1), None, None);
 
     // Act: 다른 스레드가 stop — 핸들 drop 에서 멈춘다
     let m2 = Arc::clone(&m);
     let stopper = std::thread::spawn(move || m2.stop(1));
-    dropping_rx.recv_timeout(Duration::from_secs(5)).expect("handle drop started");
+    dropping_rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("handle drop started");
 
     // Assert: 엔트리는 이미 없고(stop 은 no-op 으로 보임) 토큰이 살아 있으니 해제됐다고 말하면 안 된다
     assert!(!m.is_watching(1));
-    assert!(!m.wait_released(Duration::from_millis(50)), "closed sink with a live token must block");
+    assert!(
+        !m.wait_released(Duration::from_millis(50)),
+        "closed sink with a live token must block"
+    );
     parked.lock().unwrap().clear();
     gate_tx.send(()).unwrap();
     stopper.join().unwrap();

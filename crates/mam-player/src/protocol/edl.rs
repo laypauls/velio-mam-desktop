@@ -17,7 +17,17 @@ fn secs(ms: i64) -> String {
 /// `start_offset_ms` = 파일 첫 프레임의 pts(`demuxer-start-time`) — 구간은 "파일 시작 = 0" 기준이라 EDL 시작에 더한다.
 /// 구간은 정렬·병합 끝난 값이어야 한다 (`EdlMap::new` 가 검증)
 pub fn build_edl(path: &str, ranges: &[RangeMs], start_offset_ms: i64) -> String {
-    let parts: Vec<String> = ranges.iter().map(|&(s, e)| format!("%{}%{path},{},{}", path.len(), secs(s + start_offset_ms), secs(e - s))).collect();
+    let parts: Vec<String> = ranges
+        .iter()
+        .map(|&(s, e)| {
+            format!(
+                "%{}%{path},{},{}",
+                path.len(),
+                secs(s + start_offset_ms),
+                secs(e - s)
+            )
+        })
+        .collect();
     format!("edl://{}", parts.join(";"))
 }
 
@@ -57,7 +67,11 @@ impl EdlMap {
             acc = acc.checked_add(e - s)?;
             prev_end = e;
         }
-        Some(Self { ranges: ranges.to_vec(), offsets, total: acc })
+        Some(Self {
+            ranges: ranges.to_vec(),
+            offsets,
+            total: acc,
+        })
     }
 
     /// EDL 전체 길이 (구간 길이의 합)
@@ -86,7 +100,10 @@ impl EdlMap {
                 return (self.offsets[i] as f64, Landing::NextRange);
             }
             if src_ms < e as f64 {
-                return (self.offsets[i] as f64 + (src_ms - s as f64), Landing::Inside);
+                return (
+                    self.offsets[i] as f64 + (src_ms - s as f64),
+                    Landing::Inside,
+                );
             }
         }
         (self.total as f64, Landing::PastEnd)
@@ -117,13 +134,22 @@ mod tests {
 
     #[test]
     fn t_player_edl_01_build_uses_length_prefix_and_ms_precision() {
-        assert_eq!(build_edl(r"C:\a b\x,y;z.mp4", &[(0, 2000), (10_000, 12_500)], 0), r"edl://%16%C:\a b\x,y;z.mp4,0,2;%16%C:\a b\x,y;z.mp4,10,2.5");
+        assert_eq!(
+            build_edl(r"C:\a b\x,y;z.mp4", &[(0, 2000), (10_000, 12_500)], 0),
+            r"edl://%16%C:\a b\x,y;z.mp4,0,2;%16%C:\a b\x,y;z.mp4,10,2.5"
+        );
         assert_eq!(build_edl("a", &[], 0), "edl://");
         assert_eq!(build_edl("a", &[(10, 20)], 0), "edl://%1%a,0.01,0.01");
         // 길이 접두는 문자 수가 아니라 UTF-8 바이트 수
-        assert_eq!(build_edl("한글.mp4", &[(0, 1000)], 0), "edl://%10%한글.mp4,0,1");
+        assert_eq!(
+            build_edl("한글.mp4", &[(0, 1000)], 0),
+            "edl://%10%한글.mp4,0,1"
+        );
         // 시작 오프셋 (첫 프레임 pts 0.105s) 은 구간 시작에만 더해진다
-        assert_eq!(build_edl("a", &[(0, 1000), (2000, 2500)], 105), "edl://%1%a,0.105,1;%1%a,2.105,0.5");
+        assert_eq!(
+            build_edl("a", &[(0, 1000), (2000, 2500)], 105),
+            "edl://%1%a,0.105,1;%1%a,2.105,0.5"
+        );
     }
 
     #[test]
@@ -150,8 +176,16 @@ mod tests {
         assert_eq!(m.source_to_edl(1000.0), (0.0, Landing::Inside));
         assert_eq!(m.source_to_edl(1999.5), (999.5, Landing::Inside));
         assert_eq!(m.source_to_edl(5250.0), (1250.0, Landing::Inside));
-        assert_eq!(m.source_to_edl(0.0), (0.0, Landing::NextRange), "첫 구간 앞");
-        assert_eq!(m.source_to_edl(2000.0), (1000.0, Landing::NextRange), "구간 끝 = 사이");
+        assert_eq!(
+            m.source_to_edl(0.0),
+            (0.0, Landing::NextRange),
+            "첫 구간 앞"
+        );
+        assert_eq!(
+            m.source_to_edl(2000.0),
+            (1000.0, Landing::NextRange),
+            "구간 끝 = 사이"
+        );
         assert_eq!(m.source_to_edl(7000.0), (1500.0, Landing::NextRange));
         assert_eq!(m.source_to_edl(9250.0), (1750.0, Landing::PastEnd));
         assert_eq!(m.source_to_edl(1e9), (1750.0, Landing::PastEnd));

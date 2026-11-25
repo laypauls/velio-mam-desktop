@@ -20,8 +20,13 @@ pub fn worker_exe() -> PathBuf {
             return PathBuf::from(p);
         }
         let test_exe = std::env::current_exe().expect("test exe path");
-        let profile_dir = test_exe.parent().and_then(Path::parent).expect("profile dir").to_path_buf();
-        let mut cmd = std::process::Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()));
+        let profile_dir = test_exe
+            .parent()
+            .and_then(Path::parent)
+            .expect("profile dir")
+            .to_path_buf();
+        let mut cmd =
+            std::process::Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()));
         cmd.args(["build", "-p", "mam-plugin-worker", "--quiet"]);
         if profile_dir.file_name().is_some_and(|n| n == "release") {
             cmd.arg("--release");
@@ -36,7 +41,9 @@ pub fn worker_exe() -> PathBuf {
 }
 
 pub fn plugin_id(id: &str) -> PluginId {
-    let json = format!(r#"{{"apiVersion":1,"id":"{id}","version":"0.1.0","engines":{{"mam":">=0.1.0"}},"main":"main.js","displayName":"plugin.name"}}"#);
+    let json = format!(
+        r#"{{"apiVersion":1,"id":"{id}","version":"0.1.0","engines":{{"mam":">=0.1.0"}},"main":"main.js","displayName":"plugin.name"}}"#
+    );
     parse_manifest(&json).expect("valid manifest").id
 }
 
@@ -51,8 +58,14 @@ pub struct FakeApi {
 
 impl HostApi for FakeApi {
     fn call(&self, cx: &CallCx<'_>, method: &str, params: Value) -> Result<Value, HostError> {
-        self.scopes.lock().unwrap().push((cx.scope.assets.to_vec(), cx.scope.deadline));
-        self.calls.lock().unwrap().push((cx.plugin.as_str().to_owned(), method.to_owned()));
+        self.scopes
+            .lock()
+            .unwrap()
+            .push((cx.scope.assets.to_vec(), cx.scope.deadline));
+        self.calls
+            .lock()
+            .unwrap()
+            .push((cx.plugin.as_str().to_owned(), method.to_owned()));
         match method {
             "echo" => Ok(params),
             "fail" => Err(HostError::new("denied", "nope")),
@@ -62,7 +75,11 @@ impl HostApi for FakeApi {
             }
             "kill_me" => {
                 let pid = self.kill_pid.lock().unwrap().expect("pid set");
-                let st = std::process::Command::new("taskkill").args(["/PID", &pid.to_string(), "/F"]).stdout(std::process::Stdio::null()).status().expect("taskkill");
+                let st = std::process::Command::new("taskkill")
+                    .args(["/PID", &pid.to_string(), "/F"])
+                    .stdout(std::process::Stdio::null())
+                    .status()
+                    .expect("taskkill");
                 assert!(st.success());
                 Ok(Value::Null)
             }
@@ -83,7 +100,10 @@ pub struct FakeClock {
 
 impl FakeClock {
     pub fn new() -> Arc<Self> {
-        Arc::new(Self { base: Instant::now(), offset: Mutex::new(Duration::ZERO) })
+        Arc::new(Self {
+            base: Instant::now(),
+            offset: Mutex::new(Duration::ZERO),
+        })
     }
     pub fn advance(&self, d: Duration) {
         *self.offset.lock().unwrap() += d;
@@ -120,17 +140,34 @@ mam.commands.register('busy_with_calls', (p) => {
 mam.providers.register('meta.extract', (p) => ({ kind: 'provider', p }));
 "#;
 
-pub fn new_host(source: &str, tweak: impl FnOnce(&mut HostConfig)) -> (PluginHost, Arc<FakeApi>, Arc<FakeClock>) {
+pub fn new_host(
+    source: &str,
+    tweak: impl FnOnce(&mut HostConfig),
+) -> (PluginHost, Arc<FakeApi>, Arc<FakeClock>) {
     let api = Arc::new(FakeApi::default());
     let clock = FakeClock::new();
     let mut cfg = HostConfig::new(worker_exe(), source.to_owned());
     tweak(&mut cfg);
-    let host = PluginHost::new(plugin_id("com.example.test"), cfg, api.clone(), clock.clone());
+    let host = PluginHost::new(
+        plugin_id("com.example.test"),
+        cfg,
+        api.clone(),
+        clock.clone(),
+    );
     (host, api, clock)
 }
 
-pub fn run(host: &PluginHost, cmd: &str, params: Value) -> Result<Value, mam_plugin_host::InvokeError> {
-    host.invoke(mam_plugin_host::InvokeKind::Command, cmd, params, mam_plugin_host::InvokeScope::empty())
+pub fn run(
+    host: &PluginHost,
+    cmd: &str,
+    params: Value,
+) -> Result<Value, mam_plugin_host::InvokeError> {
+    host.invoke(
+        mam_plugin_host::InvokeKind::Command,
+        cmd,
+        params,
+        mam_plugin_host::InvokeScope::empty(),
+    )
 }
 
 pub fn ok_echo(host: &PluginHost) {

@@ -70,7 +70,11 @@ pub struct Filters {
 impl Filters {
     /// 촬영일 정렬·필터가 읽을 fast field 이름.
     pub(crate) fn captured_field_name(&self) -> &'static str {
-        if self.captured_fallback { "captured_or_modified" } else { "captured_at" }
+        if self.captured_fallback {
+            "captured_or_modified"
+        } else {
+            "captured_at"
+        }
     }
 }
 
@@ -163,10 +167,17 @@ pub(crate) fn filter_clauses(f: &Fields, flt: &Filters) -> Option<Vec<Box<dyn Qu
                 IndexRecordOption::Basic,
             )));
         }
-        let captured_field = if flt.captured_fallback { f.captured_or_modified } else { f.captured_at };
+        let captured_field = if flt.captured_fallback {
+            f.captured_or_modified
+        } else {
+            f.captured_at
+        };
         let ranges = [
-            (flt.captured_at != Range::default())
-                .then(|| bounds(&flt.captured_at, |v| Term::from_field_i64(captured_field, v))),
+            (flt.captured_at != Range::default()).then(|| {
+                bounds(&flt.captured_at, |v| {
+                    Term::from_field_i64(captured_field, v)
+                })
+            }),
             (flt.file_size != Range::default())
                 .then(|| bounds(&flt.file_size, |v| Term::from_field_u64(f.file_size, v))),
             (flt.duration_ms != Range::default())

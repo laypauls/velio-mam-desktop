@@ -14,11 +14,11 @@ mod purge;
 mod validate;
 mod values;
 
+pub(crate) use defs::load_fields;
+pub use external::load_external_user_fields;
 pub use purge::METADATA_PURGE_CHUNK;
 pub use validate::{MAX_KEYWORD_CHARS, MAX_METADATA_FIELDS};
-pub use external::load_external_user_fields;
 pub use values::load_asset_values;
-pub(crate) use defs::load_fields;
 
 use rusqlite::Connection;
 
@@ -124,7 +124,8 @@ pub(crate) fn field_type(c: &Connection, field_id: i64) -> Result<ValueType, Ing
         [field_id],
         |r| r.get(0),
     ))?;
-    raw.and_then(|s| ValueType::parse(&s)).ok_or(IngestError::NotFound)
+    raw.and_then(|s| ValueType::parse(&s))
+        .ok_or(IngestError::NotFound)
 }
 
 /// 큰 자산 목록(필드 삭제 시 최대 100만 건)을 한 문장의 JSON 인자로 보내지 않도록 나눠 revision·outbox 를 기록한다.

@@ -13,10 +13,10 @@
 pub mod collector;
 mod contract;
 pub mod fake;
+pub mod fake_ses;
 pub mod hub;
 pub mod mapper;
 pub mod parse;
-pub mod fake_ses;
 pub mod runner;
 pub mod ses;
 pub mod ses_collector;

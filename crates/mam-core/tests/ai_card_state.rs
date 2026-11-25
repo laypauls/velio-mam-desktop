@@ -21,8 +21,10 @@ fn fixture() -> (Env, i64) {
         .folder_id;
     scan_folder(env.ingest.env(), folder, &|| false, &AtomicBool::new(false)).unwrap();
     let id = env.read(|c| {
-        c.query_row("SELECT asset_id FROM media_assets", [], |r| r.get::<_, i64>(0))
-            .unwrap()
+        c.query_row("SELECT asset_id FROM media_assets", [], |r| {
+            r.get::<_, i64>(0)
+        })
+        .unwrap()
     });
     (env, id)
 }
@@ -158,7 +160,10 @@ fn t_aistate_10_subqueries_use_key_lookups_not_scans() {
         println!("{all}");
         for t in ["ai_analyses", "transcripts", "ai_task_state"] {
             assert!(!all.contains(&format!("SCAN {t}")), "{t} scan:\n{all}");
-            assert!(all.contains(&format!("SEARCH {t}")), "{t} not searched:\n{all}");
+            assert!(
+                all.contains(&format!("SEARCH {t}")),
+                "{t} not searched:\n{all}"
+            );
         }
     }
 }

@@ -44,7 +44,10 @@ fn t_scene_04_codec_rejects_oversize_unordered_and_out_of_range_input() {
     assert_eq!(encode(&[5, 5]), Err(DecodeError::NotAscending));
     assert_eq!(encode(&[5, 4]), Err(DecodeError::NotAscending));
     assert_eq!(encode(&[-1]), Err(DecodeError::OutOfRange));
-    assert_eq!(encode(&[i64::from(u32::MAX) + 1]), Err(DecodeError::OutOfRange));
+    assert_eq!(
+        encode(&[i64::from(u32::MAX) + 1]),
+        Err(DecodeError::OutOfRange)
+    );
 }
 
 #[test]
@@ -69,12 +72,22 @@ fn t_scene_04_decode_rejects_bad_length_version_order_and_oversize() {
     // Act / Assert
     assert_eq!(decode(Some(&[])), Err(DecodeError::BadLength));
     assert_eq!(decode(Some(&trailing)), Err(DecodeError::BadLength));
-    assert_eq!(decode(Some(&good[..good.len() - 1])), Err(DecodeError::BadLength));
-    assert_eq!(decode(Some(&wrong_version)), Err(DecodeError::UnknownVersion));
+    assert_eq!(
+        decode(Some(&good[..good.len() - 1])),
+        Err(DecodeError::BadLength)
+    );
+    assert_eq!(
+        decode(Some(&wrong_version)),
+        Err(DecodeError::UnknownVersion)
+    );
     assert_eq!(decode(Some(&duplicate)), Err(DecodeError::NotAscending));
     assert_eq!(decode(Some(&descending)), Err(DecodeError::NotAscending));
     assert_eq!(decode(Some(&oversize)), Err(DecodeError::TooMany));
-    assert_eq!(decode(Some(&[1])).unwrap(), Vec::<i64>::new(), "version only = empty list");
+    assert_eq!(
+        decode(Some(&[1])).unwrap(),
+        Vec::<i64>::new(),
+        "version only = empty list"
+    );
 }
 
 #[test]
@@ -96,9 +109,15 @@ fn t_scene_06_select_auto_drops_the_first_and_last_half_second() {
 fn t_scene_06_select_auto_keeps_the_highest_score_within_the_one_second_gap() {
     // Arrange / Act / Assert
     // 999ms 차이는 하나로, 1000ms 차이는 둘 다 남긴다
-    assert_eq!(select_auto(&[(1000, 0.5), (1999, 0.9), (2999, 0.4)], None), vec![1999, 2999]);
+    assert_eq!(
+        select_auto(&[(1000, 0.5), (1999, 0.9), (2999, 0.4)], None),
+        vec![1999, 2999]
+    );
     // 연쇄 0.5s 입력 (1000-1500-2000): 가운데 최고 점수만 남고 양쪽은 모두 버려진다
-    assert_eq!(select_auto(&[(1000, 0.5), (1500, 0.9), (2000, 0.5)], None), vec![1500]);
+    assert_eq!(
+        select_auto(&[(1000, 0.5), (1500, 0.9), (2000, 0.5)], None),
+        vec![1500]
+    );
     // 연쇄 0.6s 입력: 점수 순 채택 후 1000·2200 만 남는다
     assert_eq!(
         select_auto(&[(1000, 0.5), (1600, 0.6), (2200, 0.7), (2800, 0.4)], None),
@@ -107,9 +126,18 @@ fn t_scene_06_select_auto_keeps_the_highest_score_within_the_one_second_gap() {
     // 동점이면 시각이 이른 쪽
     assert_eq!(select_auto(&[(1500, 0.5), (1000, 0.5)], None), vec![1000]);
     // 입력 순서와 무관하게 오름차순 출력, 같은 시각 중복은 하나
-    assert_eq!(select_auto(&[(5000, 1.0), (3000, 1.0), (5000, 0.2)], None), vec![3000, 5000]);
+    assert_eq!(
+        select_auto(&[(5000, 1.0), (3000, 1.0), (5000, 0.2)], None),
+        vec![3000, 5000]
+    );
     // 비유한 점수 버림
-    assert_eq!(select_auto(&[(1000, f32::NAN), (3000, f32::INFINITY), (5000, 1.0)], None), vec![5000]);
+    assert_eq!(
+        select_auto(
+            &[(1000, f32::NAN), (3000, f32::INFINITY), (5000, 1.0)],
+            None
+        ),
+        vec![5000]
+    );
     assert!(select_auto(&[], Some(10_000)).is_empty());
 }
 
@@ -139,7 +167,14 @@ fn t_scene_07_tolerance_and_half_frame_tables() {
     assert_eq!(half_frame_ms(Some(25.0)), 20);
     assert_eq!(half_frame_ms(Some(1_000_000.0)), 1);
     // 없음·0·음수·NaN·무한대는 기본값 (D6 100ms, D8 20ms)
-    for bad in [None, Some(0.0), Some(-24.0), Some(f64::NAN), Some(f64::INFINITY), Some(f64::NEG_INFINITY)] {
+    for bad in [
+        None,
+        Some(0.0),
+        Some(-24.0),
+        Some(f64::NAN),
+        Some(f64::INFINITY),
+        Some(f64::NEG_INFINITY),
+    ] {
         assert_eq!(tolerance_ms(bad), 100, "{bad:?}");
         assert_eq!(half_frame_ms(bad), 20, "{bad:?}");
     }
@@ -216,13 +251,18 @@ fn t_scene_05_corrupt_blob_reads_as_empty_with_a_value_free_warning_and_next_wri
     }
 
     // Act: 다음 쓰기
-    let added = scene_cuts::add_user_tx(&db.conn, 1, 20_000, Some(25.0), Some(60_000), NOW).unwrap();
+    let added =
+        scene_cuts::add_user_tx(&db.conn, 1, 20_000, Some(25.0), Some(60_000), NOW).unwrap();
 
     // Assert: 정상 형식으로 덮어써졌고 사용자 컷은 보존
     assert!(added);
     let raw: Option<Vec<u8>> = db
         .conn
-        .query_row("SELECT auto_cuts FROM asset_scene_cuts WHERE asset_id = 1", [], |r| r.get(0))
+        .query_row(
+            "SELECT auto_cuts FROM asset_scene_cuts WHERE asset_id = 1",
+            [],
+            |r| r.get(0),
+        )
         .unwrap();
     assert!(decode(raw.as_deref()).is_ok());
     let healed = scene_cuts::get(&db.conn, 1).unwrap().unwrap();

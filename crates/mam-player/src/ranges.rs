@@ -15,7 +15,10 @@ pub struct PlayRange {
 
 /// 개수 <= `MAX_RANGES`, 각 구간 `start >= 0` 그리고 `end > start`
 pub fn valid_ranges(ranges: &[PlayRange]) -> bool {
-    ranges.len() <= MAX_RANGES && ranges.iter().all(|r| r.start_ms >= 0 && r.end_ms > r.start_ms)
+    ranges.len() <= MAX_RANGES
+        && ranges
+            .iter()
+            .all(|r| r.start_ms >= 0 && r.end_ms > r.start_ms)
 }
 
 /// 정렬하고 겹치거나 맞닿은 구간을 병합한다. 잘못된 구간(`start < 0` 또는 `end <= start`)은 버린다. 멱등
@@ -40,13 +43,18 @@ mod tests {
     #[test]
     fn t_player_ranges_04b_normalize_sorts_merges_and_drops_invalid() {
         // 정렬 + 겹침 병합 + 맞닿음 병합
-        assert_eq!(normalize(vec![(5000, 6000), (1000, 2000), (1500, 2500), (2500, 3000)]), vec![(1000, 3000), (5000, 6000)]);
+        assert_eq!(
+            normalize(vec![(5000, 6000), (1000, 2000), (1500, 2500), (2500, 3000)]),
+            vec![(1000, 3000), (5000, 6000)]
+        );
         // 잘못된 구간은 버린다
-        assert_eq!(normalize(vec![(-1, 10), (10, 10), (20, 5), (0, 1)]), vec![(0, 1)]);
+        assert_eq!(
+            normalize(vec![(-1, 10), (10, 10), (20, 5), (0, 1)]),
+            vec![(0, 1)]
+        );
         // 빈 입력, 멱등
         assert!(normalize(vec![]).is_empty());
         let once = normalize(vec![(3, 9), (1, 4)]);
         assert_eq!(normalize(once.clone()), once);
     }
-
 }

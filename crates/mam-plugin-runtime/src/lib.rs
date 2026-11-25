@@ -11,6 +11,6 @@ pub mod runtime;
 pub use api::*;
 pub use jobs::{PluginJobs, PluginJobsDeps};
 pub use mam_plugin_gateway::GatewayConfig;
-pub use mam_plugin_manifest::clean_text;
 pub use mam_plugin_host::SystemClock as HostSystemClock;
+pub use mam_plugin_manifest::clean_text;
 pub use runtime::{PluginRuntime, RuntimeDeps, locate_worker, locate_worker_default};

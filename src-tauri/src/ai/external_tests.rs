@@ -285,8 +285,15 @@ fn t_capfb_ai_01_external_payload_uses_only_the_raw_capture_date_never_the_modif
             Ok(())
         })
         .unwrap();
-    let setting = fx.pool.read(|c| mam_db::settings::load(c).map(|(s, _)| s.captured_at_fallback)).unwrap();
-    assert_eq!(setting, mam_db::CapturedAtFallback::Modified, "게이트 ON 상태에서 확인");
+    let setting = fx
+        .pool
+        .read(|c| mam_db::settings::load(c).map(|(s, _)| s.captured_at_fallback))
+        .unwrap();
+    assert_eq!(
+        setting,
+        mam_db::CapturedAtFallback::Modified,
+        "게이트 ON 상태에서 확인"
+    );
     let a = adapter(&fx);
 
     // Act

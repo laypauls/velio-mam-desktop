@@ -18,8 +18,8 @@ use common::env::{Env, T0, snapshot, wait_until};
 use mam_core::ingest::{PendingKind, SCAN_RECENT_GUARD_MS, SettleGate};
 use mam_core::scan::scan_folder;
 use mam_core::watch::{
-    ChangeDetector, ChangeSink, DetectError, DetectorOptions, DetectorRegistry, ProbeResult, WatchHandle, WatchMsg,
-    WatchTarget,
+    ChangeDetector, ChangeSink, DetectError, DetectorOptions, DetectorRegistry, ProbeResult,
+    WatchHandle, WatchMsg, WatchTarget,
 };
 
 fn scan(env: &Env, id: i64) {
@@ -27,7 +27,11 @@ fn scan(env: &Env, id: i64) {
 }
 
 fn registered(env: &Env) -> i64 {
-    let id = env.ingest.add_folder(env.path("lib").to_str().unwrap()).unwrap().folder_id;
+    let id = env
+        .ingest
+        .add_folder(env.path("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id;
     scan(env, id);
     env.clock.advance(5_000);
     id
@@ -47,7 +51,9 @@ fn rows(env: &Env) -> i64 {
 
 fn clear_jobs(env: &Env) {
     env.pool
-        .write(mam_db::Priority::Low, |c| Ok(c.execute("DELETE FROM jobs", [])?))
+        .write(mam_db::Priority::Low, |c| {
+            Ok(c.execute("DELETE FROM jobs", [])?)
+        })
         .unwrap();
 }
 
@@ -66,7 +72,8 @@ fn prod(c: &mut mam_core::ingest::IngestConfig, _: &Path) {
 fn keep_old_mtime(p: &Path) {
     let f = OpenOptions::new().write(true).open(p).unwrap();
     let old = u64::try_from(T0 - 3_600_000).unwrap();
-    f.set_modified(UNIX_EPOCH + Duration::from_millis(old)).unwrap();
+    f.set_modified(UNIX_EPOCH + Duration::from_millis(old))
+        .unwrap();
 }
 
 fn grow(p: &Path, n: usize) {
@@ -100,15 +107,26 @@ impl ChangeDetector for Capture {
 }
 
 #[test]
-fn t_subtree_02_a_subtree_report_is_recorded_by_the_writer_as_a_subtree_row_and_wins_over_a_path_report() {
+fn t_subtree_02_a_subtree_report_is_recorded_by_the_writer_as_a_subtree_row_and_wins_over_a_path_report()
+ {
     // Arrange: 실제 기록기 스레드 + 가짜 감지기
     let slot = Arc::new(Mutex::new(None));
-    let detectors = Arc::new(DetectorRegistry::new(vec![Arc::new(Capture(Arc::clone(&slot)))], &["capture"]));
+    let detectors = Arc::new(DetectorRegistry::new(
+        vec![Arc::new(Capture(Arc::clone(&slot)))],
+        &["capture"],
+    ));
     let env = Env::with_config(move |c, _| c.detectors = detectors);
     env.write("lib/a.jpg", 1);
     env.ingest.start().unwrap();
-    let id = env.ingest.add_folder(env.path("lib").to_str().unwrap()).unwrap().folder_id;
-    assert!(wait_until(Duration::from_secs(30), || slot.lock().unwrap().is_some()));
+    let id = env
+        .ingest
+        .add_folder(env.path("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id;
+    assert!(wait_until(Duration::from_secs(30), || slot
+        .lock()
+        .unwrap()
+        .is_some()));
     let sink = slot.lock().unwrap().clone().unwrap();
     let dir = env.path("lib/trip");
     fs::create_dir_all(&dir).unwrap();
@@ -116,29 +134,48 @@ fn t_subtree_02_a_subtree_report_is_recorded_by_the_writer_as_a_subtree_row_and_
     // Act: 같은 경로를 Path 로 먼저, Subtree 로 나중에 보고 (같은 묶음 안)
     sink.path(dir.clone());
     sink.subtree(dir.clone());
-    sink.emit(WatchMsg::Path { folder_id: id, path: dir.clone() });
+    sink.emit(WatchMsg::Path {
+        folder_id: id,
+        path: dir.clone(),
+    });
 
     // Assert: 1행, kind = subtree, 출처 = 감지기 ID
     assert!(wait_until(Duration::from_secs(30), || {
-        env.count("SELECT COUNT(*) FROM watch_pending WHERE kind = 'subtree' AND abs_path LIKE '%trip'") == 1
+        env.count(
+            "SELECT COUNT(*) FROM watch_pending WHERE kind = 'subtree' AND abs_path LIKE '%trip'",
+        ) == 1
     }));
-    assert_eq!(env.count("SELECT COUNT(*) FROM watch_pending WHERE abs_path LIKE '%trip'"), 1);
-    assert_eq!(env.count("SELECT COUNT(*) FROM watch_pending WHERE source = 'capture' AND abs_path LIKE '%trip'"), 1);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM watch_pending WHERE abs_path LIKE '%trip'"),
+        1
+    );
+    assert_eq!(
+        env.count(
+            "SELECT COUNT(*) FROM watch_pending WHERE source = 'capture' AND abs_path LIKE '%trip'"
+        ),
+        1
+    );
     env.ingest.shutdown();
 }
 
 #[test]
-fn t_subtree_03_a_dropped_folder_with_a_growing_inner_file_registers_once_when_stable_and_never_supersedes() {
+fn t_subtree_03_a_dropped_folder_with_a_growing_inner_file_registers_once_when_stable_and_never_supersedes()
+ {
     // Arrange: 기존 자산 1개 + 폴더째 옮겨 넣는 중 (안쪽 파일은 시각을 보존하며 자란다 — 60초 창을 피한다)
     let env = Env::with_config(prod);
     keep_old_mtime(&env.write("lib/a.jpg", 1)); // 스캔 최근 수정 창 밖이어야 첫 스캔에서 바로 등록된다
     let id = registered(&env);
-    let original = snapshot(&env.vol.join("lib")).into_iter().filter(|e| e.0 == "a.jpg").collect::<Vec<_>>();
+    let original = snapshot(&env.vol.join("lib"))
+        .into_iter()
+        .filter(|e| e.0 == "a.jpg")
+        .collect::<Vec<_>>();
     let big = env.path("lib/drop/sub/big.jpg");
     fs::create_dir_all(big.parent().unwrap()).unwrap();
     fs::write(&big, vec![9u8; 100]).unwrap();
     keep_old_mtime(&big);
-    env.ingest.queue_watch_change(id, &env.path("lib/drop"), PendingKind::Subtree).unwrap();
+    env.ingest
+        .queue_watch_change(id, &env.path("lib/drop"), PendingKind::Subtree)
+        .unwrap();
 
     // Act 1: 파일이 계속 자라는 동안 점검을 반복한다
     for i in 0..12 {
@@ -147,7 +184,11 @@ fn t_subtree_03_a_dropped_folder_with_a_growing_inner_file_registers_once_when_s
         if i < 10 {
             grow(&big, 50);
         }
-        assert_eq!(assets(&env), 1, "step {i}: a growing copy must not be registered");
+        assert_eq!(
+            assets(&env),
+            1,
+            "step {i}: a growing copy must not be registered"
+        );
     }
     assert!(rows(&env) >= 1, "the inner file is waiting in the gate");
     assert_eq!(
@@ -167,15 +208,24 @@ fn t_subtree_03_a_dropped_folder_with_a_growing_inner_file_registers_once_when_s
 
     // Assert: 자산 정확히 1개 추가(최종 크기), superseded 0, 대기열 비움, 원본 불변
     assert_eq!(assets(&env), 2);
-    assert_eq!(env.count("SELECT COUNT(*) FROM media_assets WHERE file_size = 600"), 1);
-    assert_eq!(env.count("SELECT COUNT(*) FROM media_assets WHERE status = 'superseded'"), 0);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM media_assets WHERE file_size = 600"),
+        1
+    );
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM media_assets WHERE status = 'superseded'"),
+        0
+    );
     for _ in 0..4 {
         env.clock.advance(2_000);
         pass(&env);
     }
     assert_eq!(rows(&env), 0);
     assert_eq!(assets(&env), 2, "no extra asset after the queue drains");
-    let after = snapshot(&env.vol.join("lib")).into_iter().filter(|e| e.0 == "a.jpg").collect::<Vec<_>>();
+    let after = snapshot(&env.vol.join("lib"))
+        .into_iter()
+        .filter(|e| e.0 == "a.jpg")
+        .collect::<Vec<_>>();
     assert_eq!(original, after, "original must be untouched");
 }
 
@@ -187,7 +237,9 @@ fn t_subtree_04_new_nested_directories_are_still_discovered_and_their_files_wait
     let id = registered(&env);
     env.write("lib/trip/day1/deep/x.jpg", 2);
     env.write("lib/trip/day2/y.jpg", 3);
-    env.ingest.queue_watch_change(id, &env.path("lib/trip"), PendingKind::Subtree).unwrap();
+    env.ingest
+        .queue_watch_change(id, &env.path("lib/trip"), PendingKind::Subtree)
+        .unwrap();
 
     // Act: 폴더 행이 안정될 때까지 (파일 행은 아직 반영 전)
     let mut queued_files = 0;
@@ -202,8 +254,17 @@ fn t_subtree_04_new_nested_directories_are_still_discovered_and_their_files_wait
 
     // Assert: 하위 폴더는 발견돼 트리에 기록되고, 파일 2개는 자산이 되기 전에 행으로 대기한다
     assert_eq!(queued_files, 2);
-    assert_eq!(assets(&env), 1, "files are not applied directly by the directory walk");
-    assert_eq!(env.count("SELECT COUNT(*) FROM folder_dirs WHERE rel_path IN ('trip/day1/deep', 'trip/day2')"), 2);
+    assert_eq!(
+        assets(&env),
+        1,
+        "files are not applied directly by the directory walk"
+    );
+    assert_eq!(
+        env.count(
+            "SELECT COUNT(*) FROM folder_dirs WHERE rel_path IN ('trip/day1/deep', 'trip/day2')"
+        ),
+        2
+    );
     // 이어서 게이트를 통과하면 둘 다 반영
     for _ in 0..10 {
         env.clock.advance(200);
@@ -223,7 +284,9 @@ fn t_subtree_05_a_folder_over_the_row_cap_falls_back_to_exactly_one_rescan_and_l
         env.write(&format!("lib/dump/f{i}.jpg"), 10 + i);
     }
     clear_jobs(&env);
-    env.ingest.queue_watch_change(id, &env.path("lib/dump"), PendingKind::Subtree).unwrap();
+    env.ingest
+        .queue_watch_change(id, &env.path("lib/dump"), PendingKind::Subtree)
+        .unwrap();
 
     // Act: 폴더 행이 안정돼 순회가 일어날 때까지
     for _ in 0..4 {
@@ -257,7 +320,9 @@ fn t_subtree_06_a_subtree_whose_directory_vanished_marks_everything_below_it_mis
     env.write("lib/gone/in/y.jpg", 3);
     let id = registered(&env);
     fs::remove_dir_all(env.path("lib/gone")).unwrap();
-    env.ingest.queue_watch_change(id, &env.path("lib/gone"), PendingKind::Subtree).unwrap();
+    env.ingest
+        .queue_watch_change(id, &env.path("lib/gone"), PendingKind::Subtree)
+        .unwrap();
 
     // Act: 삭제는 표본을 기다리지 않는다
     env.clock.advance(200);
@@ -266,7 +331,9 @@ fn t_subtree_06_a_subtree_whose_directory_vanished_marks_everything_below_it_mis
     // Assert
     assert_eq!(r.applied, 1);
     assert_eq!(
-        env.count("SELECT COUNT(*) FROM file_locations WHERE presence = 'missing' AND detached_at IS NULL"),
+        env.count(
+            "SELECT COUNT(*) FROM file_locations WHERE presence = 'missing' AND detached_at IS NULL"
+        ),
         2
     );
     assert_eq!(assets(&env), 3, "assets are kept (missing, not deleted)");
@@ -282,7 +349,12 @@ fn t_subtree_07_handle_watch_now_applies_a_subtree_report_directly_like_a_path_r
     env.write("lib/new/x.jpg", 2);
 
     // Act: 디바운스·게이트 없이 처리하는 시험·진단 경로
-    env.ingest.handle_watch_now(WatchMsg::Subtree { folder_id: id, dir: env.path("lib/new") }).unwrap();
+    env.ingest
+        .handle_watch_now(WatchMsg::Subtree {
+            folder_id: id,
+            dir: env.path("lib/new"),
+        })
+        .unwrap();
 
     // Assert
     assert_eq!(assets(&env), 2);
@@ -299,10 +371,17 @@ fn t_subtree_08_the_same_directory_reported_again_restarts_its_settling_and_stay
     let dir = env.path("lib/trip");
 
     // Act: Subtree 다음 Path — 종류는 subtree 로 유지된다 (UPSERT 합치기)
-    env.ingest.queue_watch_change(id, &dir, PendingKind::Subtree).unwrap();
-    env.ingest.queue_watch_change(id, &dir, PendingKind::Path).unwrap();
+    env.ingest
+        .queue_watch_change(id, &dir, PendingKind::Subtree)
+        .unwrap();
+    env.ingest
+        .queue_watch_change(id, &dir, PendingKind::Path)
+        .unwrap();
 
     // Assert
     assert_eq!(rows(&env), 1);
-    assert_eq!(env.count("SELECT COUNT(*) FROM watch_pending WHERE kind = 'subtree'"), 1);
+    assert_eq!(
+        env.count("SELECT COUNT(*) FROM watch_pending WHERE kind = 'subtree'"),
+        1
+    );
 }

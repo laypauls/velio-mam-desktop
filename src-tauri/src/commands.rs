@@ -19,10 +19,7 @@ fn app_info_from(name: &str, version: &impl Display) -> AppInfo {
 #[tauri::command]
 pub fn app_info(app: tauri::AppHandle) -> AppInfo {
     // productName 은 폴더명 제약으로 마침표가 없으므로 표시 이름 상수를 쓴다
-    app_info_from(
-        crate::native::APP_DISPLAY_NAME,
-        &app.package_info().version,
-    )
+    app_info_from(crate::native::APP_DISPLAY_NAME, &app.package_info().version)
 }
 
 #[cfg(test)]

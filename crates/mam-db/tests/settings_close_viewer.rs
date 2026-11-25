@@ -15,11 +15,16 @@ fn patch(v: Value) -> Map<String, Value> {
 }
 
 fn put_raw(conn: &Connection, key: &str, raw: &str) {
-    conn.execute("INSERT INTO settings (key, value) VALUES (?1, ?2)", [key, raw]).unwrap();
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?1, ?2)",
+        [key, raw],
+    )
+    .unwrap();
 }
 
 fn count_rows(conn: &Connection) -> i64 {
-    conn.query_row("SELECT COUNT(*) FROM settings", [], |r| r.get(0)).unwrap()
+    conn.query_row("SELECT COUNT(*) FROM settings", [], |r| r.get(0))
+        .unwrap()
 }
 
 #[test]
@@ -42,9 +47,15 @@ fn t_settings_closekey_02_round_trips_valid_values_including_null() {
         json!("a".repeat(20)),
         Value::Null,
     ] {
-        let s = settings::update(&mut db.conn, &patch(json!({"closeViewerShortcut": want.clone()})))
-            .unwrap();
-        assert_eq!(serde_json::to_value(&s).unwrap()["closeViewerShortcut"], want);
+        let s = settings::update(
+            &mut db.conn,
+            &patch(json!({"closeViewerShortcut": want.clone()})),
+        )
+        .unwrap();
+        assert_eq!(
+            serde_json::to_value(&s).unwrap()["closeViewerShortcut"],
+            want
+        );
         assert_eq!(settings::load(&db.conn).unwrap().0, s);
     }
 }
@@ -62,8 +73,11 @@ fn t_settings_closekey_03_invalid_values_are_rejected_and_change_nothing() {
         json!(true),
         json!(["Q"]),
     ] {
-        let err = settings::update(&mut db.conn, &patch(json!({"closeViewerShortcut": bad.clone()})))
-            .unwrap_err();
+        let err = settings::update(
+            &mut db.conn,
+            &patch(json!({"closeViewerShortcut": bad.clone()})),
+        )
+        .unwrap_err();
         assert!(
             matches!(&err, SettingsError::Invalid(f) if f == "closeViewerShortcut"),
             "{bad}"

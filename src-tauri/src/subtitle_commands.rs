@@ -32,7 +32,10 @@ pub struct SubtitleService {
 
 fn check_track_id(id: &str) -> Result<(), CommandError> {
     if id.is_empty() || id.chars().count() > MAX_TRACK_ID_CHARS {
-        return Err(CommandError::new(ErrorCode::InvalidInput, "invalid trackId"));
+        return Err(CommandError::new(
+            ErrorCode::InvalidInput,
+            "invalid trackId",
+        ));
     }
     Ok(())
 }
@@ -40,9 +43,10 @@ fn check_track_id(id: &str) -> Result<(), CommandError> {
 fn original_path(reuse: &Reuse, asset_id: i64) -> Result<PathBuf, CommandError> {
     match reuse.original_path(asset_id) {
         Ok(p) => Ok(p),
-        Err(IngestError::Offline | IngestError::NotFound) => {
-            Err(CommandError::new(ErrorCode::AssetOffline, "the original file is offline or missing"))
-        }
+        Err(IngestError::Offline | IngestError::NotFound) => Err(CommandError::new(
+            ErrorCode::AssetOffline,
+            "the original file is offline or missing",
+        )),
         Err(e) => Err(e.into()),
     }
 }
@@ -89,11 +93,20 @@ impl SubtitleService {
     /// 정렬된 트랙 (없으면 `[]`). 항상 다시 탐색한다. 오프라인·파일 없음·자산 없음 → `asset_offline`
     pub fn tracks(&self, reuse: &Reuse, asset_id: i64) -> Result<Vec<SubtitleTrack>, CommandError> {
         let video = original_path(reuse, asset_id)?;
-        Ok(self.rescan(asset_id, &video).iter().map(|p| p.track.clone()).collect())
+        Ok(self
+            .rescan(asset_id, &video)
+            .iter()
+            .map(|p| p.track.clone())
+            .collect())
     }
 
     /// 트랙의 큐. 빈/긴 `track_id` → `invalid_input`, 없는 트랙 → `not_found`, 오프라인 → `asset_offline`
-    pub fn cues(&self, reuse: &Reuse, asset_id: i64, track_id: &str) -> Result<Vec<Cue>, CommandError> {
+    pub fn cues(
+        &self,
+        reuse: &Reuse,
+        asset_id: i64,
+        track_id: &str,
+    ) -> Result<Vec<Cue>, CommandError> {
         check_track_id(track_id)?;
         let parsed = self.cached_or_scan(asset_id, || original_path(reuse, asset_id))?;
         parsed
@@ -106,7 +119,9 @@ impl SubtitleService {
 
 type Subs<'a> = State<'a, Arc<SubtitleService>>;
 
-async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T, CommandError> + Send + 'static) -> Result<T, CommandError> {
+async fn blocking<T: Send + 'static>(
+    f: impl FnOnce() -> Result<T, CommandError> + Send + 'static,
+) -> Result<T, CommandError> {
     tauri::async_runtime::spawn_blocking(f).await.map_err(|e| {
         tracing::error!(%e, "blocking task failed");
         CommandError::internal()
@@ -114,13 +129,22 @@ async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T, CommandError>
 }
 
 #[tauri::command]
-pub async fn subtitle_tracks(subs: Subs<'_>, reuse: State<'_, Arc<Reuse>>, asset_id: i64) -> Result<Vec<SubtitleTrack>, CommandError> {
+pub async fn subtitle_tracks(
+    subs: Subs<'_>,
+    reuse: State<'_, Arc<Reuse>>,
+    asset_id: i64,
+) -> Result<Vec<SubtitleTrack>, CommandError> {
     let (subs, reuse) = (Arc::clone(&subs), Arc::clone(&reuse));
     blocking(move || subs.tracks(&reuse, asset_id)).await
 }
 
 #[tauri::command]
-pub async fn subtitle_cues(subs: Subs<'_>, reuse: State<'_, Arc<Reuse>>, asset_id: i64, track_id: String) -> Result<Vec<Cue>, CommandError> {
+pub async fn subtitle_cues(
+    subs: Subs<'_>,
+    reuse: State<'_, Arc<Reuse>>,
+    asset_id: i64,
+    track_id: String,
+) -> Result<Vec<Cue>, CommandError> {
     let (subs, reuse) = (Arc::clone(&subs), Arc::clone(&reuse));
     blocking(move || subs.cues(&reuse, asset_id, &track_id)).await
 }

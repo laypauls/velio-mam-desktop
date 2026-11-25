@@ -22,7 +22,10 @@ pub fn locate_worker(env: Option<OsString>, exe_dir: Option<&Path>) -> Option<Pa
     {
         candidates.push(parent.to_path_buf());
     }
-    candidates.into_iter().map(|d| d.join(WORKER_EXE)).find(|p| p.is_file())
+    candidates
+        .into_iter()
+        .map(|d| d.join(WORKER_EXE))
+        .find(|p| p.is_file())
 }
 
 /// 실제 프로세스 환경 기준. **환경변수 재정의는 디버그 빌드 전용** — 릴리스에서는 같은 사용자 환경의 다른 프로그램·셸이 심은 변수로
@@ -32,8 +35,14 @@ pub fn locate_worker_default() -> Option<PathBuf> {
 }
 
 fn locate_worker_with(allow_env_override: bool) -> Option<PathBuf> {
-    let exe_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(Path::to_path_buf));
-    let env = if allow_env_override { std::env::var_os(WORKER_ENV) } else { None };
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(Path::to_path_buf));
+    let env = if allow_env_override {
+        std::env::var_os(WORKER_ENV)
+    } else {
+        None
+    };
     locate_worker(env, exe_dir.as_deref())
 }
 
@@ -51,10 +60,19 @@ mod tests {
         std::fs::create_dir_all(&exe_dir).unwrap();
         let planted = env_dir.join("evil.exe");
         std::fs::write(&planted, "x").unwrap();
-        let pick = |allow: bool| locate_worker(allow.then(|| planted.clone().into_os_string()), Some(&exe_dir));
+        let pick = |allow: bool| {
+            locate_worker(
+                allow.then(|| planted.clone().into_os_string()),
+                Some(&exe_dir),
+            )
+        };
         // Act / Assert
         assert_eq!(pick(true), Some(planted.clone()));
-        assert_eq!(pick(false), None, "릴리스 분기: 환경변수 무시, exe 폴더에 워커 없음 -> None");
+        assert_eq!(
+            pick(false),
+            None,
+            "릴리스 분기: 환경변수 무시, exe 폴더에 워커 없음 -> None"
+        );
         std::fs::write(exe_dir.join(WORKER_EXE), "x").unwrap();
         assert_eq!(pick(false), Some(exe_dir.join(WORKER_EXE)));
         let _ = std::fs::remove_dir_all(&t);
@@ -65,6 +83,15 @@ mod tests {
     fn t_prt_loc_02_default_gate_follows_the_build_profile() {
         // 불허 경로는 환경변수가 설정돼 있어도 결과가 환경변수와 무관하다
         let without_env = locate_worker_with(false);
-        assert_eq!(without_env, locate_worker(None, std::env::current_exe().ok().and_then(|p| p.parent().map(Path::to_path_buf)).as_deref()));
+        assert_eq!(
+            without_env,
+            locate_worker(
+                None,
+                std::env::current_exe()
+                    .ok()
+                    .and_then(|p| p.parent().map(Path::to_path_buf))
+                    .as_deref()
+            )
+        );
     }
 }

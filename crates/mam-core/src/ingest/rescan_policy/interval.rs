@@ -22,14 +22,18 @@ impl RescanTrigger for IntervalTrigger {
 
     fn parse(&self, raw: &Map<String, Value>) -> Result<Box<dyn TriggerSpec>, PolicyError> {
         if raw.keys().any(|k| k != "kind" && k != "hours") {
-            return Err(PolicyError { field: "rescanPolicy.trigger" });
+            return Err(PolicyError {
+                field: "rescanPolicy.trigger",
+            });
         }
         let hours = raw
             .get("hours")
             .and_then(Value::as_i64)
             .filter(|h| (i64::from(INTERVAL_MIN_HOURS)..=i64::from(INTERVAL_MAX_HOURS)).contains(h))
             .and_then(|h| u32::try_from(h).ok())
-            .ok_or(PolicyError { field: "rescanPolicy.trigger.hours" })?;
+            .ok_or(PolicyError {
+                field: "rescanPolicy.trigger.hours",
+            })?;
         Ok(Box::new(IntervalSpec { hours }))
     }
 }

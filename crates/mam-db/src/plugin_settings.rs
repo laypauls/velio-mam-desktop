@@ -41,7 +41,10 @@ pub fn key(prefix: &str, plugin_id: &str) -> Result<String, InvalidPluginId> {
 }
 
 /// 한 접두어의 모든 행 (플러그인 ID -> 원문). 키 범위 `[prefix:, prefix;)` 로 설정 PK 인덱스를 쓴다 (LIKE 이스케이프 불필요).
-pub fn load_prefixed(conn: &Connection, prefix: &str) -> rusqlite::Result<BTreeMap<String, String>> {
+pub fn load_prefixed(
+    conn: &Connection,
+    prefix: &str,
+) -> rusqlite::Result<BTreeMap<String, String>> {
     let (lo, hi) = (format!("{prefix}:"), format!("{prefix};"));
     let mut stmt =
         conn.prepare("SELECT key, value FROM settings WHERE key >= ?1 AND key < ?2 ORDER BY key")?;
@@ -56,11 +59,15 @@ pub fn load_prefixed(conn: &Connection, prefix: &str) -> rusqlite::Result<BTreeM
     Ok(out)
 }
 
-
 /// 한 플러그인의 한 행 원문 (없으면 `None`). 잘못된 ID 는 `None` — 읽기는 닫힘 쪽으로 실패한다.
 pub fn get(conn: &Connection, prefix: &str, plugin_id: &str) -> rusqlite::Result<Option<String>> {
-    let Ok(key) = key(prefix, plugin_id) else { return Ok(None) };
-    conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| r.get(0)).optional()
+    let Ok(key) = key(prefix, plugin_id) else {
+        return Ok(None);
+    };
+    conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| {
+        r.get(0)
+    })
+    .optional()
 }
 
 /// 한 행을 쓴다 (없으면 추가, 있으면 덮어쓴다). 잘못된 ID 는 거부한다.
@@ -93,7 +100,10 @@ pub fn delete_prefixed(conn: &Connection, prefix: &str) -> rusqlite::Result<usiz
 /// 모든 접두어의 한 플러그인 행을 지운다 (제거·복원 정리용).
 pub fn delete_plugin(conn: &Connection, plugin_id: &str) -> Result<(), PutError> {
     for prefix in ALL_PREFIXES {
-        conn.execute("DELETE FROM settings WHERE key = ?1", [key(prefix, plugin_id)?])?;
+        conn.execute(
+            "DELETE FROM settings WHERE key = ?1",
+            [key(prefix, plugin_id)?],
+        )?;
     }
     Ok(())
 }

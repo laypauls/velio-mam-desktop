@@ -9,7 +9,10 @@ use std::time::{Instant, SystemTime};
 
 use mam_db::{DbPool, Priority, migrate, open};
 use mam_plugin_host::Clock;
-use mam_plugin_runtime::{ChangeReason, GatewayConfig, JobHooks, PluginChanged, PluginId, PluginInfo, PluginRuntime, RuntimeDeps};
+use mam_plugin_runtime::{
+    ChangeReason, GatewayConfig, JobHooks, PluginChanged, PluginId, PluginInfo, PluginRuntime,
+    RuntimeDeps,
+};
 use semver::Version;
 use tempfile::TempDir;
 
@@ -47,13 +50,23 @@ pub fn worker_exe() -> PathBuf {
             return PathBuf::from(p);
         }
         let test_exe = std::env::current_exe().expect("test exe path");
-        let profile_dir = test_exe.parent().and_then(Path::parent).expect("profile dir").to_path_buf();
-        let mut cmd = std::process::Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()));
+        let profile_dir = test_exe
+            .parent()
+            .and_then(Path::parent)
+            .expect("profile dir")
+            .to_path_buf();
+        let mut cmd =
+            std::process::Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()));
         cmd.args(["build", "-p", "mam-plugin-worker", "--quiet"]);
         if profile_dir.file_name().is_some_and(|n| n == "release") {
             cmd.arg("--release");
         }
-        assert!(cmd.status().expect("run cargo build for the worker").success(), "building mam-plugin-worker failed");
+        assert!(
+            cmd.status()
+                .expect("run cargo build for the worker")
+                .success(),
+            "building mam-plugin-worker failed"
+        );
         let exe = profile_dir.join("mam-plugin-worker.exe");
         assert!(exe.exists(), "worker not found at {}", exe.display());
         exe
@@ -69,7 +82,10 @@ pub struct RecHooks {
 
 impl JobHooks for RecHooks {
     fn installed(&self, plugin: &PluginId, fresh: bool) {
-        self.installed.lock().unwrap().push((plugin.to_string(), fresh));
+        self.installed
+            .lock()
+            .unwrap()
+            .push((plugin.to_string(), fresh));
     }
 
     fn enabled(&self, plugin: &PluginId) {
@@ -89,7 +105,14 @@ pub struct Rt {
     vol: i64,
 }
 
-fn deps(pool: &Arc<DbPool>, data_root: &Path, plugins_dir: &Path, worker: Option<PathBuf>, app: &str, events: &Arc<Mutex<Vec<PluginChanged>>>) -> RuntimeDeps {
+fn deps(
+    pool: &Arc<DbPool>,
+    data_root: &Path,
+    plugins_dir: &Path,
+    worker: Option<PathBuf>,
+    app: &str,
+    events: &Arc<Mutex<Vec<PluginChanged>>>,
+) -> RuntimeDeps {
     let sink = Arc::clone(events);
     RuntimeDeps {
         pool: Arc::clone(pool),
@@ -131,19 +154,40 @@ impl Rt {
         let rt = PluginRuntime::boot(deps(&pool, &data_root, &plugins_dir, worker, app, &events));
         let hooks = Arc::new(RecHooks::default());
         rt.set_job_hooks(hooks.clone());
-        Self { tmp, pool, data_root, plugins_dir, src_root, rt, events, hooks, vol }
+        Self {
+            tmp,
+            pool,
+            data_root,
+            plugins_dir,
+            src_root,
+            rt,
+            events,
+            hooks,
+            vol,
+        }
     }
 
     /// 같은 DB·폴더로 런타임을 다시 부팅한다 (앱 재시작). 이전 런타임의 워커는 정리한다
     pub fn reboot(&mut self, worker: Option<PathBuf>, app: &str) {
         self.rt.shutdown_all();
-        self.rt = PluginRuntime::boot(deps(&self.pool, &self.data_root, &self.plugins_dir, worker, app, &self.events));
+        self.rt = PluginRuntime::boot(deps(
+            &self.pool,
+            &self.data_root,
+            &self.plugins_dir,
+            worker,
+            app,
+            &self.events,
+        ));
         self.rt.set_job_hooks(self.hooks.clone());
     }
 
     /// 픽스처 플러그인을 `src/<dest>` 로 복사한다
     pub fn fixture(&self, name: &str, dest: &str) -> PathBuf {
-        let from = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("fixtures").join("plugins").join(name);
+        let from = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("fixtures")
+            .join("plugins")
+            .join(name);
         let to = self.src_root.join(dest);
         copy_dir(&from, &to);
         to
@@ -158,31 +202,56 @@ impl Rt {
 
     /// 선언한 권한 전부를 허용해 설치한다
     pub fn install_basic(&self, dir: &Path) -> PluginInfo {
-        self.rt.install(dir, "com.example.basic", &self.version_of(dir), basic_perms(), EN).unwrap()
+        self.rt
+            .install(
+                dir,
+                "com.example.basic",
+                &self.version_of(dir),
+                basic_perms(),
+                EN,
+            )
+            .unwrap()
     }
 
     pub fn version_of(&self, dir: &Path) -> String {
-        let v: serde_json::Value = serde_json::from_str(&fs::read_to_string(dir.join("plugin.json")).unwrap()).unwrap();
+        let v: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(dir.join("plugin.json")).unwrap()).unwrap();
         v["version"].as_str().unwrap().to_owned()
     }
 
     pub fn events(&self) -> Vec<(String, ChangeReason)> {
-        self.events.lock().unwrap().iter().map(|c| (c.plugin_id.clone(), c.reason)).collect()
+        self.events
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|c| (c.plugin_id.clone(), c.reason))
+            .collect()
     }
 
     pub fn exec(&self, sql: &str) {
         let sql = sql.to_owned();
-        self.pool.write(Priority::High, move |c| Ok(c.execute_batch(&sql)?)).unwrap();
+        self.pool
+            .write(Priority::High, move |c| Ok(c.execute_batch(&sql)?))
+            .unwrap();
     }
 
     pub fn count(&self, sql: &str) -> i64 {
-        self.pool.read(|c| Ok(c.query_row(sql, [], |r| r.get(0))?)).unwrap()
+        self.pool
+            .read(|c| Ok(c.query_row(sql, [], |r| r.get(0))?))
+            .unwrap()
     }
 
     pub fn setting(&self, key: &str) -> Option<String> {
         let key = key.to_owned();
         self.pool
-            .read(move |c| Ok(c.query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| r.get::<_, String>(0)).ok()))
+            .read(move |c| {
+                Ok(
+                    c.query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| {
+                        r.get::<_, String>(0)
+                    })
+                    .ok(),
+                )
+            })
             .unwrap()
     }
 
@@ -223,7 +292,16 @@ impl Rt {
 }
 
 pub fn basic_perms() -> Vec<String> {
-    ["asset.read.metadata", "kv.read", "kv.write", "tag.write", "export.write"].iter().map(|s| (*s).to_owned()).collect()
+    [
+        "asset.read.metadata",
+        "kv.read",
+        "kv.write",
+        "tag.write",
+        "export.write",
+    ]
+    .iter()
+    .map(|s| (*s).to_owned())
+    .collect()
 }
 
 pub fn copy_dir(from: &Path, to: &Path) {
@@ -244,7 +322,11 @@ pub fn snapshot(root: &Path) -> Vec<(String, Vec<u8>, SystemTime)> {
     let mut out = Vec::new();
     walk(root, &mut |p| {
         let m = fs::metadata(p).unwrap();
-        out.push((p.strip_prefix(root).unwrap().to_string_lossy().into_owned(), fs::read(p).unwrap(), m.modified().unwrap()));
+        out.push((
+            p.strip_prefix(root).unwrap().to_string_lossy().into_owned(),
+            fs::read(p).unwrap(),
+            m.modified().unwrap(),
+        ));
     });
     out.sort_by(|a, b| a.0.cmp(&b.0));
     out
@@ -254,7 +336,14 @@ pub fn snapshot(root: &Path) -> Vec<(String, Vec<u8>, SystemTime)> {
 pub fn file_list(root: &Path) -> Vec<String> {
     let mut v = Vec::new();
     if root.exists() {
-        walk(root, &mut |p| v.push(p.strip_prefix(root).unwrap().to_string_lossy().replace('\\', "/")));
+        walk(root, &mut |p| {
+            v.push(
+                p.strip_prefix(root)
+                    .unwrap()
+                    .to_string_lossy()
+                    .replace('\\', "/"),
+            )
+        });
     }
     v.sort();
     v
@@ -269,12 +358,19 @@ fn walk(dir: &Path, f: &mut dyn FnMut(&Path)) {
 
 /// PID 로만 확인 — 이미지 이름으로 찾지 않는다
 pub fn pid_alive(pid: u32) -> bool {
-    let out = std::process::Command::new("tasklist").args(["/FI", &format!("PID eq {pid}"), "/FO", "CSV", "/NH"]).output().expect("tasklist");
+    let out = std::process::Command::new("tasklist")
+        .args(["/FI", &format!("PID eq {pid}"), "/FO", "CSV", "/NH"])
+        .output()
+        .expect("tasklist");
     String::from_utf8_lossy(&out.stdout).contains(&format!("\"{pid}\""))
 }
 
 /// PID 로 종료 (이름으로 종료하지 않는다)
 pub fn kill_pid(pid: u32) {
-    let st = std::process::Command::new("taskkill").args(["/PID", &pid.to_string(), "/F"]).stdout(std::process::Stdio::null()).status().expect("taskkill");
+    let st = std::process::Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/F"])
+        .stdout(std::process::Stdio::null())
+        .status()
+        .expect("taskkill");
     assert!(st.success());
 }

@@ -28,7 +28,11 @@ impl SubtitleFiles {
     pub fn new(cache_dir: &Path) -> Self {
         let dir = cache_dir.join(SUBTITLE_DIR);
         let _ = std::fs::remove_dir_all(&dir);
-        Self { dir, seq: AtomicU64::new(0), written: Mutex::new(HashMap::new()) }
+        Self {
+            dir,
+            seq: AtomicU64::new(0),
+            written: Mutex::new(HashMap::new()),
+        }
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, Written> {
@@ -36,13 +40,19 @@ impl SubtitleFiles {
     }
 
     /// `(asset_id, track_id)` 의 SRT 경로. 이미 쓴 파일이 있으면 재사용하고, 없으면 `cues` 를 SRT 로 직렬화해 쓴다
-    pub fn prepare(&self, asset_id: i64, track_id: &str, cues: &[Cue]) -> Result<PathBuf, CommandError> {
+    pub fn prepare(
+        &self,
+        asset_id: i64,
+        track_id: &str,
+        cues: &[Cue],
+    ) -> Result<PathBuf, CommandError> {
         let mut written = self.lock();
         let key = (asset_id, track_id.to_owned());
         if let Some(p) = written.get(&key).filter(|p| p.is_file()) {
             return Ok(p.clone());
         }
-        let io = |e: std::io::Error| CommandError::logged(ErrorCode::Io, "file operation failed", &e);
+        let io =
+            |e: std::io::Error| CommandError::logged(ErrorCode::Io, "file operation failed", &e);
         std::fs::create_dir_all(&self.dir).map_err(io)?;
         let n = self.seq.fetch_add(1, Ordering::Relaxed);
         let path = self.dir.join(format!("sub-{}-{n}.srt", std::process::id()));

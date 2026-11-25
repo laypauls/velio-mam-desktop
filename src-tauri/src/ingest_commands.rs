@@ -27,9 +27,10 @@ impl From<IngestError> for CommandError {
                 Self::new(ErrorCode::AlreadyRegistered, "already registered")
             }
             // 이전하려는 경로가 현재 경로와 같다 — 별도 코드 없이 "이미 등록됨" 으로 합친다 (경로는 싣지 않는다)
-            IngestError::SamePath => {
-                Self::new(ErrorCode::AlreadyRegistered, "folder is already at this path")
-            }
+            IngestError::SamePath => Self::new(
+                ErrorCode::AlreadyRegistered,
+                "folder is already at this path",
+            ),
             IngestError::ScanRunning => {
                 Self::new(ErrorCode::ScanRunning, "a scan of this folder is running")
             }
@@ -54,13 +55,17 @@ impl From<IngestError> for CommandError {
                 },
             ),
             IngestError::Offline => Self::new(ErrorCode::Offline, "volume is offline"),
-            IngestError::Busy => Self::new(ErrorCode::Busy, "a folder in this range is being removed"),
-            IngestError::BackupFailed => {
-                Self::new(ErrorCode::BackupFailed, "database backup before removal failed")
+            IngestError::Busy => {
+                Self::new(ErrorCode::Busy, "a folder in this range is being removed")
             }
-            IngestError::VolumeHasFolders => {
-                Self::new(ErrorCode::VolumeHasFolders, "volume still has managed folders")
-            }
+            IngestError::BackupFailed => Self::new(
+                ErrorCode::BackupFailed,
+                "database backup before removal failed",
+            ),
+            IngestError::VolumeHasFolders => Self::new(
+                ErrorCode::VolumeHasFolders,
+                "volume still has managed folders",
+            ),
             IngestError::Io(ref io) if io.kind() == std::io::ErrorKind::StorageFull => {
                 Self::logged(ErrorCode::DiskFull, "not enough disk space", &e)
             }
@@ -133,7 +138,10 @@ pub async fn add_folder(
     path: String,
     media_types: MediaTypeSet,
 ) -> Result<ManagedFolderView, CommandError> {
-    blocking(&ingest, move |i| i.add_folder_with_types(&path, media_types)).await
+    blocking(&ingest, move |i| {
+        i.add_folder_with_types(&path, media_types)
+    })
+    .await
 }
 
 /// 폴더를 새 경로로 옮겨 연결한다 (자산·태그·메모 유지). 새 경로 스캔이 예약된다.

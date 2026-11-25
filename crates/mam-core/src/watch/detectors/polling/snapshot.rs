@@ -74,7 +74,10 @@ impl Snapshot {
     }
 
     pub fn entry_count(&self) -> usize {
-        self.dirs.values().map(|d| d.files.iter().count() + d.dirs.iter().count()).sum()
+        self.dirs
+            .values()
+            .map(|d| d.files.iter().count() + d.dirs.iter().count())
+            .sum()
     }
 
     /// 스냅숏이 쥔 대략의 힙 바이트 — 이름 문자열 + 디렉터리 항목(키 경로 + 구조체). 해시 테이블 여유분은 제외한다.
@@ -82,7 +85,11 @@ impl Snapshot {
         self.dirs
             .iter()
             .map(|(k, v)| {
-                k.as_os_str().len() + std::mem::size_of::<PathBuf>() + std::mem::size_of::<DirSnap>() + v.files.heap_bytes() + v.dirs.heap_bytes()
+                k.as_os_str().len()
+                    + std::mem::size_of::<PathBuf>()
+                    + std::mem::size_of::<DirSnap>()
+                    + v.files.heap_bytes()
+                    + v.dirs.heap_bytes()
             })
             .sum()
     }
@@ -90,7 +97,10 @@ impl Snapshot {
 
 /// 읽을 수 없어 추적하지 않는 디렉터리인가 (사라졌거나 권한 없음) — 전체를 실패시키지 않고 건너뛴다.
 fn skippable(e: PollError) -> bool {
-    matches!(e, PollError::NotFound | PollError::Io(std::io::ErrorKind::PermissionDenied))
+    matches!(
+        e,
+        PollError::NotFound | PollError::Io(std::io::ErrorKind::PermissionDenied)
+    )
 }
 
 /// 수정 시각이 "방금"인가 — 목록을 읽은 직후 같은 시각 칸 안에서 생긴 변경은 시각이 같아 보이므로 다음 주기에 한 번 더 읽는다.
@@ -176,7 +186,12 @@ fn forget(map: &mut HashMap<PathBuf, DirSnap>, dir: &Path) {
 
 impl Snapshot {
     /// 기준선 — 보고 없이 전체를 한 번 읽는다. 하나라도 실패하면 스냅숏을 만들지 않는다 (부분 스냅숏은 누락을 숨긴다).
-    pub fn baseline(fs: &dyn PollFs, root: &Path, now_ms: i64, stop: &dyn Fn() -> bool) -> (Result<Self, PollError>, TickStats) {
+    pub fn baseline(
+        fs: &dyn PollFs,
+        root: &Path,
+        now_ms: i64,
+        stop: &dyn Fn() -> bool,
+    ) -> (Result<Self, PollError>, TickStats) {
         let mut stats = TickStats::default();
         let mut dirs = HashMap::new();
         let r = walk_into(fs, root, true, now_ms, &mut dirs, stop, &mut stats);
@@ -185,7 +200,13 @@ impl Snapshot {
 
     /// 한 주기 — 수정 시각이 바뀐 디렉터리만 목록을 읽어 비교하고 스냅숏을 갱신한다.
     /// 디렉터리 단위로 원자적이다: 한 디렉터리의 읽기가 실패하면 그 디렉터리는 스냅숏을 바꾸지 않고(다음 주기에 다시 본다) 주기를 멈춘다.
-    pub fn tick(&mut self, fs: &dyn PollFs, root: &Path, now_ms: i64, stop: &dyn Fn() -> bool) -> TickOutcome {
+    pub fn tick(
+        &mut self,
+        fs: &dyn PollFs,
+        root: &Path,
+        now_ms: i64,
+        stop: &dyn Fn() -> bool,
+    ) -> TickOutcome {
         let mut out = TickOutcome::default();
         let mut stack = vec![root.to_path_buf()];
         while let Some(dir) = stack.pop() {
@@ -193,7 +214,9 @@ impl Snapshot {
                 out.failure = Some(PollError::Stopped);
                 break;
             }
-            let Some(old) = self.dirs.get(&dir) else { continue };
+            let Some(old) = self.dirs.get(&dir) else {
+                continue;
+            };
             out.stats.stats += 1;
             let is_root = dir == root;
             let mtime = match fs.dir_mtime(&dir) {
@@ -220,13 +243,24 @@ impl Snapshot {
             let new = snap_of(mtime, false, listing);
             let (gone_files, added_files) = diff(&old.files, &new.files);
             let (gone_dirs, added_dirs) = diff(&old.dirs, &new.dirs);
-            let changed = !(gone_files.is_empty() && added_files.is_empty() && gone_dirs.is_empty() && added_dirs.is_empty());
+            let changed = !(gone_files.is_empty()
+                && added_files.is_empty()
+                && gone_dirs.is_empty()
+                && added_dirs.is_empty());
 
             // 새 폴더는 안쪽까지 조용히 기준선에 담고 `Subtree` 한 건으로 보고한다 (그 안의 파일은 반영 쪽이 게이트를 거쳐 처리한다)
             let mut fresh = HashMap::new();
             let mut failure = None;
             for n in &added_dirs {
-                if let Err(e) = walk_into(fs, &dir.join(n), false, now_ms, &mut fresh, stop, &mut out.stats) {
+                if let Err(e) = walk_into(
+                    fs,
+                    &dir.join(n),
+                    false,
+                    now_ms,
+                    &mut fresh,
+                    stop,
+                    &mut out.stats,
+                ) {
                     failure = Some(e);
                     break;
                 }
@@ -236,7 +270,11 @@ impl Snapshot {
                 break;
             }
 
-            let mut changes: Vec<Change> = gone_files.iter().chain(gone_dirs.iter()).map(|n| Change::Path(dir.join(n))).collect();
+            let mut changes: Vec<Change> = gone_files
+                .iter()
+                .chain(gone_dirs.iter())
+                .map(|n| Change::Path(dir.join(n)))
+                .collect();
             changes.extend(added_files.iter().map(|n| Change::Path(dir.join(n))));
             changes.extend(added_dirs.iter().map(|n| Change::Subtree(dir.join(n))));
             let gone: Vec<PathBuf> = gone_dirs.iter().map(|n| dir.join(n)).collect();
@@ -247,7 +285,13 @@ impl Snapshot {
                 forget(&mut self.dirs, g);
             }
             self.dirs.extend(fresh);
-            self.dirs.insert(dir, DirSnap { verify: changed || recent(mtime, now_ms), ..new });
+            self.dirs.insert(
+                dir,
+                DirSnap {
+                    verify: changed || recent(mtime, now_ms),
+                    ..new
+                },
+            );
             stack.extend(kept);
         }
         out

@@ -27,31 +27,47 @@ pub struct JobRow {
 impl Env {
     pub fn exec(&self, sql: &str) {
         let sql = sql.to_owned();
-        self.pool.write(Priority::High, move |c| Ok(c.execute_batch(&sql)?)).unwrap();
+        self.pool
+            .write(Priority::High, move |c| Ok(c.execute_batch(&sql)?))
+            .unwrap();
     }
 
     pub fn count(&self, sql: &str) -> i64 {
-        self.pool.read(|c| Ok(c.query_row(sql, [], |r| r.get(0))?)).unwrap()
+        self.pool
+            .read(|c| Ok(c.query_row(sql, [], |r| r.get(0))?))
+            .unwrap()
     }
 
     pub fn revision(&self, asset: i64) -> i64 {
-        self.count(&format!("SELECT revision FROM media_assets WHERE asset_id = {asset}"))
+        self.count(&format!(
+            "SELECT revision FROM media_assets WHERE asset_id = {asset}"
+        ))
     }
 
     pub fn max_event(&self) -> i64 {
-        self.pool.read(|c| Ok(plugin_tasks::max_event_id(c)?)).unwrap()
+        self.pool
+            .read(|c| Ok(plugin_tasks::max_event_id(c)?))
+            .unwrap()
     }
 
     pub fn cursor(&self, plugin: &str) -> Option<i64> {
         let p = plugin.to_owned();
-        self.pool.read(move |c| Ok(plugin_tasks::feed_cursor(c, &p)?)).unwrap()
+        self.pool
+            .read(move |c| Ok(plugin_tasks::feed_cursor(c, &p)?))
+            .unwrap()
     }
 
     pub fn set_cursor(&self, plugin: &str, value: i64) {
         let p = plugin.to_owned();
         self.pool
             .write(Priority::High, move |c| {
-                mam_db::plugin_settings::put(c, mam_db::plugin_settings::FEED_CURSOR, &p, &value.to_string()).unwrap();
+                mam_db::plugin_settings::put(
+                    c,
+                    mam_db::plugin_settings::FEED_CURSOR,
+                    &p,
+                    &value.to_string(),
+                )
+                .unwrap();
                 Ok(())
             })
             .unwrap();
@@ -72,8 +88,18 @@ impl Env {
     }
 
     /// 작업 행 하나를 레지스트리(정수 키)를 거쳐 직접 넣는다 — 테스트 시드용 (`last_error` 는 `NULL`)
-    pub fn seed_task(&self, plugin: &str, provider: &str, asset: i64, target: i64, status: &str, last_error: Option<&str>) {
-        self.exec(&format!("INSERT OR IGNORE INTO plugins (plugin_id) VALUES ('{plugin}')"));
+    pub fn seed_task(
+        &self,
+        plugin: &str,
+        provider: &str,
+        asset: i64,
+        target: i64,
+        status: &str,
+        last_error: Option<&str>,
+    ) {
+        self.exec(&format!(
+            "INSERT OR IGNORE INTO plugins (plugin_id) VALUES ('{plugin}')"
+        ));
         self.exec(&format!("INSERT OR IGNORE INTO plugin_providers (plugin_ref, name) SELECT plugin_ref, '{provider}' FROM plugins WHERE plugin_id = '{plugin}'"));
         let err = last_error.map_or_else(|| "NULL".to_owned(), |e| format!("'{e}'"));
         self.exec(&format!(
@@ -125,6 +151,9 @@ impl Env {
 
     /// 자동(플러그인) 태그만 — 사용자 태그(`user-tag-*`)를 뺀다
     pub fn plugin_tags(&self, asset: i64) -> Vec<String> {
-        self.tags(asset).into_iter().filter(|t| !t.starts_with("user-tag-")).collect()
+        self.tags(asset)
+            .into_iter()
+            .filter(|t| !t.starts_with("user-tag-"))
+            .collect()
     }
 }

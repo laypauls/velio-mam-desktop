@@ -127,7 +127,9 @@ fn build_common(
 }
 
 /// 내보내기 확장자 허용 목록 — 데이터 형식만 (실행·스크립트·바로가기 형식, html/svg 제외)
-pub const EXPORT_EXTENSIONS: &[&str] = &["csv", "tsv", "json", "jsonl", "txt", "md", "xml", "xmp", "srt", "vtt", "yaml", "yml"];
+pub const EXPORT_EXTENSIONS: &[&str] = &[
+    "csv", "tsv", "json", "jsonl", "txt", "md", "xml", "xmp", "srt", "vtt", "yaml", "yml",
+];
 
 /// 소문자 정확 일치만 허용한다
 pub fn export_extension_allowed(s: &str) -> bool {

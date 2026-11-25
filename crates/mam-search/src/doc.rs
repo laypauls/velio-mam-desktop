@@ -178,7 +178,11 @@ impl AssetDoc {
         d.add_u64(f.name_hi, hi);
         d.add_u64(f.name_lo, lo);
         let title = self.title.trim();
-        let (hi, lo) = name_sort_key(if title.is_empty() { &self.file_name } else { title });
+        let (hi, lo) = name_sort_key(if title.is_empty() {
+            &self.file_name
+        } else {
+            title
+        });
         d.add_u64(f.title_hi, hi);
         d.add_u64(f.title_lo, lo);
         if let Some(fid) = self.folder_id {
@@ -273,7 +277,10 @@ mod tests {
     fn t_capfb_doc_01_captured_or_modified_prefers_capture_and_floors_modified_ms_to_seconds() {
         // Arrange
         let (_, f) = build_schema();
-        let flags = BuildFlags { ngram: false, raw: false };
+        let flags = BuildFlags {
+            ngram: false,
+            raw: false,
+        };
         let mut with_capture = sample();
         with_capture.captured_at = Some(1_700_000_000);
         with_capture.modified_at = 5_000_000_000_000;
@@ -298,7 +305,11 @@ mod tests {
         assert_eq!(captured_or_modified(None, 999), 0);
         assert_eq!(captured_or_modified(None, 1000), 1);
         assert_eq!(captured_or_modified(None, -1), -1);
-        assert_eq!(captured_or_modified(Some(0), 9_999), 0, "capture 0 is a value, not 'missing'");
+        assert_eq!(
+            captured_or_modified(Some(0), 9_999),
+            0,
+            "capture 0 is a value, not 'missing'"
+        );
     }
 
     fn texts(d: &TantivyDocument, f: tantivy::schema::Field) -> Vec<String> {

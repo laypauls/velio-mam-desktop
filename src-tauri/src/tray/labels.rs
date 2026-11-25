@@ -60,7 +60,11 @@ impl TrayLabels {
 
     /// 일시정지 상태에 맞는 토글 항목 문구
     pub fn toggle(&self, paused: bool) -> &str {
-        if paused { &self.resume_jobs } else { &self.pause_jobs }
+        if paused {
+            &self.resume_jobs
+        } else {
+            &self.pause_jobs
+        }
     }
 }
 
@@ -155,7 +159,10 @@ mod tests {
         // Act / Assert
         assert_eq!(custom.toggle(false), "Pausar");
         assert_eq!(custom.toggle(true), "Reanudar");
-        assert_ne!(TrayLabels::default().toggle(false), TrayLabels::default().toggle(true));
+        assert_ne!(
+            TrayLabels::default().toggle(false),
+            TrayLabels::default().toggle(true)
+        );
     }
 
     #[test]

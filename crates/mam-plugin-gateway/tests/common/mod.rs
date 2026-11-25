@@ -32,7 +32,10 @@ pub struct Rec(pub Mutex<Vec<(String, LogLevel, String)>>);
 
 impl LogSink for Rec {
     fn emit(&self, plugin_id: &str, level: LogLevel, message: &str) {
-        self.0.lock().unwrap().push((plugin_id.to_owned(), level, message.to_owned()));
+        self.0
+            .lock()
+            .unwrap()
+            .push((plugin_id.to_owned(), level, message.to_owned()));
     }
 }
 
@@ -43,7 +46,9 @@ impl Rec {
 }
 
 pub fn plugin_id(id: &str) -> PluginId {
-    let json = format!(r#"{{"apiVersion":1,"id":"{id}","version":"0.1.0","engines":{{"mam":">=0.1.0"}},"main":"main.js","displayName":"plugin.name"}}"#);
+    let json = format!(
+        r#"{{"apiVersion":1,"id":"{id}","version":"0.1.0","engines":{{"mam":">=0.1.0"}},"main":"main.js","displayName":"plugin.name"}}"#
+    );
     parse_manifest(&json).expect("valid manifest").id
 }
 
@@ -85,8 +90,20 @@ impl Fx {
         let mut cfg = GatewayConfig::new(cache.clone());
         tweak(&mut cfg);
         let sink = Arc::new(Rec::default());
-        let gw = Arc::new(Gateway::new(Arc::clone(&pool), Arc::new(FixedClock(T0)), cfg).with_log_sink(sink.clone()));
-        Self { dir, db_path, pool, gw, lib, cache, sink, vol }
+        let gw = Arc::new(
+            Gateway::new(Arc::clone(&pool), Arc::new(FixedClock(T0)), cfg)
+                .with_log_sink(sink.clone()),
+        );
+        Self {
+            dir,
+            db_path,
+            pool,
+            gw,
+            lib,
+            cache,
+            sink,
+            vol,
+        }
     }
 
     /// 원본 파일(임시 폴더 안)과 활성 위치가 있는 자산. 내용은 id 로 달라진다
@@ -110,7 +127,9 @@ impl Fx {
 
     pub fn exec(&self, sql: &str) {
         let sql = sql.to_owned();
-        self.pool.write(Priority::High, move |c| Ok(c.execute_batch(&sql)?)).unwrap();
+        self.pool
+            .write(Priority::High, move |c| Ok(c.execute_batch(&sql)?))
+            .unwrap();
     }
 
     pub fn read<T>(&self, f: impl FnOnce(&Connection) -> T) -> T {
@@ -124,25 +143,62 @@ impl Fx {
     /// 실제 WebP 썸네일(320·1024)을 캐시에 만든다. 원본 PNG 는 임시 폴더에만 둔다
     pub fn thumbs(&self, id: i64) {
         let src = self.dir.path().join(format!("thumb_src_{id}.png"));
-        image::RgbImage::from_fn(1500, 900, |x, _| if x < 750 { image::Rgb([255, 0, 0]) } else { image::Rgb([0, 0, 255]) }).save(&src).unwrap();
-        let tools = mam_media::tool::MediaTools::with_paths(None, None, Arc::new(mam_media::tool::ProcessRunner));
-        mam_media::thumbnail::create_thumbnails(&tools, &src, id, &self.cache, &mam_media::thumbnail::ThumbnailOptions::default()).unwrap();
+        image::RgbImage::from_fn(1500, 900, |x, _| {
+            if x < 750 {
+                image::Rgb([255, 0, 0])
+            } else {
+                image::Rgb([0, 0, 255])
+            }
+        })
+        .save(&src)
+        .unwrap();
+        let tools = mam_media::tool::MediaTools::with_paths(
+            None,
+            None,
+            Arc::new(mam_media::tool::ProcessRunner),
+        );
+        mam_media::thumbnail::create_thumbnails(
+            &tools,
+            &src,
+            id,
+            &self.cache,
+            &mam_media::thumbnail::ThumbnailOptions::default(),
+        )
+        .unwrap();
     }
 
     /// 플러그인을 등록하고 허용 상태(`enabled`, `granted` 원문)를 DB 에 쓴 뒤 `refresh` 한다
-    pub fn plugin(&self, id: &str, manifest: &[Permission], granted_raw: Option<&str>, enabled_raw: Option<&str>) -> PluginId {
+    pub fn plugin(
+        &self,
+        id: &str,
+        manifest: &[Permission],
+        granted_raw: Option<&str>,
+        enabled_raw: Option<&str>,
+    ) -> PluginId {
         let pid = plugin_id(id);
-        self.gw.grants().register(&pid, &manifest.iter().copied().collect::<BTreeSet<_>>());
+        self.gw
+            .grants()
+            .register(&pid, &manifest.iter().copied().collect::<BTreeSet<_>>());
         self.set_settings(id, enabled_raw, granted_raw);
         self.gw.grants().refresh(&self.pool, &pid, soon()).unwrap();
         pid
     }
 
     pub fn set_settings(&self, id: &str, enabled_raw: Option<&str>, granted_raw: Option<&str>) {
-        let (id, e, g) = (id.to_owned(), enabled_raw.map(str::to_owned), granted_raw.map(str::to_owned));
+        let (id, e, g) = (
+            id.to_owned(),
+            enabled_raw.map(str::to_owned),
+            granted_raw.map(str::to_owned),
+        );
         self.pool
             .write(Priority::High, move |c| {
-                c.execute("DELETE FROM settings WHERE key IN (?1, ?2)", (format!("plugin_enabled:{id}"), format!("plugin_granted:{id}")))?;
+                c.execute(
+                    "DELETE FROM settings WHERE key IN (?1, ?2)",
+                    (
+                        format!("plugin_enabled:{id}"),
+                        format!("plugin_granted:{id}"),
+                    ),
+                )?;
                 if let Some(e) = e {
                     put(c, ENABLED, &id, &e).unwrap();
                 }
@@ -156,15 +212,34 @@ impl Fx {
 
     /// 모든 권한 허용 + 활성
     pub fn full_plugin(&self, id: &str) -> PluginId {
-        self.plugin(id, &ALL_PERMS, Some(&granted_json(&ALL_PERMS)), Some("true"))
+        self.plugin(
+            id,
+            &ALL_PERMS,
+            Some(&granted_json(&ALL_PERMS)),
+            Some("true"),
+        )
     }
 
-    pub fn call(&self, plugin: &PluginId, assets: &[i64], method: &str, params: Value) -> Result<Value, HostError> {
-        let scope = InvokeScope::new(assets.to_vec()).unwrap().with_deadline(soon());
+    pub fn call(
+        &self,
+        plugin: &PluginId,
+        assets: &[i64],
+        method: &str,
+        params: Value,
+    ) -> Result<Value, HostError> {
+        let scope = InvokeScope::new(assets.to_vec())
+            .unwrap()
+            .with_deadline(soon());
         self.call_scope(plugin, &scope, method, params)
     }
 
-    pub fn call_scope(&self, plugin: &PluginId, scope: &InvokeScope, method: &str, params: Value) -> Result<Value, HostError> {
+    pub fn call_scope(
+        &self,
+        plugin: &PluginId,
+        scope: &InvokeScope,
+        method: &str,
+        params: Value,
+    ) -> Result<Value, HostError> {
         self.gw.call(&CallCx { plugin, scope }, method, params)
     }
 
@@ -183,7 +258,11 @@ pub fn snapshot(root: &Path) -> Vec<(String, Vec<u8>, std::time::SystemTime)> {
     let mut out = Vec::new();
     for e in walk(root) {
         let m = std::fs::metadata(&e).unwrap();
-        out.push((e.strip_prefix(root).unwrap().to_string_lossy().into_owned(), std::fs::read(&e).unwrap(), m.modified().unwrap()));
+        out.push((
+            e.strip_prefix(root).unwrap().to_string_lossy().into_owned(),
+            std::fs::read(&e).unwrap(),
+            m.modified().unwrap(),
+        ));
     }
     out.sort_by(|a, b| a.0.cmp(&b.0));
     out
@@ -193,7 +272,11 @@ fn walk(dir: &Path) -> Vec<PathBuf> {
     let mut v = Vec::new();
     for e in std::fs::read_dir(dir).unwrap() {
         let p = e.unwrap().path();
-        if p.is_dir() { v.extend(walk(&p)) } else { v.push(p) }
+        if p.is_dir() {
+            v.extend(walk(&p))
+        } else {
+            v.push(p)
+        }
     }
     v
 }

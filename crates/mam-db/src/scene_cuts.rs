@@ -14,8 +14,8 @@ pub use codec::{
 };
 pub use jobs::{
     BACKFILL_BATCH, BACKFILL_COUNT_SQL, BACKFILL_PAGE_SQL, BackfillBatch, REQUEUE_SQL,
-    RequestOptions, RequestOutcome, backfill_batch_tx, backfill_count, enqueue_auto_tx,
-    request_tx, requeue_pending_tx,
+    RequestOptions, RequestOutcome, backfill_batch_tx, backfill_count, enqueue_auto_tx, request_tx,
+    requeue_pending_tx,
 };
 
 use codec::{has_within, nearest_within};
@@ -242,12 +242,7 @@ pub fn set_outcome_tx(
     Ok(())
 }
 
-fn save_cuts(
-    conn: &Connection,
-    asset_id: i64,
-    row: &SceneRow,
-    now: i64,
-) -> Result<(), SceneError> {
+fn save_cuts(conn: &Connection, asset_id: i64, row: &SceneRow, now: i64) -> Result<(), SceneError> {
     conn.prepare_cached(
         "UPDATE asset_scene_cuts SET auto_cuts = ?2, user_cuts = ?3, suppressed = ?4, updated_at = ?5
          WHERE asset_id = ?1",

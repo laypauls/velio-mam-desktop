@@ -86,8 +86,16 @@ fn t_ipc_purge_01_new_error_codes_serialize_in_snake_case_and_hide_internals() {
     // Arrange + Act
     let cases = [
         (IngestError::Busy, ErrorCode::Busy, "busy"),
-        (IngestError::BackupFailed, ErrorCode::BackupFailed, "backup_failed"),
-        (IngestError::VolumeHasFolders, ErrorCode::VolumeHasFolders, "volume_has_folders"),
+        (
+            IngestError::BackupFailed,
+            ErrorCode::BackupFailed,
+            "backup_failed",
+        ),
+        (
+            IngestError::VolumeHasFolders,
+            ErrorCode::VolumeHasFolders,
+            "volume_has_folders",
+        ),
     ];
 
     // Assert
@@ -96,12 +104,16 @@ fn t_ipc_purge_01_new_error_codes_serialize_in_snake_case_and_hide_internals() {
         assert_eq!(cmd.code(), code);
         let v = serde_json::to_value(&cmd).unwrap();
         assert_eq!(v["code"], text);
-        assert!(!v["message"].as_str().unwrap().contains('\\'), "no paths in messages");
+        assert!(
+            !v["message"].as_str().unwrap().contains('\\'),
+            "no paths in messages"
+        );
     }
 }
 
 #[test]
-fn t_ipc_purge_02_remove_folder_emits_removal_progress_with_the_contract_shape_and_backs_up_first() {
+fn t_ipc_purge_02_remove_folder_emits_removal_progress_with_the_contract_shape_and_backs_up_first()
+{
     // Arrange
     let fx = fixture();
     let cap = Arc::new(Capture::default());
@@ -110,7 +122,11 @@ fn t_ipc_purge_02_remove_folder_emits_removal_progress_with_the_contract_shape_a
         Arc::clone(&fx.storage),
         Arc::new(FixedClock(AtomicI64::new(1_800_000_000_000))),
     ));
-    let id = fx.ingest.add_folder(fx.media.to_str().unwrap()).unwrap().folder_id;
+    let id = fx
+        .ingest
+        .add_folder(fx.media.to_str().unwrap())
+        .unwrap()
+        .folder_id;
 
     // Act
     fx.ingest.remove_folder(id).unwrap();
@@ -118,7 +134,11 @@ fn t_ipc_purge_02_remove_folder_emits_removal_progress_with_the_contract_shape_a
 
     // Assert: 마지막 이벤트가 { folderId, done, total, finished, error } 모양
     let events = cap.0.lock().unwrap();
-    assert!(events.iter().all(|(name, _)| name == "folders://removal-progress"));
+    assert!(
+        events
+            .iter()
+            .all(|(name, _)| name == "folders://removal-progress")
+    );
     let last = &events.last().unwrap().1;
     assert_eq!(
         *last,
@@ -143,7 +163,11 @@ fn t_ipc_purge_03_backup_failure_maps_to_backup_failed_and_the_folder_stays() {
         Arc::clone(&fx.storage),
         Arc::new(SystemClock),
     ));
-    let id = fx.ingest.add_folder(fx.media.to_str().unwrap()).unwrap().folder_id;
+    let id = fx
+        .ingest
+        .add_folder(fx.media.to_str().unwrap())
+        .unwrap()
+        .folder_id;
 
     // Act
     let err = CommandError::from(fx.ingest.remove_folder(id).unwrap_err());
@@ -151,7 +175,11 @@ fn t_ipc_purge_03_backup_failure_maps_to_backup_failed_and_the_folder_stays() {
 
     // Assert
     assert_eq!(err.code(), ErrorCode::BackupFailed);
-    assert_eq!(fx.ingest.list_folders().unwrap().len(), 1, "nothing changed");
+    assert_eq!(
+        fx.ingest.list_folders().unwrap().len(),
+        1,
+        "nothing changed"
+    );
 }
 
 #[test]
@@ -168,7 +196,14 @@ fn t_ipc_purge_04_known_volumes_and_forget_follow_the_contract() {
     // Assert
     assert_eq!(list.as_array().unwrap().len(), 1);
     assert_eq!(list[0]["folderCount"], 1);
-    for field in ["label", "kind", "lastMountPoint", "availability", "lastSeenAt", "ignored"] {
+    for field in [
+        "label",
+        "kind",
+        "lastMountPoint",
+        "availability",
+        "lastSeenAt",
+        "ignored",
+    ] {
         assert!(list[0].get(field).is_some(), "missing {field}");
     }
     assert_eq!(refused.code(), ErrorCode::VolumeHasFolders);
@@ -181,7 +216,11 @@ fn t_ipc_purge_04_known_volumes_and_forget_follow_the_contract() {
 #[test]
 fn t_ipc_purge_05_impact_serializes_with_the_contract_keys() {
     let fx = fixture();
-    let id = fx.ingest.add_folder(fx.media.to_str().unwrap()).unwrap().folder_id;
+    let id = fx
+        .ingest
+        .add_folder(fx.media.to_str().unwrap())
+        .unwrap()
+        .folder_id;
 
     let v = serde_json::to_value(fx.ingest.folder_removal_impact(id).unwrap()).unwrap();
 

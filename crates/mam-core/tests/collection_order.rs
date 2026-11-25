@@ -7,9 +7,7 @@
 use std::sync::Arc;
 
 use mam_core::SharedClock;
-use mam_core::query::{
-    Availability, MediaKind, QueryService, SortDirection, SortField, SortSpec,
-};
+use mam_core::query::{Availability, MediaKind, QueryService, SortDirection, SortField, SortSpec};
 use mam_core::scan::IngestError;
 use mam_core::userdata::{MEMBERSHIP_SQL, ReorderTarget, UserData};
 use mam_db::{DbPool, SystemClock, migrate, open};
@@ -88,7 +86,10 @@ impl Fx {
                  ORDER BY position IS NULL, position, added_at, asset_id",
             )
             .unwrap();
-        s.query_map([cid], |r| r.get(0)).unwrap().map(Result::unwrap).collect()
+        s.query_map([cid], |r| r.get(0))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
     }
 
     fn positions(&self, cid: i64) -> Vec<(i64, Option<i64>)> {
@@ -96,7 +97,10 @@ impl Fx {
         let mut s = c
             .prepare("SELECT asset_id, position FROM collection_assets WHERE collection_id = ?1 ORDER BY asset_id")
             .unwrap();
-        s.query_map([cid], |r| Ok((r.get(0)?, r.get(1)?))).unwrap().map(Result::unwrap).collect()
+        s.query_map([cid], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
     }
 
     fn count(&self, sql: &str) -> i64 {
@@ -120,7 +124,18 @@ fn t_cord_01_add_appends_new_items_in_request_order() {
 
     // Assert
     assert_eq!(f.order(c), [5, 3, 9]);
-    let pos: Vec<i64> = f.order(c).iter().map(|a| f.positions(c).iter().find(|p| p.0 == *a).unwrap().1.unwrap()).collect();
+    let pos: Vec<i64> = f
+        .order(c)
+        .iter()
+        .map(|a| {
+            f.positions(c)
+                .iter()
+                .find(|p| p.0 == *a)
+                .unwrap()
+                .1
+                .unwrap()
+        })
+        .collect();
     assert!(pos.windows(2).all(|w| w[0] < w[1]), "{pos:?}");
 }
 
@@ -156,7 +171,11 @@ fn t_cord_03_null_positions_from_an_old_app_are_normalized_on_the_next_add() {
              INSERT INTO collection_assets (collection_id, asset_id, added_at) VALUES ({c}, 3, 50);"
         ))
         .unwrap();
-    assert_eq!(f.order(c), [1, 3, 2], "NULL 은 위치 있는 행 뒤, added_at 순");
+    assert_eq!(
+        f.order(c),
+        [1, 3, 2],
+        "NULL 은 위치 있는 행 뒤, added_at 순"
+    );
 
     // Act
     f.ud.add_to_collection(c, &[4]).unwrap();
@@ -177,9 +196,11 @@ fn t_cord_04_reorder_moves_before_a_target_to_the_start_and_to_the_end() {
     // Act + Assert
     f.ud.reorder_collection(c, &[4], before(2)).unwrap();
     assert_eq!(f.order(c), [1, 4, 2, 3, 5]);
-    f.ud.reorder_collection(c, &[5], ReorderTarget::Start).unwrap();
+    f.ud.reorder_collection(c, &[5], ReorderTarget::Start)
+        .unwrap();
     assert_eq!(f.order(c), [5, 1, 4, 2, 3]);
-    f.ud.reorder_collection(c, &[1], ReorderTarget::End).unwrap();
+    f.ud.reorder_collection(c, &[1], ReorderTarget::End)
+        .unwrap();
     assert_eq!(f.order(c), [5, 4, 2, 3, 1]);
     f.ud.reorder_collection(c, &[3], before(5)).unwrap(); // 맨 앞 항목 앞 (lo 없음)
     assert_eq!(f.order(c), [3, 5, 4, 2, 1]);
@@ -196,9 +217,11 @@ fn t_cord_05_multi_move_keeps_the_current_relative_order_as_one_block() {
     // Act: 요청 순서(6,2,4)는 무시 — 현재 순서(2,4,6)가 유지된다
     f.ud.reorder_collection(c, &[6, 2, 4], before(3)).unwrap();
     assert_eq!(f.order(c), [1, 2, 4, 6, 3, 5]);
-    f.ud.reorder_collection(c, &[6, 1], ReorderTarget::End).unwrap();
+    f.ud.reorder_collection(c, &[6, 1], ReorderTarget::End)
+        .unwrap();
     assert_eq!(f.order(c), [2, 4, 3, 5, 1, 6]);
-    f.ud.reorder_collection(c, &[3, 5], ReorderTarget::Start).unwrap();
+    f.ud.reorder_collection(c, &[3, 5], ReorderTarget::Start)
+        .unwrap();
     assert_eq!(f.order(c), [3, 5, 2, 4, 1, 6]);
 }
 
@@ -225,7 +248,10 @@ fn t_cord_07_non_member_in_the_moved_set_rejects_the_whole_call() {
     let err = f.ud.reorder_collection(c, &[3, 4], ReorderTarget::Start);
 
     // Assert: 전부 아니면 전무 — 3 도 옮겨지지 않았다
-    assert!(matches!(err, Err(IngestError::InvalidInput("assetIds"))), "{err:?}");
+    assert!(
+        matches!(err, Err(IngestError::InvalidInput("assetIds"))),
+        "{err:?}"
+    );
     assert_eq!(f.positions(c), snapshot);
     assert_eq!(f.order(c), [1, 2, 3]);
 }
@@ -239,7 +265,10 @@ fn t_cord_08_before_target_inside_the_moved_set_is_rejected() {
 
     let err = f.ud.reorder_collection(c, &[1, 2], before(2));
 
-    assert!(matches!(err, Err(IngestError::InvalidInput("beforeAssetId"))), "{err:?}");
+    assert!(
+        matches!(err, Err(IngestError::InvalidInput("beforeAssetId"))),
+        "{err:?}"
+    );
     assert_eq!(f.order(c), [1, 2, 3]);
 }
 
@@ -255,7 +284,10 @@ fn t_cord_09_before_target_that_is_not_a_member_is_rejected() {
     // 소속이 아닌 자산(3: 다른 컬렉션, 4: 어디에도 없음)을 기준으로 삼을 수 없다
     for target in [3, 4] {
         let err = f.ud.reorder_collection(c, &[1], before(target));
-        assert!(matches!(err, Err(IngestError::InvalidInput("beforeAssetId"))), "{target}: {err:?}");
+        assert!(
+            matches!(err, Err(IngestError::InvalidInput("beforeAssetId"))),
+            "{target}: {err:?}"
+        );
     }
     assert_eq!(f.order(c), [1, 2]);
 }
@@ -272,9 +304,18 @@ fn t_cord_10_empty_and_oversized_requests_are_invalid() {
     let too_many = f.ud.reorder_collection(c, &big, ReorderTarget::End);
     let add_too_many = f.ud.add_to_collection(c, &big);
 
-    assert!(matches!(empty, Err(IngestError::InvalidInput("assetIds"))), "{empty:?}");
-    assert!(matches!(too_many, Err(IngestError::InvalidInput("too many assets"))), "{too_many:?}");
-    assert!(matches!(add_too_many, Err(IngestError::InvalidInput("too many assets"))));
+    assert!(
+        matches!(empty, Err(IngestError::InvalidInput("assetIds"))),
+        "{empty:?}"
+    );
+    assert!(
+        matches!(too_many, Err(IngestError::InvalidInput("too many assets"))),
+        "{too_many:?}"
+    );
+    assert!(matches!(
+        add_too_many,
+        Err(IngestError::InvalidInput("too many assets"))
+    ));
 }
 
 #[test]
@@ -296,7 +337,17 @@ fn t_cord_11_repeated_inserts_into_one_gap_rebalance_and_keep_order_within_bound
         model.pop();
         model.insert(1, last);
         assert_eq!(f.order(c), model);
-        let pos: Vec<i64> = model.iter().map(|a| f.positions(c).iter().find(|p| p.0 == *a).unwrap().1.unwrap()).collect();
+        let pos: Vec<i64> = model
+            .iter()
+            .map(|a| {
+                f.positions(c)
+                    .iter()
+                    .find(|p| p.0 == *a)
+                    .unwrap()
+                    .1
+                    .unwrap()
+            })
+            .collect();
         assert!(pos.windows(2).all(|w| w[0] < w[1]), "{pos:?}");
         assert!(pos.iter().all(|p| p.abs() <= POS_MAX));
         renumbered |= pos.iter().all(|p| p % STEP == 0);
@@ -317,7 +368,8 @@ fn t_cord_12_reorder_does_not_touch_revision_or_outbox() {
     assert!(o0 >= 3, "추가는 outbox 를 남긴다");
 
     // Act
-    f.ud.reorder_collection(c, &[3], ReorderTarget::Start).unwrap();
+    f.ud.reorder_collection(c, &[3], ReorderTarget::Start)
+        .unwrap();
 
     // Assert
     assert_eq!((f.count(rev), f.count(outbox)), (r0, o0));
@@ -372,14 +424,19 @@ fn t_cord_15_membership_counts_duplicate_input_ids_once_and_caps_the_input() {
     let big: Vec<i64> = (1..=10_001).collect();
 
     assert_eq!(m.iter().map(|x| x.count).collect::<Vec<_>>(), [2]);
-    assert!(matches!(f.ud.collection_membership(&big), Err(IngestError::InvalidInput("too many assets"))));
+    assert!(matches!(
+        f.ud.collection_membership(&big),
+        Err(IngestError::InvalidInput("too many assets"))
+    ));
 }
 
 #[test]
 fn t_cord_16_membership_query_plan_uses_the_asset_index() {
     let f = Fx::new();
     let c = f.raw();
-    let mut s = c.prepare(&format!("EXPLAIN QUERY PLAN {MEMBERSHIP_SQL}")).unwrap();
+    let mut s = c
+        .prepare(&format!("EXPLAIN QUERY PLAN {MEMBERSHIP_SQL}"))
+        .unwrap();
     let plan: Vec<String> = s
         .query_map(["[1,2]"], |r| r.get::<_, String>(3))
         .unwrap()
@@ -397,8 +454,18 @@ fn t_cord_17_play_queue_follows_collection_order_with_null_positions_last() {
     // Arrange: 1,2 위치 있음 (2 가 먼저), 3·4 는 구 버전 앱이 넣은 NULL (added_at 순)
     let f = Fx::new();
     f.assets(4);
-    f.raw().execute("INSERT INTO media_metadata (asset_id, duration_ms) VALUES (2, 4500)", []).unwrap();
-    f.raw().execute("INSERT INTO asset_user_data (asset_id, title, updated_at) VALUES (2, '둘째', 0)", []).unwrap();
+    f.raw()
+        .execute(
+            "INSERT INTO media_metadata (asset_id, duration_ms) VALUES (2, 4500)",
+            [],
+        )
+        .unwrap();
+    f.raw()
+        .execute(
+            "INSERT INTO asset_user_data (asset_id, title, updated_at) VALUES (2, '둘째', 0)",
+            [],
+        )
+        .unwrap();
     let c = f.collection("c");
     f.raw()
         .execute_batch(&format!(
@@ -413,12 +480,18 @@ fn t_cord_17_play_queue_follows_collection_order_with_null_positions_last() {
     let q = f.ud.collection_play_queue(c).unwrap();
 
     // Assert: 순서 + 가벼운 필드
-    assert_eq!(q.iter().map(|i| i.asset_id).collect::<Vec<_>>(), [2, 1, 4, 3]);
+    assert_eq!(
+        q.iter().map(|i| i.asset_id).collect::<Vec<_>>(),
+        [2, 1, 4, 3]
+    );
     assert_eq!(q[0].file_name, "file2.bin");
     assert_eq!(q[0].title.as_deref(), Some("둘째"));
     assert_eq!(q[0].duration_ms, Some(4500));
     assert_eq!((q[1].title.clone(), q[1].duration_ms), (None, None));
-    assert_eq!((q[0].media_type, q[0].availability), (MediaKind::Image, Availability::Online));
+    assert_eq!(
+        (q[0].media_type, q[0].availability),
+        (MediaKind::Image, Availability::Online)
+    );
     let json = serde_json::to_value(&q[0]).unwrap();
     assert_eq!(
         json,
@@ -439,15 +512,30 @@ fn t_cord_18_play_queue_excludes_inactive_assets_and_reports_offline_and_missing
     let c = f.collection("c");
     f.ud.add_to_collection(c, &[1, 2, 3, 4, 5]).unwrap();
     let raw = f.raw();
-    raw.execute("UPDATE file_locations SET presence = 'missing' WHERE asset_id = 3", []).unwrap();
-    raw.execute("UPDATE media_assets SET status = 'superseded' WHERE asset_id = 4", []).unwrap();
-    raw.execute("UPDATE file_locations SET detached_at = 1 WHERE asset_id = 5", []).unwrap();
+    raw.execute(
+        "UPDATE file_locations SET presence = 'missing' WHERE asset_id = 3",
+        [],
+    )
+    .unwrap();
+    raw.execute(
+        "UPDATE media_assets SET status = 'superseded' WHERE asset_id = 4",
+        [],
+    )
+    .unwrap();
+    raw.execute(
+        "UPDATE file_locations SET detached_at = 1 WHERE asset_id = 5",
+        [],
+    )
+    .unwrap();
 
     // Act
     let q = f.ud.collection_play_queue(c).unwrap();
 
     // Assert
-    let got: Vec<_> = q.iter().map(|i| (i.asset_id, i.media_type, i.availability)).collect();
+    let got: Vec<_> = q
+        .iter()
+        .map(|i| (i.asset_id, i.media_type, i.availability))
+        .collect();
     assert_eq!(
         got,
         [
@@ -463,20 +551,29 @@ fn t_cord_19_play_queue_of_an_unknown_collection_is_not_found_and_an_empty_one_i
     let f = Fx::new();
     let c = f.collection("empty");
 
-    assert!(matches!(f.ud.collection_play_queue(999), Err(IngestError::NotFound)));
+    assert!(matches!(
+        f.ud.collection_play_queue(999),
+        Err(IngestError::NotFound)
+    ));
     assert!(f.ud.collection_play_queue(c).unwrap().is_empty());
 }
 
 #[test]
 fn t_cord_20_collection_order_sort_serializes_as_camel_case_contract() {
     // Arrange
-    let sort = SortSpec { field: SortField::CollectionOrder, direction: SortDirection::Asc };
+    let sort = SortSpec {
+        field: SortField::CollectionOrder,
+        direction: SortDirection::Asc,
+    };
 
     // Act
     let json = serde_json::to_value(sort).unwrap();
 
     // Assert: TS 계약 `collectionOrder` 와 일치
-    assert_eq!(json, serde_json::json!({"field": "collectionOrder", "direction": "asc"}));
+    assert_eq!(
+        json,
+        serde_json::json!({"field": "collectionOrder", "direction": "asc"})
+    );
 }
 
 #[test]
@@ -506,10 +603,18 @@ fn t_cord_22_order_rows_query_uses_an_index_on_the_collection_prefix() {
     let mut s = c
         .prepare("EXPLAIN QUERY PLAN SELECT asset_id, position, added_at FROM collection_assets WHERE collection_id = ?1")
         .unwrap();
-    let plan = s.query_map([1], |r| r.get::<_, String>(3)).unwrap().map(Result::unwrap).collect::<Vec<_>>().join(" | ");
+    let plan = s
+        .query_map([1], |r| r.get::<_, String>(3))
+        .unwrap()
+        .map(Result::unwrap)
+        .collect::<Vec<_>>()
+        .join(" | ");
 
     println!("PLAN order_rows: {plan}");
-    assert!(plan.contains("SEARCH") && plan.contains("collection_id=?"), "{plan}");
+    assert!(
+        plan.contains("SEARCH") && plan.contains("collection_id=?"),
+        "{plan}"
+    );
 }
 
 #[test]
@@ -518,7 +623,8 @@ fn t_cord_23_exhausted_gaps_fall_back_to_a_full_renumber_that_keeps_block_order(
     let f = Fx::new();
     f.assets(8);
     let c = f.collection("c");
-    f.ud.add_to_collection(c, &(1..=8).collect::<Vec<_>>()).unwrap();
+    f.ud.add_to_collection(c, &(1..=8).collect::<Vec<_>>())
+        .unwrap();
     let dense = |f: &Fx| {
         let order = f.order(c);
         for (i, a) in order.iter().enumerate() {
@@ -545,13 +651,15 @@ fn t_cord_23_exhausted_gaps_fall_back_to_a_full_renumber_that_keeps_block_order(
             params![c, -POS_MAX],
         )
         .unwrap();
-    f.ud.reorder_collection(c, &[8, 3], ReorderTarget::Start).unwrap();
+    f.ud.reorder_collection(c, &[8, 3], ReorderTarget::Start)
+        .unwrap();
     assert_eq!(f.order(c), [3, 8, 1, 4, 2, 7, 5, 6]);
     assert!(multiples(&f));
 
     // End — 정상 간격이면 폴백 없이 뒤에 붙는다
     dense(&f);
-    f.ud.reorder_collection(c, &[3, 5], ReorderTarget::End).unwrap();
+    f.ud.reorder_collection(c, &[3, 5], ReorderTarget::End)
+        .unwrap();
     assert_eq!(f.order(c), [8, 1, 4, 2, 7, 6, 3, 5]);
 }
 
@@ -570,14 +678,29 @@ fn t_cord_24_positions_near_the_upper_bound_are_renumbered_instead_of_overflowin
         .unwrap();
 
     // Act: 맨 뒤로 이동(이웃 + STEP 이 상한을 넘는다)과 추가 모두 상한 안에서 끝난다
-    f.ud.reorder_collection(c, &[1], ReorderTarget::End).unwrap();
+    f.ud.reorder_collection(c, &[1], ReorderTarget::End)
+        .unwrap();
     assert_eq!(f.order(c), [2, 3, 1]);
     f.ud.add_to_collection(c, &[4]).unwrap();
 
     // Assert
     assert_eq!(f.order(c), [2, 3, 1, 4]);
-    let pos: Vec<i64> = f.order(c).iter().map(|a| f.positions(c).iter().find(|p| p.0 == *a).unwrap().1.unwrap()).collect();
-    assert!(pos.windows(2).all(|w| w[0] < w[1]) && pos.iter().all(|p| p.abs() <= POS_MAX), "{pos:?}");
+    let pos: Vec<i64> = f
+        .order(c)
+        .iter()
+        .map(|a| {
+            f.positions(c)
+                .iter()
+                .find(|p| p.0 == *a)
+                .unwrap()
+                .1
+                .unwrap()
+        })
+        .collect();
+    assert!(
+        pos.windows(2).all(|w| w[0] < w[1]) && pos.iter().all(|p| p.abs() <= POS_MAX),
+        "{pos:?}"
+    );
 }
 
 /// 풀 읽기 연결 1개짜리라 대기열 조회와 이 조회가 같은 연결을 쓴다 -> (mmap_size, cache_size)
@@ -599,13 +722,19 @@ fn t_cord_25_play_queue_restores_the_connection_read_settings_on_success_and_not
     let c = f.collection("c");
     f.ud.add_to_collection(c, &[1, 2, 3]).unwrap();
     let default = read_settings(&f);
-    assert!(default.0 < (2 << 30) && default.1 > -262_144, "기본값이 이미 올라가 있다: {default:?}");
+    assert!(
+        default.0 < (2 << 30) && default.1 > -262_144,
+        "기본값이 이미 올라가 있다: {default:?}"
+    );
 
     // Act + Assert: 성공 후 원래 값
     assert_eq!(f.ud.collection_play_queue(c).unwrap().len(), 3);
     assert_eq!(read_settings(&f), default);
     // 오류(not_found) 경로 후에도 원래 값
-    assert!(matches!(f.ud.collection_play_queue(999), Err(IngestError::NotFound)));
+    assert!(matches!(
+        f.ud.collection_play_queue(999),
+        Err(IngestError::NotFound)
+    ));
     assert_eq!(read_settings(&f), default);
     // 겹치는 호출: 여러 스레드가 동시에 불러도 (연결 1개라 직렬) 끝난 뒤 원래 값
     let ud = Arc::new(UserData::new(Arc::clone(&f.pool), Arc::new(SystemClock)));

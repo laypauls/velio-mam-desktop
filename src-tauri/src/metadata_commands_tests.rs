@@ -70,7 +70,12 @@ fn fixture(asset_count: i64) -> Fx {
         query,
     );
     let user = Arc::new(UserData::new(Arc::clone(&pool), clock));
-    let fx = Fx { _dir: dir, pool, user, search };
+    let fx = Fx {
+        _dir: dir,
+        pool,
+        user,
+        search,
+    };
     wait_total(&fx, &request(vec![]), asset_count);
     fx
 }
@@ -96,7 +101,10 @@ fn request(user_fields: Vec<UserFieldFilter>) -> SearchRequest {
             rating_max: None,
             user_fields,
         },
-        sort: SortSpec { field: SortField::Name, direction: SortDirection::Asc },
+        sort: SortSpec {
+            field: SortField::Name,
+            direction: SortDirection::Asc,
+        },
         limit: 50,
         cursor: None,
         mode: None,
@@ -114,7 +122,10 @@ fn wait_total(fx: &Fx, req: &SearchRequest, expected: i64) -> SearchPage {
         {
             return p;
         }
-        assert!(Instant::now() < deadline, "index did not reach total {expected} in time");
+        assert!(
+            Instant::now() < deadline,
+            "index did not reach total {expected} in time"
+        );
         std::thread::sleep(Duration::from_millis(30));
     }
 }
@@ -132,17 +143,26 @@ fn call<T: Send + 'static>(
 }
 
 fn search_code(fx: &Fx, conds: Vec<UserFieldFilter>) -> ErrorCode {
-    let e: SearchFailure = fx.search.search(&request(conds)).expect_err("must be rejected");
+    let e: SearchFailure = fx
+        .search
+        .search(&request(conds))
+        .expect_err("must be rejected");
     CommandError::from(e).code()
 }
 
 fn text_field(fx: &Fx, name: &str) -> i64 {
-    fx.user.create_metadata_field(name, ValueType::Keyword, &[]).unwrap().field_id
+    fx.user
+        .create_metadata_field(name, ValueType::Keyword, &[])
+        .unwrap()
+        .field_id
 }
 
 fn set_keyword(fx: &Fx, asset: i64, field: i64, v: &str) {
     fx.user
-        .set_metadata_values(asset, &[(field, FieldPatch::Set(FieldValue::Keyword(v.into())))])
+        .set_metadata_values(
+            asset,
+            &[(field, FieldPatch::Set(FieldValue::Keyword(v.into())))],
+        )
         .unwrap();
     fx.search.wake();
 }
@@ -179,7 +199,10 @@ fn t_ipc_umeta_01_search_filters_user_fields_json_round_trips_and_old_json_still
         json!({ "kind": "has", "field_id": 1 }),
         json!({ "kind": "has" }),
     ] {
-        assert!(serde_json::from_value::<UserFieldFilter>(bad.clone()).is_err(), "{bad}");
+        assert!(
+            serde_json::from_value::<UserFieldFilter>(bad.clone()).is_err(),
+            "{bad}"
+        );
     }
 }
 
@@ -188,8 +211,12 @@ fn t_ipc_umeta_02_command_wire_shapes_match_the_ts_contract() {
     // Arrange
     let fx = fixture(1);
     let created = call(&fx, |u| {
-        u.create_metadata_field("프로젝트", ValueType::MultiEnum, &["봄".to_string(), "여름".to_string()])
-            .map(MetadataFieldView::from)
+        u.create_metadata_field(
+            "프로젝트",
+            ValueType::MultiEnum,
+            &["봄".to_string(), "여름".to_string()],
+        )
+        .map(MetadataFieldView::from)
     })
     .unwrap();
     let opt = created.options[0].option_id;
@@ -198,17 +225,36 @@ fn t_ipc_umeta_02_command_wire_shapes_match_the_ts_contract() {
     let v = serde_json::to_value(&created).unwrap();
     assert_eq!(v["valueType"], "multiEnum");
     assert_eq!(v["fieldId"], created.field_id);
-    assert_eq!(v["options"][0], json!({ "optionId": opt, "label": "봄", "position": 0 }));
+    assert_eq!(
+        v["options"][0],
+        json!({ "optionId": opt, "label": "봄", "position": 0 })
+    );
     for k in ["name", "position", "createdAt", "updatedAt"] {
         assert!(v.get(k).is_some(), "{k}");
     }
     // 값: { kind, value } 로 타입을 함께 싣는다
-    assert_eq!(serde_json::to_value(FieldValueDto::Date(20261120)).unwrap(), json!({ "kind": "date", "value": 20261120 }));
-    assert_eq!(serde_json::to_value(FieldValueDto::MultiEnum(vec![1, 2])).unwrap(), json!({ "kind": "multiEnum", "value": [1, 2] }));
+    assert_eq!(
+        serde_json::to_value(FieldValueDto::Date(20261120)).unwrap(),
+        json!({ "kind": "date", "value": 20261120 })
+    );
+    assert_eq!(
+        serde_json::to_value(FieldValueDto::MultiEnum(vec![1, 2])).unwrap(),
+        json!({ "kind": "multiEnum", "value": [1, 2] })
+    );
     // 패치 입력: set / clear
-    let set: FieldPatchDto = serde_json::from_value(json!({ "op": "set", "fieldId": 3, "value": { "kind": "number", "value": 1.5 } })).unwrap();
-    let clear: FieldPatchDto = serde_json::from_value(json!({ "op": "clear", "fieldId": 3 })).unwrap();
-    assert_eq!(set, FieldPatchDto::Set { field_id: 3, value: FieldValueDto::Number(1.5) });
+    let set: FieldPatchDto = serde_json::from_value(
+        json!({ "op": "set", "fieldId": 3, "value": { "kind": "number", "value": 1.5 } }),
+    )
+    .unwrap();
+    let clear: FieldPatchDto =
+        serde_json::from_value(json!({ "op": "clear", "fieldId": 3 })).unwrap();
+    assert_eq!(
+        set,
+        FieldPatchDto::Set {
+            field_id: 3,
+            value: FieldValueDto::Number(1.5)
+        }
+    );
     assert_eq!(clear, FieldPatchDto::Clear { field_id: 3 });
     for bad in [
         json!({ "op": "set", "fieldId": 3 }),
@@ -216,16 +262,38 @@ fn t_ipc_umeta_02_command_wire_shapes_match_the_ts_contract() {
         json!({ "op": "clear", "field_id": 3 }),
         json!({ "op": "set", "fieldId": 3, "value": { "kind": "text", "value": "x" } }),
     ] {
-        assert!(serde_json::from_value::<FieldPatchDto>(bad.clone()).is_err(), "{bad}");
+        assert!(
+            serde_json::from_value::<FieldPatchDto>(bad.clone()).is_err(),
+            "{bad}"
+        );
     }
     // 자산 값 보기 + 타입 문자열 입력
     call(&fx, move |u| {
-        u.set_metadata_values(1, &[(created.field_id, FieldPatch::Set(FieldValue::MultiEnum(vec![opt])))]).map(|_| ())
+        u.set_metadata_values(
+            1,
+            &[(
+                created.field_id,
+                FieldPatch::Set(FieldValue::MultiEnum(vec![opt])),
+            )],
+        )
+        .map(|_| ())
     })
     .unwrap();
-    let got = call(&fx, |u| Ok(u.get_metadata_values(1)?.into_iter().map(AssetFieldValueView::from).collect::<Vec<_>>())).unwrap();
-    assert_eq!(serde_json::to_value(&got).unwrap(), json!([{ "fieldId": v["fieldId"], "value": { "kind": "multiEnum", "value": [opt] } }]));
-    assert_eq!(serde_json::from_value::<ValueType>(json!("multiEnum")).unwrap(), ValueType::MultiEnum);
+    let got = call(&fx, |u| {
+        Ok(u.get_metadata_values(1)?
+            .into_iter()
+            .map(AssetFieldValueView::from)
+            .collect::<Vec<_>>())
+    })
+    .unwrap();
+    assert_eq!(
+        serde_json::to_value(&got).unwrap(),
+        json!([{ "fieldId": v["fieldId"], "value": { "kind": "multiEnum", "value": [opt] } }])
+    );
+    assert_eq!(
+        serde_json::from_value::<ValueType>(json!("multiEnum")).unwrap(),
+        ValueType::MultiEnum
+    );
     assert!(serde_json::from_value::<ValueType>(json!("multi_enum")).is_err());
 }
 
@@ -234,7 +302,14 @@ fn t_ipc_umeta_03_conditions_are_checked_against_current_definitions() {
     // Arrange: keyword 필드, enum 필드(선택지 2), 삭제 요청한 필드
     let fx = fixture(2);
     let kw = text_field(&fx, "감독");
-    let en = fx.user.create_metadata_field("프로젝트", ValueType::Enum, &["봄".to_string(), "여름".to_string()]).unwrap();
+    let en = fx
+        .user
+        .create_metadata_field(
+            "프로젝트",
+            ValueType::Enum,
+            &["봄".to_string(), "여름".to_string()],
+        )
+        .unwrap();
     let (o1, o2) = (en.options[0].option_id, en.options[1].option_id);
     let gone = text_field(&fx, "임시");
     fx.user.delete_metadata_field(gone).unwrap(); // 값 정리 전이어도 삭제 중 = 없는 필드
@@ -242,9 +317,20 @@ fn t_ipc_umeta_03_conditions_are_checked_against_current_definitions() {
 
     // Act + Assert: 정상 조건은 통과
     for ok in [
-        vec![UserFieldFilter::KeywordAnyOf { field_id: kw, values: vec!["x".into()] }],
-        vec![UserFieldFilter::EnumAnyOf { field_id: en.field_id, option_ids: vec![o1] }],
-        vec![UserFieldFilter::Has { field_id: en.field_id }, UserFieldFilter::Missing { field_id: kw }],
+        vec![UserFieldFilter::KeywordAnyOf {
+            field_id: kw,
+            values: vec!["x".into()],
+        }],
+        vec![UserFieldFilter::EnumAnyOf {
+            field_id: en.field_id,
+            option_ids: vec![o1],
+        }],
+        vec![
+            UserFieldFilter::Has {
+                field_id: en.field_id,
+            },
+            UserFieldFilter::Missing { field_id: kw },
+        ],
     ] {
         assert!(fx.search.search(&request(ok)).is_ok());
     }
@@ -253,14 +339,35 @@ fn t_ipc_umeta_03_conditions_are_checked_against_current_definitions() {
         vec![UserFieldFilter::Has { field_id: 9_999 }],
         vec![UserFieldFilter::Missing { field_id: gone }],
         vec![UserFieldFilter::Has { field_id: -1 }],
-        vec![UserFieldFilter::EnumAnyOf { field_id: en.field_id, option_ids: vec![o2] }],
-        vec![UserFieldFilter::EnumAnyOf { field_id: en.field_id, option_ids: vec![o1, 9_999] }],
-        vec![UserFieldFilter::NumberRange { field_id: kw, min: Some(1.0), max: None }],
-        vec![UserFieldFilter::KeywordAnyOf { field_id: en.field_id, values: vec!["x".into()] }],
-        vec![UserFieldFilter::MultiEnum { field_id: en.field_id, option_ids: vec![o1], all: false }],
+        vec![UserFieldFilter::EnumAnyOf {
+            field_id: en.field_id,
+            option_ids: vec![o2],
+        }],
+        vec![UserFieldFilter::EnumAnyOf {
+            field_id: en.field_id,
+            option_ids: vec![o1, 9_999],
+        }],
+        vec![UserFieldFilter::NumberRange {
+            field_id: kw,
+            min: Some(1.0),
+            max: None,
+        }],
+        vec![UserFieldFilter::KeywordAnyOf {
+            field_id: en.field_id,
+            values: vec!["x".into()],
+        }],
+        vec![UserFieldFilter::MultiEnum {
+            field_id: en.field_id,
+            option_ids: vec![o1],
+            all: false,
+        }],
         vec![UserFieldFilter::Has { field_id: kw }; mam_core::query::MAX_USER_FIELD_FILTERS + 1],
         // 구조 오류(mam-search 검증)도 invalid_input
-        vec![UserFieldFilter::NumberRange { field_id: kw, min: None, max: None }],
+        vec![UserFieldFilter::NumberRange {
+            field_id: kw,
+            min: None,
+            max: None,
+        }],
     ];
     for (i, conds) in rejected.into_iter().enumerate() {
         assert_eq!(search_code(&fx, conds), ErrorCode::InvalidInput, "case {i}");
@@ -269,7 +376,10 @@ fn t_ipc_umeta_03_conditions_are_checked_against_current_definitions() {
     let idx = mam_core::query::SearchIndexRequest {
         query: String::new(),
         filters: request(vec![UserFieldFilter::Has { field_id: 9_999 }]).filters,
-        sort: SortSpec { field: SortField::Name, direction: SortDirection::Asc },
+        sort: SortSpec {
+            field: SortField::Name,
+            direction: SortDirection::Asc,
+        },
         mode: None,
     };
     let e = fx.search.search_index(&idx).expect_err("must be rejected");
@@ -281,16 +391,27 @@ fn t_ipc_umeta_04_search_filtered_by_a_user_field_returns_the_right_asset_end_to
     // Arrange: 자산 1 에만 keyword 값, 자산 2 에는 enum 값
     let fx = fixture(3);
     let kw = text_field(&fx, "감독");
-    let en = fx.user.create_metadata_field("프로젝트", ValueType::Enum, &["봄".to_string()]).unwrap();
+    let en = fx
+        .user
+        .create_metadata_field("프로젝트", ValueType::Enum, &["봄".to_string()])
+        .unwrap();
     let opt = en.options[0].option_id;
     set_keyword(&fx, 1, kw, "  Kim Minsu ");
-    fx.user.set_metadata_values(2, &[(en.field_id, FieldPatch::Set(FieldValue::Enum(opt)))]).unwrap();
+    fx.user
+        .set_metadata_values(2, &[(en.field_id, FieldPatch::Set(FieldValue::Enum(opt)))])
+        .unwrap();
     fx.search.wake();
 
     // Act + Assert: 대소문자·공백이 달라도 일치
-    let by_kw = request(vec![UserFieldFilter::KeywordAnyOf { field_id: kw, values: vec!["kim minsu".into()] }]);
+    let by_kw = request(vec![UserFieldFilter::KeywordAnyOf {
+        field_id: kw,
+        values: vec!["kim minsu".into()],
+    }]);
     assert_eq!(ids(&wait_total(&fx, &by_kw, 1)), vec![1]);
-    let by_enum = request(vec![UserFieldFilter::EnumAnyOf { field_id: en.field_id, option_ids: vec![opt] }]);
+    let by_enum = request(vec![UserFieldFilter::EnumAnyOf {
+        field_id: en.field_id,
+        option_ids: vec![opt],
+    }]);
     assert_eq!(ids(&wait_total(&fx, &by_enum, 1)), vec![2]);
     let missing = request(vec![UserFieldFilter::Missing { field_id: kw }]);
     assert_eq!(ids(&wait_total(&fx, &missing, 2)), vec![2, 3]);
@@ -298,7 +419,9 @@ fn t_ipc_umeta_04_search_filtered_by_a_user_field_returns_the_right_asset_end_to
     assert_eq!(fx.search.search(&request(vec![])).unwrap().total, 3);
     let both = request(vec![
         UserFieldFilter::Has { field_id: kw },
-        UserFieldFilter::Has { field_id: en.field_id },
+        UserFieldFilter::Has {
+            field_id: en.field_id,
+        },
     ]);
     assert_eq!(fx.search.search(&both).unwrap().total, 0);
 }
@@ -308,7 +431,12 @@ fn t_ipc_umeta_05_bulk_set_rejects_more_than_10000_assets_and_reports_changed_co
     // Arrange
     let fx = fixture(3);
     let kw = text_field(&fx, "감독");
-    let patch = |v: &str| vec![FieldPatchDto::Set { field_id: kw, value: FieldValueDto::Keyword(v.into()) }];
+    let patch = |v: &str| {
+        vec![FieldPatchDto::Set {
+            field_id: kw,
+            value: FieldValueDto::Keyword(v.into()),
+        }]
+    };
 
     // Act + Assert: 10,001 건은 아무것도 쓰기 전에 invalid_input
     let too_many: Vec<i64> = (1..=10_001).collect();
@@ -319,16 +447,38 @@ fn t_ipc_umeta_05_bulk_set_rejects_more_than_10000_assets_and_reports_changed_co
     // 정상: 바뀐 자산 수, 같은 값 재적용은 0
     let p = to_patches(patch("x"));
     let q = p.clone();
-    assert_eq!(call(&fx, move |u| u.bulk_set_metadata_values(&[1, 2], &p)).unwrap(), 2);
-    assert_eq!(call(&fx, move |u| u.bulk_set_metadata_values(&[1, 2], &q)).unwrap(), 0);
+    assert_eq!(
+        call(&fx, move |u| u.bulk_set_metadata_values(&[1, 2], &p)).unwrap(),
+        2
+    );
+    assert_eq!(
+        call(&fx, move |u| u.bulk_set_metadata_values(&[1, 2], &q)).unwrap(),
+        0
+    );
     // 없는 자산이 섞이면 not_found, 값 타입 불일치는 invalid_input
     let r = to_patches(patch("y"));
-    assert_eq!(call(&fx, move |u| u.bulk_set_metadata_values(&[1, 99], &r)).unwrap_err().code(), ErrorCode::NotFound);
-    let bad = to_patches(vec![FieldPatchDto::Set { field_id: kw, value: FieldValueDto::Date(20261120) }]);
-    assert_eq!(call(&fx, move |u| u.bulk_set_metadata_values(&[1], &bad)).unwrap_err().code(), ErrorCode::InvalidInput);
+    assert_eq!(
+        call(&fx, move |u| u.bulk_set_metadata_values(&[1, 99], &r))
+            .unwrap_err()
+            .code(),
+        ErrorCode::NotFound
+    );
+    let bad = to_patches(vec![FieldPatchDto::Set {
+        field_id: kw,
+        value: FieldValueDto::Date(20261120),
+    }]);
+    assert_eq!(
+        call(&fx, move |u| u.bulk_set_metadata_values(&[1], &bad))
+            .unwrap_err()
+            .code(),
+        ErrorCode::InvalidInput
+    );
     // 지우기
     let clear = to_patches(vec![FieldPatchDto::Clear { field_id: kw }]);
-    assert_eq!(call(&fx, move |u| u.bulk_set_metadata_values(&[1, 2, 3], &clear)).unwrap(), 2);
+    assert_eq!(
+        call(&fx, move |u| u.bulk_set_metadata_values(&[1, 2, 3], &clear)).unwrap(),
+        2
+    );
 }
 
 #[test]
@@ -345,8 +495,12 @@ fn t_ipc_umeta_06_deleting_a_field_hides_it_at_once_and_the_kicked_purge_removes
     let affected = call(&fx, move |u| u.delete_metadata_field(kw)).unwrap();
     // 요청 직후: 목록·필터에서 이미 없는 필드
     assert!(call(&fx, |u| u.list_metadata_fields()).unwrap().is_empty());
-    assert_eq!(search_code(&fx, vec![UserFieldFilter::Has { field_id: kw }]), ErrorCode::InvalidInput);
-    let handle = kick_purge(Arc::clone(&fx.user), Some(Arc::clone(&fx.search))).expect("thread started");
+    assert_eq!(
+        search_code(&fx, vec![UserFieldFilter::Has { field_id: kw }]),
+        ErrorCode::InvalidInput
+    );
+    let handle =
+        kick_purge(Arc::clone(&fx.user), Some(Arc::clone(&fx.search))).expect("thread started");
     handle.join().unwrap();
 
     // Assert: 값·필드 행이 지워지고, 같은 이름을 다시 만들 수 있으며, 재호출은 멱등
@@ -356,7 +510,14 @@ fn t_ipc_umeta_06_deleting_a_field_hides_it_at_once_and_the_kicked_purge_removes
         .read(|c| Ok(c.query_row("SELECT (SELECT count(*) FROM asset_metadata_values) + (SELECT count(*) FROM metadata_fields)", [], |r| r.get(0))?))
         .unwrap();
     assert_eq!(left, 0);
-    assert!(call(&fx, |u| u.create_metadata_field("감독", ValueType::Keyword, &[])).is_ok());
+    assert!(
+        call(&fx, |u| u.create_metadata_field(
+            "감독",
+            ValueType::Keyword,
+            &[]
+        ))
+        .is_ok()
+    );
     assert_eq!(fx.user.purge_pending_metadata_deletions().unwrap(), 0);
     // 삭제한 필드의 값 조회는 없음
     assert!(call(&fx, |u| u.get_metadata_values(1)).unwrap().is_empty());
@@ -366,29 +527,93 @@ fn t_ipc_umeta_06_deleting_a_field_hides_it_at_once_and_the_kicked_purge_removes
 fn t_ipc_umeta_07_definition_errors_map_to_contract_codes_and_option_delete_cleans_values() {
     // Arrange
     let fx = fixture(2);
-    let en = fx.user.create_metadata_field("프로젝트", ValueType::Enum, &["봄".to_string(), "여름".to_string()]).unwrap();
+    let en = fx
+        .user
+        .create_metadata_field(
+            "프로젝트",
+            ValueType::Enum,
+            &["봄".to_string(), "여름".to_string()],
+        )
+        .unwrap();
     let (o1, o2) = (en.options[0].option_id, en.options[1].option_id);
 
     // Act + Assert: 중복 이름 = already_registered, 없는 id = not_found, 빈 이름·잘못된 옵션 = invalid_input
-    let dup = call(&fx, |u| u.create_metadata_field(" 프로젝트 ", ValueType::Keyword, &[])).unwrap_err();
+    let dup = call(&fx, |u| {
+        u.create_metadata_field(" 프로젝트 ", ValueType::Keyword, &[])
+    })
+    .unwrap_err();
     assert_eq!(dup.code(), ErrorCode::AlreadyRegistered);
-    assert_eq!(call(&fx, |u| u.rename_metadata_field(9_999, "x")).unwrap_err().code(), ErrorCode::NotFound);
-    assert_eq!(call(&fx, |u| u.delete_metadata_option(9_999)).unwrap_err().code(), ErrorCode::NotFound);
-    assert_eq!(call(&fx, |u| u.create_metadata_field("  ", ValueType::Keyword, &[])).unwrap_err().code(), ErrorCode::InvalidInput);
-    assert_eq!(call(&fx, |u| u.create_metadata_field("메모", ValueType::Keyword, &["a".to_string()])).unwrap_err().code(), ErrorCode::InvalidInput);
-    assert_eq!(call(&fx, |u| u.reorder_metadata_fields(&[])).unwrap_err().code(), ErrorCode::InvalidInput);
-    assert_eq!(call(&fx, move |u| u.add_metadata_option(en.field_id, "봄")).unwrap_err().code(), ErrorCode::AlreadyRegistered);
+    assert_eq!(
+        call(&fx, |u| u.rename_metadata_field(9_999, "x"))
+            .unwrap_err()
+            .code(),
+        ErrorCode::NotFound
+    );
+    assert_eq!(
+        call(&fx, |u| u.delete_metadata_option(9_999))
+            .unwrap_err()
+            .code(),
+        ErrorCode::NotFound
+    );
+    assert_eq!(
+        call(&fx, |u| u.create_metadata_field(
+            "  ",
+            ValueType::Keyword,
+            &[]
+        ))
+        .unwrap_err()
+        .code(),
+        ErrorCode::InvalidInput
+    );
+    assert_eq!(
+        call(&fx, |u| u.create_metadata_field(
+            "메모",
+            ValueType::Keyword,
+            &["a".to_string()]
+        ))
+        .unwrap_err()
+        .code(),
+        ErrorCode::InvalidInput
+    );
+    assert_eq!(
+        call(&fx, |u| u.reorder_metadata_fields(&[]))
+            .unwrap_err()
+            .code(),
+        ErrorCode::InvalidInput
+    );
+    assert_eq!(
+        call(&fx, move |u| u.add_metadata_option(en.field_id, "봄"))
+            .unwrap_err()
+            .code(),
+        ErrorCode::AlreadyRegistered
+    );
     // 선택지 사용 건수 -> 삭제 -> 정리 후 값이 지워지고 검색 필터에서도 사라진다
-    fx.user.set_metadata_values(1, &[(en.field_id, FieldPatch::Set(FieldValue::Enum(o2)))]).unwrap();
-    fx.user.set_metadata_values(2, &[(en.field_id, FieldPatch::Set(FieldValue::Enum(o1)))]).unwrap();
+    fx.user
+        .set_metadata_values(1, &[(en.field_id, FieldPatch::Set(FieldValue::Enum(o2)))])
+        .unwrap();
+    fx.user
+        .set_metadata_values(2, &[(en.field_id, FieldPatch::Set(FieldValue::Enum(o1)))])
+        .unwrap();
     assert_eq!(call(&fx, move |u| u.metadata_option_usage(o2)).unwrap(), 1);
-    assert_eq!(call(&fx, move |u| u.metadata_field_asset_count(en.field_id)).unwrap(), 2);
+    assert_eq!(
+        call(&fx, move |u| u.metadata_field_asset_count(en.field_id)).unwrap(),
+        2
+    );
     assert_eq!(call(&fx, move |u| u.delete_metadata_option(o2)).unwrap(), 1);
-    kick_purge(Arc::clone(&fx.user), Some(Arc::clone(&fx.search))).unwrap().join().unwrap();
+    kick_purge(Arc::clone(&fx.user), Some(Arc::clone(&fx.search)))
+        .unwrap()
+        .join()
+        .unwrap();
     assert!(call(&fx, |u| u.get_metadata_values(1)).unwrap().is_empty());
     assert_eq!(call(&fx, |u| u.get_metadata_values(2)).unwrap().len(), 1);
     assert_eq!(
-        search_code(&fx, vec![UserFieldFilter::EnumAnyOf { field_id: en.field_id, option_ids: vec![o2] }]),
+        search_code(
+            &fx,
+            vec![UserFieldFilter::EnumAnyOf {
+                field_id: en.field_id,
+                option_ids: vec![o2]
+            }]
+        ),
         ErrorCode::InvalidInput
     );
 }

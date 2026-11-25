@@ -22,10 +22,12 @@ use mam_db::plugin_tasks;
 use mam_db::{DbPool, PoolError};
 use mam_plugin_gateway::Gateway;
 
-use crate::api::{ExportResult, PluginTaskCount, ProviderInvoker, RunAllResult};
 use self::core::Core;
+use crate::api::{ExportResult, PluginTaskCount, ProviderInvoker, RunAllResult};
 
-pub use self::core::{FEED_BATCH, FEED_BUSY_PAUSE, FEED_IDLE, JobsTuning, PENDING_CAP, ProtectedSource, WRITE_WAIT};
+pub use self::core::{
+    FEED_BATCH, FEED_BUSY_PAUSE, FEED_IDLE, JobsTuning, PENDING_CAP, ProtectedSource, WRITE_WAIT,
+};
 pub use self::export::{ExportError, MAX_EXPORT_ASSETS, MAX_EXPORT_BYTES};
 pub use self::run_all::RunAllError;
 
@@ -59,8 +61,19 @@ pub struct PluginJobs {
 
 impl PluginJobs {
     pub fn new(deps: PluginJobsDeps) -> Arc<Self> {
-        let core = Arc::new(Core::new(deps.pool, deps.clock, deps.queue, deps.invoker, deps.gateway, deps.protected));
-        Arc::new(Self { core, feed: Mutex::new(None), run_all: Arc::new(run_all::Registry::default()) })
+        let core = Arc::new(Core::new(
+            deps.pool,
+            deps.clock,
+            deps.queue,
+            deps.invoker,
+            deps.gateway,
+            deps.protected,
+        ));
+        Arc::new(Self {
+            core,
+            feed: Mutex::new(None),
+            run_all: Arc::new(run_all::Registry::default()),
+        })
     }
 
     pub fn executor(&self) -> Arc<dyn JobExecutor> {
@@ -95,7 +108,13 @@ impl PluginJobs {
     }
 
     /// 내보내기 provider 를 직접 호출해 결과를 `dest_path` 에 원자적으로 쓴다 (블로킹 — `spawn_blocking` 에서)
-    pub fn export(&self, plugin: &str, provider: &str, asset_ids: Vec<i64>, dest_path: &str) -> Result<ExportResult, ExportError> {
+    pub fn export(
+        &self,
+        plugin: &str,
+        provider: &str,
+        asset_ids: Vec<i64>,
+        dest_path: &str,
+    ) -> Result<ExportResult, ExportError> {
         export::export(&self.core, plugin, provider, asset_ids, dest_path)
     }
 
@@ -107,11 +126,20 @@ impl PluginJobs {
     /// 설치된 플러그인별 대기·실패 작업 수 (플러그인 ID 순)
     pub fn task_counts(&self) -> Result<Vec<PluginTaskCount>, PoolError> {
         let rows = self.core.read(|c| {
-            let ids: Vec<String> = plugin_settings::load_prefixed(c, INSTALLED)?.into_keys().collect();
+            let ids: Vec<String> = plugin_settings::load_prefixed(c, INSTALLED)?
+                .into_keys()
+                .collect();
             let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
             Ok(plugin_tasks::counts_by_plugin(c, &refs)?)
         })?;
-        Ok(rows.into_iter().map(|r| PluginTaskCount { plugin_id: r.plugin_id, pending: r.pending.max(0) as u64, failed: r.failed.max(0) as u64 }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| PluginTaskCount {
+                plugin_id: r.plugin_id,
+                pending: r.pending.max(0) as u64,
+                failed: r.failed.max(0) as u64,
+            })
+            .collect())
     }
 
     /// `failed` 작업을 다시 대기로 돌리고 `jobs` 에 올린다. 되돌린 자산 수(중복 제거)를 돌려준다

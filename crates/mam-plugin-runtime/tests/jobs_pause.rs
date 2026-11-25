@@ -36,14 +36,20 @@ fn t_pjob_11_paused_feed_does_not_advance_the_cursor_and_resume_feeds_the_backlo
 
     // Assert 1: 커서도 작업도 움직이지 않는다
     assert!(!more);
-    assert_eq!((env.cursor(P), env.task_rows(P), env.jobs_rows().len()), (Some(0), 0, 0));
+    assert_eq!(
+        (env.cursor(P), env.task_rows(P), env.jobs_rows().len()),
+        (Some(0), 0, 0)
+    );
 
     // Act 2: 재개
     env.queue.resume(Some(JobKind::Plugin)).unwrap();
     env.jobs.feed_tick();
 
     // Assert 2
-    assert_eq!((env.cursor(P), env.task_rows(P), env.jobs_rows().len()), (Some(env.max_event()), 2, 1));
+    assert_eq!(
+        (env.cursor(P), env.task_rows(P), env.jobs_rows().len()),
+        (Some(env.max_event()), 2, 1)
+    );
 }
 
 #[test]
@@ -68,12 +74,22 @@ fn t_pjob_11_pause_between_tasks_yields_without_an_attempt_and_resume_runs_only_
     assert!(matches!(first[0].outcome, Ok(JobOutcome::Yielded)));
     assert_eq!(env.invoker.call_count(), 1);
     let rows = env.jobs_rows();
-    assert_eq!((rows.len(), rows[0].status.as_str(), rows[0].attempts), (1, "pending", 0));
+    assert_eq!(
+        (rows.len(), rows[0].status.as_str(), rows[0].attempts),
+        (1, "pending", 0)
+    );
     let done_first = env.invoker.calls()[0].provider.clone();
-    let other = if done_first == "meta.run" { "meta.b" } else { "meta.run" };
+    let other = if done_first == "meta.run" {
+        "meta.b"
+    } else {
+        "meta.run"
+    };
     assert_eq!(env.task(P, &done_first, asset).unwrap().status, "done");
     let rest = env.task(P, other, asset).unwrap();
-    assert_eq!((rest.status.as_str(), rest.attempts, rest.last_error), ("pending", 0, None));
+    assert_eq!(
+        (rest.status.as_str(), rest.attempts, rest.last_error),
+        ("pending", 0, None)
+    );
 
     // Act 2: 재개
     env.invoker.clear_hooks();
@@ -81,7 +97,12 @@ fn t_pjob_11_pause_between_tasks_yields_without_an_attempt_and_resume_runs_only_
     env.run(1);
 
     // Assert 2: 남은 하나만 호출 — 완료된 provider 를 다시 부르지 않는다
-    let providers: Vec<String> = env.invoker.calls().iter().map(|c| c.provider.clone()).collect();
+    let providers: Vec<String> = env
+        .invoker
+        .calls()
+        .iter()
+        .map(|c| c.provider.clone())
+        .collect();
     assert_eq!(providers, vec![done_first, other.to_owned()]);
     assert_eq!(env.pending_tasks(P), 0);
     assert!(env.jobs_rows().is_empty());
@@ -112,7 +133,11 @@ fn t_pjob_11_yield_with_a_twin_job_registered_during_the_run_does_not_leave_a_st
     // Assert: Yielded 가 오류 없이 끝나 running 행이 남지 않고, 쌍둥이 하나가 이어받는다
     assert!(matches!(first[0].outcome, Ok(JobOutcome::Yielded)));
     let rows = env.jobs_rows();
-    assert_eq!(rows.iter().map(|r| r.status.as_str()).collect::<Vec<_>>(), vec!["pending"], "{rows:?}");
+    assert_eq!(
+        rows.iter().map(|r| r.status.as_str()).collect::<Vec<_>>(),
+        vec!["pending"],
+        "{rows:?}"
+    );
     assert_eq!(env.queue.running_count(JobKind::Plugin), 0);
 
     // Act 2: 재개 -> 새 revision(3)까지 모두 처리된다
@@ -122,6 +147,9 @@ fn t_pjob_11_yield_with_a_twin_job_registered_during_the_run_does_not_leave_a_st
 
     // Assert 2
     assert_eq!(env.pending_tasks(P), 0);
-    assert!(["meta.run", "meta.b"].iter().all(|p| env.task(P, p, asset).is_some_and(|t| t.status == "done" && t.done == 3)));
+    assert!(["meta.run", "meta.b"].iter().all(|p| {
+        env.task(P, p, asset)
+            .is_some_and(|t| t.status == "done" && t.done == 3)
+    }));
     assert!(env.jobs_rows().is_empty());
 }

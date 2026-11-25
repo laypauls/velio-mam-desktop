@@ -11,7 +11,9 @@ use std::fs;
 use std::sync::{Arc, Mutex};
 
 use common::env::Env;
-use common::purge::{exec, ids_sql, insert_assets, seed_linked, status_counts, total_linked, volume_id};
+use common::purge::{
+    exec, ids_sql, insert_assets, seed_linked, status_counts, total_linked, volume_id,
+};
 use mam_core::purge::LINKED_TABLES;
 use mam_core::scan::{IngestError, MediaTypeSet};
 use mam_vector::VectorKind;
@@ -43,7 +45,13 @@ fn t_rmv_20_impact_counts_only_what_would_be_lost_and_skips_relocated_assets() {
 
     // Assert
     assert_eq!(
-        (impact.media_count, impact.tag_links, impact.notes, impact.collection_items, impact.ai_results),
+        (
+            impact.media_count,
+            impact.tag_links,
+            impact.notes,
+            impact.collection_items,
+            impact.ai_results
+        ),
         (4, 3, 3, 3, 3)
     );
 }
@@ -52,9 +60,15 @@ fn t_rmv_20_impact_counts_only_what_would_be_lost_and_skips_relocated_assets() {
 fn t_rmv_21_impact_of_unknown_or_removing_folder_is_not_found() {
     let env = Env::new();
     let a = add(&env, "a");
-    assert!(matches!(env.ingest.folder_removal_impact(999), Err(IngestError::NotFound)));
+    assert!(matches!(
+        env.ingest.folder_removal_impact(999),
+        Err(IngestError::NotFound)
+    ));
     env.ingest.begin_folder_removal(a).unwrap();
-    assert!(matches!(env.ingest.folder_removal_impact(a), Err(IngestError::NotFound)));
+    assert!(matches!(
+        env.ingest.folder_removal_impact(a),
+        Err(IngestError::NotFound)
+    ));
 }
 
 #[test]
@@ -82,15 +96,35 @@ fn t_rmv_22_media_type_purge_deletes_linked_data_of_the_excluded_type_only() {
     // Act: 영상 제외 + 정리
     let removed = env
         .ingest
-        .set_folder_media_types(lib, MediaTypeSet { image: true, video: false, audio: true }, true)
+        .set_folder_media_types(
+            lib,
+            MediaTypeSet {
+                image: true,
+                video: false,
+                audio: true,
+            },
+            true,
+        )
         .unwrap();
 
     // Assert
     assert_eq!(removed, 2);
     assert_eq!(total_linked(&env, &vid), 0);
     assert_eq!(status_counts(&env, &vid, "deleted"), 2);
-    assert_eq!(env.count(&format!("SELECT COUNT(*) FROM file_locations WHERE asset_id IN ({})", ids_sql(&vid))), 0);
-    assert_eq!(env.count(&format!("SELECT COUNT(*) FROM search_outbox WHERE event_type = 'delete' AND asset_id IN ({})", ids_sql(&vid))), 2);
+    assert_eq!(
+        env.count(&format!(
+            "SELECT COUNT(*) FROM file_locations WHERE asset_id IN ({})",
+            ids_sql(&vid)
+        )),
+        0
+    );
+    assert_eq!(
+        env.count(&format!(
+            "SELECT COUNT(*) FROM search_outbox WHERE event_type = 'delete' AND asset_id IN ({})",
+            ids_sql(&vid)
+        )),
+        2
+    );
     assert_eq!(total_linked(&env, &img), img_before);
     assert_eq!(status_counts(&env, &img, "active"), 3);
     assert!(!thumb.exists());
@@ -112,13 +146,28 @@ fn t_rmv_23_keep_mode_and_nothing_to_purge_delete_nothing_and_skip_the_backup() 
         *c.lock().unwrap() += 1;
         Ok(())
     }));
-    let no_video = MediaTypeSet { image: true, video: false, audio: true };
+    let no_video = MediaTypeSet {
+        image: true,
+        video: false,
+        audio: true,
+    };
 
     // Act: purge=false -> 유지, 지울 유형(오디오)에 자산이 없으면 purge=true 라도 백업·삭제 없음
-    let kept = env.ingest.set_folder_media_types(lib, no_video, false).unwrap();
+    let kept = env
+        .ingest
+        .set_folder_media_types(lib, no_video, false)
+        .unwrap();
     let nothing = env
         .ingest
-        .set_folder_media_types(lib, MediaTypeSet { image: true, video: true, audio: false }, true)
+        .set_folder_media_types(
+            lib,
+            MediaTypeSet {
+                image: true,
+                video: true,
+                audio: false,
+            },
+            true,
+        )
         .unwrap();
 
     // Assert
@@ -144,8 +193,14 @@ fn t_rmv_24_contract_types_serialize_with_the_camel_case_names() {
     })
     .unwrap();
 
-    assert_eq!(impact, serde_json::json!({"mediaCount": 1, "tagLinks": 0, "notes": 0, "collectionItems": 0, "aiResults": 0}));
-    assert_eq!(progress, serde_json::json!({"folderId": 7, "done": 1, "total": 2, "finished": false, "error": null}));
+    assert_eq!(
+        impact,
+        serde_json::json!({"mediaCount": 1, "tagLinks": 0, "notes": 0, "collectionItems": 0, "aiResults": 0})
+    );
+    assert_eq!(
+        progress,
+        serde_json::json!({"folderId": 7, "done": 1, "total": 2, "finished": false, "error": null})
+    );
 }
 
 #[test]
@@ -162,7 +217,10 @@ fn t_rmv_25_removing_folder_leaves_the_sidebar_total_and_hidden_filter_immediate
 
     // Assert
     assert_eq!(env.ingest.summary().unwrap().total_assets, 2);
-    assert_eq!(env.read(|c| mam_core::scan::hidden_folder_ids(c).unwrap()), vec![a as u64]);
+    assert_eq!(
+        env.read(|c| mam_core::scan::hidden_folder_ids(c).unwrap()),
+        vec![a as u64]
+    );
 }
 
 #[test]
@@ -177,17 +235,30 @@ fn t_rmv_26_every_table_with_an_asset_id_column_has_a_delete_or_keep_decision() 
                  WHERE m.type = 'table' AND p.name = 'asset_id'",
             )
             .unwrap();
-        stmt.query_map([], |r| r.get(0)).unwrap().map(Result::unwrap).collect()
+        stmt.query_map([], |r| r.get(0))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
     });
     let decided: BTreeSet<String> = LINKED_TABLES
         .iter()
         .copied()
-        .chain(["transcripts", "file_locations", "ai_usage", "search_outbox", "index_progress", "media_assets"])
+        .chain([
+            "transcripts",
+            "file_locations",
+            "ai_usage",
+            "search_outbox",
+            "index_progress",
+            "media_assets",
+        ])
         .map(str::to_owned)
         .collect();
 
     let undecided: Vec<_> = found.difference(&decided).collect();
-    assert!(undecided.is_empty(), "decide delete/keep for: {undecided:?}");
+    assert!(
+        undecided.is_empty(),
+        "decide delete/keep for: {undecided:?}"
+    );
 }
 
 #[test]
@@ -198,17 +269,29 @@ fn t_rmv_27_media_type_purge_with_failed_backup_changes_neither_types_nor_data()
     let vid = insert_assets(&env, "vol-a", "lib", 2, "video");
     seed_linked(&env, &vid);
     let before = total_linked(&env, &vid);
-    env.ingest.set_backup_hook(Arc::new(|| Err("no space".into())));
+    env.ingest
+        .set_backup_hook(Arc::new(|| Err("no space".into())));
 
     // Act
     let err = env
         .ingest
-        .set_folder_media_types(lib, MediaTypeSet { image: true, video: false, audio: true }, true)
+        .set_folder_media_types(
+            lib,
+            MediaTypeSet {
+                image: true,
+                video: false,
+                audio: true,
+            },
+            true,
+        )
         .unwrap_err();
 
     // Assert
     assert!(matches!(err, IngestError::BackupFailed), "{err:?}");
-    assert!(env.ingest.list_folders().unwrap()[0].media_types.video, "types are unchanged");
+    assert!(
+        env.ingest.list_folders().unwrap()[0].media_types.video,
+        "types are unchanged"
+    );
     assert_eq!(total_linked(&env, &vid), before);
     assert_eq!(status_counts(&env, &vid, "active"), 2);
 }
@@ -221,7 +304,9 @@ fn t_rmv_28_batch_selects_and_impact_use_the_location_indexes() {
         env.read(|c| {
             let mut stmt = c.prepare(&format!("EXPLAIN QUERY PLAN {sql}")).unwrap();
             let rows: Vec<String> = stmt
-                .query_map(rusqlite::params![1, "a/", "a0", 500], |r| r.get::<_, String>(3))
+                .query_map(rusqlite::params![1, "a/", "a0", 500], |r| {
+                    r.get::<_, String>(3)
+                })
                 .unwrap()
                 .map(Result::unwrap)
                 .collect();
@@ -246,8 +331,14 @@ fn t_rmv_28_batch_selects_and_impact_use_the_location_indexes() {
     });
 
     assert!(active.contains("uq_file_locations_active_path"), "{active}");
-    assert!(detached.contains("idx_file_locations_detached_path"), "{detached}");
-    assert!(elsewhere.contains("uq_file_locations_active_asset"), "{elsewhere}");
+    assert!(
+        detached.contains("idx_file_locations_detached_path"),
+        "{detached}"
+    );
+    assert!(
+        elsewhere.contains("uq_file_locations_active_asset"),
+        "{elsewhere}"
+    );
     for p in [&active, &detached, &elsewhere] {
         assert!(!p.contains("SCAN file_locations"), "{p}");
     }
@@ -289,10 +380,22 @@ fn t_rmv_29_impact_and_legacy_candidate_queries_use_indexes() {
         &[&0, &500],
     );
 
-    assert!(impact_tags.contains("uq_file_locations_active_path") && impact_tags.contains("asset_tags"), "{impact_tags}");
-    assert!(impact_ai.contains("uq_file_locations_active_path"), "{impact_ai}");
-    assert!(legacy.contains("uq_file_locations_active_asset"), "{legacy}");
-    assert!(legacy.contains("SEARCH a USING INTEGER PRIMARY KEY"), "{legacy}");
+    assert!(
+        impact_tags.contains("uq_file_locations_active_path") && impact_tags.contains("asset_tags"),
+        "{impact_tags}"
+    );
+    assert!(
+        impact_ai.contains("uq_file_locations_active_path"),
+        "{impact_ai}"
+    );
+    assert!(
+        legacy.contains("uq_file_locations_active_asset"),
+        "{legacy}"
+    );
+    assert!(
+        legacy.contains("SEARCH a USING INTEGER PRIMARY KEY"),
+        "{legacy}"
+    );
     for p in [&impact_tags, &impact_ai] {
         assert!(!p.contains("SCAN file_locations"), "{p}");
     }
@@ -309,11 +412,14 @@ fn t_rmv_30_embedding_hook_receives_the_model_keys_of_deleted_embeddings_only() 
     type Key = (VectorKind, String, usize);
     let calls: Arc<Mutex<Vec<Vec<Key>>>> = Arc::default();
     let sink = Arc::clone(&calls);
-    env.ingest.set_embeddings_changed_hook(Arc::new(move |keys| {
-        sink.lock()
-            .unwrap()
-            .push(keys.iter().map(|k| (k.kind, k.model_id.clone(), k.dimension)).collect());
-    }));
+    env.ingest
+        .set_embeddings_changed_hook(Arc::new(move |keys| {
+            sink.lock().unwrap().push(
+                keys.iter()
+                    .map(|k| (k.kind, k.model_id.clone(), k.dimension))
+                    .collect(),
+            );
+        }));
 
     // Act: 임베딩이 없는 폴더 -> 알리지 않는다, 있는 폴더 -> 키 1개 (자산 2개여도 중복 없음)
     env.ingest.remove_folder(b).unwrap();
@@ -324,6 +430,9 @@ fn t_rmv_30_embedding_hook_receives_the_model_keys_of_deleted_embeddings_only() 
 
     // Assert
     assert_eq!(none, 0);
-    assert_eq!(*calls.lock().unwrap(), vec![vec![(VectorKind::Visual, "m".to_string(), 4)]]);
+    assert_eq!(
+        *calls.lock().unwrap(),
+        vec![vec![(VectorKind::Visual, "m".to_string(), 4)]]
+    );
     assert_eq!(status_counts(&env, &ib, "deleted"), 1);
 }

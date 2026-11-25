@@ -71,7 +71,11 @@ fn t_umeta_mig_01_v19_applies_to_a_v18_db_keeping_existing_rows() {
     assert_eq!(report.applied, vec![19, 20, 21, 22, 23, 24, 25, 26, 27]);
     assert!(report.backup.is_some_and(|b| b.is_file()));
     assert_eq!(count(&db.conn, "media_assets"), 1);
-    for t in ["metadata_fields", "metadata_field_options", "asset_metadata_values"] {
+    for t in [
+        "metadata_fields",
+        "metadata_field_options",
+        "asset_metadata_values",
+    ] {
         assert_eq!(count(&db.conn, t), 0, "{t}");
     }
 }
@@ -84,7 +88,10 @@ fn t_umeta_mig_02_value_type_check_rejects_unknown_types() {
         add_field(&db.conn, ok, ok).unwrap();
     }
     for bad in ["text", "integer", "real", ""] {
-        assert!(add_field(&db.conn, &format!("x{bad}"), bad).is_err(), "{bad}");
+        assert!(
+            add_field(&db.conn, &format!("x{bad}"), bad).is_err(),
+            "{bad}"
+        );
     }
     assert_eq!(count(&db.conn, "metadata_fields"), 6);
 }
@@ -136,7 +143,10 @@ fn t_umeta_mig_05_duplicate_keys_are_rejected() {
     let db = migrated_v19();
     add_asset(&db.conn, 1);
     add_field(&db.conn, "f", "multi_enum").unwrap();
-    assert!(add_field(&db.conn, "f", "keyword").is_err(), "name_key UNIQUE");
+    assert!(
+        add_field(&db.conn, "f", "keyword").is_err(),
+        "name_key UNIQUE"
+    );
     let opt = |label: &str| {
         db.conn.execute(
             "INSERT INTO metadata_field_options (field_id, label, label_key, position) VALUES (1, ?1, ?1, 0)",
@@ -215,9 +225,11 @@ fn t_umeta_mig_06_cascades_from_field_and_asset() {
     add_field(&db.conn, "c", "keyword").unwrap();
     let id: i64 = db
         .conn
-        .query_row("SELECT field_id FROM metadata_fields WHERE name = 'c'", [], |r| {
-            r.get(0)
-        })
+        .query_row(
+            "SELECT field_id FROM metadata_fields WHERE name = 'c'",
+            [],
+            |r| r.get(0),
+        )
         .unwrap();
     assert_eq!(id, 3);
 }
@@ -270,7 +282,11 @@ fn t_umeta_mig_09_deleting_at_is_nullable_on_fields_and_options_and_frees_keys()
         assert_eq!((ty.as_str(), notnull), ("INTEGER", 0), "{table}");
         let set: i64 = db
             .conn
-            .query_row(&format!("SELECT count(*) FROM {table} WHERE deleting_at IS NOT NULL"), [], |r| r.get(0))
+            .query_row(
+                &format!("SELECT count(*) FROM {table} WHERE deleting_at IS NOT NULL"),
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(set, 0, "{table}");
     }

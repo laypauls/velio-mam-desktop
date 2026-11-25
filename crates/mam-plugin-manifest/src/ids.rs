@@ -40,11 +40,16 @@ string_newtype!(TitleKey);
 /// 내보내기 대상 경로 검사(`mam-plugin-runtime`)도 이 함수를 쓴다.
 pub fn is_reserved_name(stem: &str) -> bool {
     let u = stem.trim_end().to_uppercase();
-    if matches!(u.as_str(), "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$") {
+    if matches!(
+        u.as_str(),
+        "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$"
+    ) {
         return true;
     }
     let chars: Vec<char> = u.chars().collect();
-    chars.len() == 4 && (u.starts_with("COM") || u.starts_with("LPT")) && matches!(chars[3], '1'..='9' | '¹' | '²' | '³')
+    chars.len() == 4
+        && (u.starts_with("COM") || u.starts_with("LPT"))
+        && matches!(chars[3], '1'..='9' | '¹' | '²' | '³')
 }
 
 pub(crate) fn check_len(v: &str, path: &str, max: usize) -> Result<(), ManifestError> {

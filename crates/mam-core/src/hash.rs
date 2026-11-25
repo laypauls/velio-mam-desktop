@@ -159,7 +159,11 @@ pub fn edge_signature_observed(
     hasher.update(&size_before.to_le_bytes());
 
     let whole = size_before < (2 * EDGE_LEN) as u64;
-    let head_len = if whole { size_before as usize } else { EDGE_LEN };
+    let head_len = if whole {
+        size_before as usize
+    } else {
+        EDGE_LEN
+    };
     let mut buf = vec![0u8; head_len];
     read_full(&mut file, &mut buf, path, &changed)?;
     hasher.update(&buf);

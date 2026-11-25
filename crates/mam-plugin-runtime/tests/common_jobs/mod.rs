@@ -86,8 +86,22 @@ impl Editor {
     /// 새 태그를 붙인다 → revision +1 과 outbox upsert 이벤트. 새 revision 을 돌려준다
     pub fn edit(&self, asset: i64) -> i64 {
         let n = self.edits.fetch_add(1, Ordering::SeqCst);
-        self.userdata.update_asset_tags(UpdateTagsInput { asset_ids: vec![asset], add: vec![format!("user-tag-{n}")], remove: vec![] }).unwrap();
-        self.pool.read(move |c| Ok(c.query_row("SELECT revision FROM media_assets WHERE asset_id = ?1", [asset], |r| r.get(0))?)).unwrap()
+        self.userdata
+            .update_asset_tags(UpdateTagsInput {
+                asset_ids: vec![asset],
+                add: vec![format!("user-tag-{n}")],
+                remove: vec![],
+            })
+            .unwrap();
+        self.pool
+            .read(move |c| {
+                Ok(c.query_row(
+                    "SELECT revision FROM media_assets WHERE asset_id = ?1",
+                    [asset],
+                    |r| r.get(0),
+                )?)
+            })
+            .unwrap()
     }
 }
 
@@ -98,7 +112,11 @@ impl Env {
 
     pub fn with(tweak: impl FnOnce(&mut GatewayConfig)) -> Self {
         let tmp = TempDir::new().unwrap();
-        let (data, lib, backups) = (tmp.path().join("MAMData"), tmp.path().join("SecretLibrary"), tmp.path().join("Backups"));
+        let (data, lib, backups) = (
+            tmp.path().join("MAMData"),
+            tmp.path().join("SecretLibrary"),
+            tmp.path().join("Backups"),
+        );
         std::fs::create_dir_all(&backups).unwrap();
         std::fs::create_dir_all(&data).unwrap();
         std::fs::create_dir_all(&lib).unwrap();
@@ -118,16 +136,43 @@ impl Env {
         let mut cfg = GatewayConfig::new(data.join("cache"));
         tweak(&mut cfg);
         let gw = Arc::new(Gateway::new(Arc::clone(&pool), Arc::clone(&shared), cfg));
-        let invoker = Arc::new(TestInvoker::new(Arc::clone(&gw), Arc::new(TestApi::new(Arc::clone(&gw)))));
+        let invoker = Arc::new(TestInvoker::new(
+            Arc::clone(&gw),
+            Arc::new(TestApi::new(Arc::clone(&gw))),
+        ));
         let queue = JobQueue::new(Arc::clone(&pool), Arc::clone(&shared));
         let protected = vec![data.clone(), backups.clone()];
         let jobs = Self::make_jobs(&pool, &shared, &queue, &invoker, &gw, &protected);
         let userdata = Arc::new(UserData::new(Arc::clone(&pool), shared));
         let (done_tx, done_rx) = channel();
-        Self { tmp, pool, clock, gw, invoker, queue, jobs, userdata, lib, vol, data, backups, edits: Arc::new(AtomicUsize::new(0)), runner: Mutex::new(None), done_tx, done_rx: Mutex::new(done_rx) }
+        Self {
+            tmp,
+            pool,
+            clock,
+            gw,
+            invoker,
+            queue,
+            jobs,
+            userdata,
+            lib,
+            vol,
+            data,
+            backups,
+            edits: Arc::new(AtomicUsize::new(0)),
+            runner: Mutex::new(None),
+            done_tx,
+            done_rx: Mutex::new(done_rx),
+        }
     }
 
-    fn make_jobs(pool: &Arc<DbPool>, clock: &SharedClock, queue: &Arc<JobQueue>, invoker: &Arc<TestInvoker>, gw: &Arc<Gateway>, protected: &[PathBuf]) -> Arc<PluginJobs> {
+    fn make_jobs(
+        pool: &Arc<DbPool>,
+        clock: &SharedClock,
+        queue: &Arc<JobQueue>,
+        invoker: &Arc<TestInvoker>,
+        gw: &Arc<Gateway>,
+        protected: &[PathBuf],
+    ) -> Arc<PluginJobs> {
         PluginJobs::new(PluginJobsDeps {
             pool: Arc::clone(pool),
             clock: Arc::clone(clock),
@@ -146,7 +191,14 @@ impl Env {
         self.queue = JobQueue::new(Arc::clone(&self.pool), Arc::clone(&shared));
         self.queue.recover().unwrap();
         let protected = vec![self.data.clone(), self.backups.clone()];
-        self.jobs = Self::make_jobs(&self.pool, &shared, &self.queue, &self.invoker, &self.gw, &protected);
+        self.jobs = Self::make_jobs(
+            &self.pool,
+            &shared,
+            &self.queue,
+            &self.invoker,
+            &self.gw,
+            &protected,
+        );
     }
 
     // ── 자산 ────────────────────────────────────────────────
@@ -176,13 +228,18 @@ impl Env {
 
     /// 훅 클로저로 옮길 수 있는 편집기 (같은 `UserData`·같은 태그 이름 카운터)
     pub fn editor(&self) -> Editor {
-        Editor { userdata: Arc::clone(&self.userdata), edits: Arc::clone(&self.edits), pool: Arc::clone(&self.pool) }
+        Editor {
+            userdata: Arc::clone(&self.userdata),
+            edits: Arc::clone(&self.edits),
+            pool: Arc::clone(&self.pool),
+        }
     }
 
     pub fn set_status(&self, asset: i64, status: &str) {
-        self.exec(&format!("UPDATE media_assets SET status = '{status}' WHERE asset_id = {asset}"));
+        self.exec(&format!(
+            "UPDATE media_assets SET status = '{status}' WHERE asset_id = {asset}"
+        ));
     }
-
 }
 
 impl Drop for Env {
@@ -200,7 +257,11 @@ pub fn snapshot(root: &Path) -> Vec<(String, Vec<u8>, std::time::SystemTime)> {
         .map(|e| {
             let p = e.unwrap().path();
             let m = std::fs::metadata(&p).unwrap();
-            (p.file_name().unwrap().to_string_lossy().into_owned(), std::fs::read(&p).unwrap(), m.modified().unwrap())
+            (
+                p.file_name().unwrap().to_string_lossy().into_owned(),
+                std::fs::read(&p).unwrap(),
+                m.modified().unwrap(),
+            )
         })
         .collect();
     out.sort_by(|a, b| a.0.cmp(&b.0));
@@ -209,6 +270,9 @@ pub fn snapshot(root: &Path) -> Vec<(String, Vec<u8>, std::time::SystemTime)> {
 
 /// PID 로만 확인 — 이미지 이름으로 찾지 않는다
 pub fn pid_alive(pid: u32) -> bool {
-    let out = std::process::Command::new("tasklist").args(["/FI", &format!("PID eq {pid}"), "/FO", "CSV", "/NH"]).output().expect("tasklist");
+    let out = std::process::Command::new("tasklist")
+        .args(["/FI", &format!("PID eq {pid}"), "/FO", "CSV", "/NH"])
+        .output()
+        .expect("tasklist");
     String::from_utf8_lossy(&out.stdout).contains(&format!("\"{pid}\""))
 }

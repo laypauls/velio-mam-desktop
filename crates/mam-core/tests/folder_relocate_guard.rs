@@ -30,21 +30,66 @@ fn t_relocate_04_invalid_targets_are_rejected_without_any_db_change() {
     let before = r.db_state();
     type Check = fn(&IngestError) -> bool;
     let cases: Vec<(&str, String, Check)> = vec![
-        ("same path", r.env.path("lib").to_str().unwrap().into(), |e| matches!(e, IngestError::SamePath)),
-        ("nonexistent", r.path_b("nope").to_str().unwrap().into(), |e| matches!(e, IngestError::InvalidInput(_))),
-        ("a file", file.to_str().unwrap().into(), |e| matches!(e, IngestError::InvalidInput(_))),
-        ("relative", "lib".into(), |e| matches!(e, IngestError::InvalidInput(_))),
-        ("empty", String::new(), |e| matches!(e, IngestError::InvalidInput(_))),
-        ("other folder itself", r.env.path("other").to_str().unwrap().into(), |e| matches!(e, IngestError::AlreadyRegistered)),
-        ("child of other", r.env.path("other").join("sub").to_str().unwrap().into(), |e| {
-            matches!(e, IngestError::NestedFolder { inside_existing: true })
+        (
+            "same path",
+            r.env.path("lib").to_str().unwrap().into(),
+            |e| matches!(e, IngestError::SamePath),
+        ),
+        (
+            "nonexistent",
+            r.path_b("nope").to_str().unwrap().into(),
+            |e| matches!(e, IngestError::InvalidInput(_)),
+        ),
+        ("a file", file.to_str().unwrap().into(), |e| {
+            matches!(e, IngestError::InvalidInput(_))
         }),
-        ("own child", r.env.path("lib/sub").to_str().unwrap().into(), |e| {
-            matches!(e, IngestError::NestedFolder { inside_existing: true })
+        ("relative", "lib".into(), |e| {
+            matches!(e, IngestError::InvalidInput(_))
         }),
-        ("own parent (volume root)", r.env.vol.to_str().unwrap().into(), |e| {
-            matches!(e, IngestError::NestedFolder { inside_existing: false })
+        ("empty", String::new(), |e| {
+            matches!(e, IngestError::InvalidInput(_))
         }),
+        (
+            "other folder itself",
+            r.env.path("other").to_str().unwrap().into(),
+            |e| matches!(e, IngestError::AlreadyRegistered),
+        ),
+        (
+            "child of other",
+            r.env.path("other").join("sub").to_str().unwrap().into(),
+            |e| {
+                matches!(
+                    e,
+                    IngestError::NestedFolder {
+                        inside_existing: true
+                    }
+                )
+            },
+        ),
+        (
+            "own child",
+            r.env.path("lib/sub").to_str().unwrap().into(),
+            |e| {
+                matches!(
+                    e,
+                    IngestError::NestedFolder {
+                        inside_existing: true
+                    }
+                )
+            },
+        ),
+        (
+            "own parent (volume root)",
+            r.env.vol.to_str().unwrap().into(),
+            |e| {
+                matches!(
+                    e,
+                    IngestError::NestedFolder {
+                        inside_existing: false
+                    }
+                )
+            },
+        ),
         ("MAMData itself", r.env.data.to_str().unwrap().into(), |e| {
             matches!(e, IngestError::OverlapsManagedData { contains: false })
         }),
@@ -61,19 +106,40 @@ fn t_relocate_04_invalid_targets_are_rejected_without_any_db_change() {
         assert_eq!(before, r.db_state(), "{name}: DB changed");
     }
     // 대상이 두 번째 폴더의 부모: vol-a 루트는 위 "own parent" 가 이미 덮는다 — 다른 폴더 기준으로도 확인
-    let err = r.env.ingest.relocate_folder(other, r.env.vol.to_str().unwrap()).unwrap_err();
-    assert!(matches!(err, IngestError::NestedFolder { inside_existing: false }), "{err:?}");
+    let err = r
+        .env
+        .ingest
+        .relocate_folder(other, r.env.vol.to_str().unwrap())
+        .unwrap_err();
+    assert!(
+        matches!(
+            err,
+            IngestError::NestedFolder {
+                inside_existing: false
+            }
+        ),
+        "{err:?}"
+    );
     // 없는 폴더·비활성 폴더
-    assert!(matches!(r.relocate(9_999, &r.path_b("empty")), Err(IngestError::NotFound)));
+    assert!(matches!(
+        r.relocate(9_999, &r.path_b("empty")),
+        Err(IngestError::NotFound)
+    ));
     r.env
         .pool
         .write(mam_db::Priority::High, move |c| {
-            c.execute("UPDATE managed_folders SET enabled = 0 WHERE folder_id = ?1", [other])?;
+            c.execute(
+                "UPDATE managed_folders SET enabled = 0 WHERE folder_id = ?1",
+                [other],
+            )?;
             Ok(())
         })
         .unwrap();
     let disabled = r.db_state();
-    assert!(matches!(r.relocate(other, &r.path_b("empty")), Err(IngestError::NotFound)));
+    assert!(matches!(
+        r.relocate(other, &r.path_b("empty")),
+        Err(IngestError::NotFound)
+    ));
     assert_eq!(disabled, r.db_state());
     assert_eq!(fixtures, snapshot(&r.env.vol), "originals untouched");
 }
@@ -84,7 +150,13 @@ fn t_relocate_05_running_scan_blocks_relocation_but_pending_and_paused_do_not() 
     let r = Reloc::new();
     let id = r.seeded();
     r.copy_tree(&r.env.path("lib"), &r.path_b("lib"));
-    let job = r.env.ingest.jobs().claim_next(&[JobKind::Scan]).unwrap().expect("pending scan job");
+    let job = r
+        .env
+        .ingest
+        .jobs()
+        .claim_next(&[JobKind::Scan])
+        .unwrap()
+        .expect("pending scan job");
     assert_eq!(job.kind, JobKind::Scan);
     let before = r.db_state();
 
@@ -103,11 +175,15 @@ fn t_relocate_05_running_scan_blocks_relocation_but_pending_and_paused_do_not() 
         })
         .unwrap();
     assert_eq!(r.relocate(id, &r.path_b("lib")).unwrap().relocated, 3);
-    assert_eq!(r.env.count("SELECT COUNT(*) FROM jobs WHERE kind = 'scan'"), 1);
+    assert_eq!(
+        r.env.count("SELECT COUNT(*) FROM jobs WHERE kind = 'scan'"),
+        1
+    );
 }
 
 #[test]
-fn t_relocate_06_each_asset_gets_one_revision_bump_and_one_event_and_failure_rolls_everything_back() {
+fn t_relocate_06_each_asset_gets_one_revision_bump_and_one_event_and_failure_rolls_everything_back()
+{
     // Arrange
     let r = Reloc::new();
     let id = r.seeded();
@@ -145,7 +221,10 @@ fn t_relocate_06_each_asset_gets_one_revision_bump_and_one_event_and_failure_rol
 
     // Assert 2: 자산마다 revision +1, upsert 이벤트 +1
     assert_eq!(rev(&r), rev0 + 3);
-    assert_eq!(r.env.count("SELECT COUNT(*) FROM search_outbox"), events0 + 3);
+    assert_eq!(
+        r.env.count("SELECT COUNT(*) FROM search_outbox"),
+        events0 + 3
+    );
     assert_eq!(
         r.env.count(
             "SELECT COUNT(*) FROM media_assets a WHERE EXISTS (SELECT 1 FROM search_outbox o
@@ -182,7 +261,11 @@ fn t_relocate_08_a_scan_that_started_before_the_relocation_writes_nothing_afterw
         r.env.count(&format!("SELECT COUNT(*) FROM file_locations WHERE volume_id = {old_volume} AND detached_at IS NULL")),
         0
     );
-    assert_eq!(r.env.count("SELECT COUNT(*) FROM file_locations WHERE rel_path LIKE '%late.jpg'"), 0);
+    assert_eq!(
+        r.env
+            .count("SELECT COUNT(*) FROM file_locations WHERE rel_path LIKE '%late.jpg'"),
+        0
+    );
     assert_eq!(r.env.count("SELECT COUNT(*) FROM media_assets"), 3);
 }
 
@@ -214,8 +297,16 @@ fn t_relocate_13_enqueues_exactly_one_pending_scan_and_restarts_the_watcher_on_t
     r.relocate(id, &r.path_b("lib")).unwrap();
 
     // Assert 1: 실패 행은 지워지고, 대기 작업은 하나뿐이며 즉시 실행 가능하다
-    assert_eq!(r.env.count("SELECT COUNT(*) FROM jobs WHERE kind = 'scan' AND status = 'failed'"), 0);
-    assert_eq!(r.env.count("SELECT COUNT(*) FROM jobs WHERE kind = 'scan' AND status = 'pending'"), 1);
+    assert_eq!(
+        r.env
+            .count("SELECT COUNT(*) FROM jobs WHERE kind = 'scan' AND status = 'failed'"),
+        0
+    );
+    assert_eq!(
+        r.env
+            .count("SELECT COUNT(*) FROM jobs WHERE kind = 'scan' AND status = 'pending'"),
+        1
+    );
     assert_eq!(r.env.count("SELECT COUNT(*) FROM jobs WHERE kind = 'scan' AND status = 'pending' AND not_before = 0 AND attempts = 0"), 1);
 
     // Assert 2: 새 루트에 파일을 만들면 감시가 반영한다 (스캔은 일시정지 상태이므로 감시만이 이 자산을 만들 수 있다)
@@ -223,7 +314,9 @@ fn t_relocate_13_enqueues_exactly_one_pending_scan_and_restarts_the_watcher_on_t
     // 디바운스는 주입 시계로 판단한다 — 폴링하는 동안 시계를 전진시킨다
     let seen = wait_until(Duration::from_secs(30), || {
         r.env.clock.advance(100);
-        r.env.count("SELECT COUNT(*) FROM file_locations WHERE rel_path LIKE '%watched.jpg'") == 1
+        r.env
+            .count("SELECT COUNT(*) FROM file_locations WHERE rel_path LIKE '%watched.jpg'")
+            == 1
     });
     r.env.ingest.shutdown();
     assert!(seen, "watcher must observe the new root");
@@ -235,8 +328,14 @@ fn t_relocate_13_enqueues_exactly_one_pending_scan_and_restarts_the_watcher_on_t
 #[ignore = "measurement"]
 fn t_relocate_14_measure_transaction_time_by_location_count() {
     // Arrange
-    let n: usize = std::env::var("RELOCATE_N").ok().and_then(|v| v.parse().ok()).unwrap_or(10_000);
-    let rounds: usize = std::env::var("RELOCATE_ROUNDS").ok().and_then(|v| v.parse().ok()).unwrap_or(6);
+    let n: usize = std::env::var("RELOCATE_N")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(10_000);
+    let rounds: usize = std::env::var("RELOCATE_ROUNDS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(6);
     let r = Reloc::new();
     r.env.write("lib/seed.jpg", 1);
     let id = r.add("lib");
@@ -261,22 +360,31 @@ fn t_relocate_14_measure_transaction_time_by_location_count() {
     // Act: lib(vol-a) <-> lib(vol-b) 왕복
     let mut ms = Vec::new();
     for round in 0..rounds {
-        let target = if round % 2 == 0 { r.path_b("lib") } else { r.env.path("lib") };
+        let target = if round % 2 == 0 {
+            r.path_b("lib")
+        } else {
+            r.env.path("lib")
+        };
         let t = Instant::now();
         let out = r.relocate(id, &target).unwrap();
         ms.push(t.elapsed().as_secs_f64() * 1000.0);
         assert_eq!(out.relocated as usize, n);
         r.env.clock.advance(1_000);
-        r.env.pool.write(mam_db::Priority::High, |c| {
-            c.execute("DELETE FROM jobs WHERE kind = 'scan'", [])?;
-            Ok(())
-        }).unwrap();
+        r.env
+            .pool
+            .write(mam_db::Priority::High, |c| {
+                c.execute("DELETE FROM jobs WHERE kind = 'scan'", [])?;
+                Ok(())
+            })
+            .unwrap();
     }
 
     // Assert + report
     ms.sort_by(f64::total_cmp);
     let q = |p: f64| ms[((ms.len() as f64 - 1.0) * p).round() as usize];
-    let wal = fs::metadata(r.env.data.join("mam.sqlite-wal")).map(|m| m.len()).unwrap_or(0);
+    let wal = fs::metadata(r.env.data.join("mam.sqlite-wal"))
+        .map(|m| m.len())
+        .unwrap_or(0);
     eprintln!(
         "RELOCATE locations={} rounds={rounds} ms P50={:.0} P95={:.0} P99={:.0} max={:.0} wal_bytes={wal}",
         n,

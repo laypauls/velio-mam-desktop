@@ -18,5 +18,5 @@ mod tag;
 pub use errors::ALLOWED_MESSAGES;
 pub use gateway::{Gateway, GatewayConfig};
 pub use grants::{Grant, GrantRegistry, compute_grant};
-pub use record::{Completion, MAX_OUTPUT_KV, RecordError, Recorded};
 pub use logs::{Admit, LogLimiter, LogSink, MAX_LOG_BYTES, TracingSink, sanitize};
+pub use record::{Completion, MAX_OUTPUT_KV, RecordError, Recorded};

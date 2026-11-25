@@ -23,7 +23,8 @@ impl Meter {
 
     /// DB 합계로 (재)설정한다
     pub(crate) fn reset(&self, sum: i64) {
-        self.used.store(u64::try_from(sum).unwrap_or(0), Ordering::Release);
+        self.used
+            .store(u64::try_from(sum).unwrap_or(0), Ordering::Release);
         self.ready.store(true, Ordering::Release);
     }
 
@@ -37,12 +38,14 @@ impl Meter {
 
     /// 성공한 쓰기·삭제 뒤에만 부른다
     pub(crate) fn apply(&self, delta: i64) {
-        let _ = self.used.fetch_update(Ordering::AcqRel, Ordering::Acquire, |u| {
-            Some(match u64::try_from(delta) {
-                Ok(d) => u.saturating_add(d),
-                Err(_) => u.saturating_sub(delta.unsigned_abs()),
-            })
-        });
+        let _ = self
+            .used
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |u| {
+                Some(match u64::try_from(delta) {
+                    Ok(d) => u.saturating_add(d),
+                    Err(_) => u.saturating_sub(delta.unsigned_abs()),
+                })
+            });
     }
 }
 
@@ -59,7 +62,10 @@ impl Meters {
 
     /// 제거 뒤 계량기를 버린다 — 다음 `kv.set` 이 DB 합계로 다시 초기화한다 (재설치 시 낡은 사용량이 남지 않게)
     pub(crate) fn forget(&self, plugin: &str) {
-        self.map.lock().unwrap_or_else(|p| p.into_inner()).remove(plugin);
+        self.map
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .remove(plugin);
     }
 }
 
@@ -73,7 +79,10 @@ mod tests {
     fn t_pgw_quota_01_fits_allows_shrinking_even_when_over_the_limit() {
         let m = Meter::default();
         m.reset(100);
-        assert!(m.fits(0, 50) && m.fits(-10, 50), "초과 상태에서도 축소·삭제는 허용");
+        assert!(
+            m.fits(0, 50) && m.fits(-10, 50),
+            "초과 상태에서도 축소·삭제는 허용"
+        );
         assert!(m.fits(10, 110) && !m.fits(11, 110));
         assert!(!m.fits(i64::MAX, 50), "큰 증가는 거부");
         m.apply(-30);

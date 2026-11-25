@@ -20,7 +20,10 @@ pub struct Grant {
     pub effective: u8,
 }
 
-const CLOSED: Grant = Grant { enabled: false, effective: 0 };
+const CLOSED: Grant = Grant {
+    enabled: false,
+    effective: 0,
+};
 
 fn bit(p: Permission) -> u8 {
     1 << Permission::ALL.iter().position(|q| *q == p).unwrap_or(0)
@@ -48,8 +51,14 @@ pub fn compute_grant(manifest: u8, enabled_raw: Option<&str>, granted_raw: Optio
         return CLOSED;
     }
     let granted = granted_raw.map(parse_granted).unwrap_or_default();
-    let allowed = granted.iter().filter_map(|s| Permission::from_str(s).ok()).fold(0u8, |m, p| m | bit(p));
-    Grant { enabled, effective: manifest & allowed }
+    let allowed = granted
+        .iter()
+        .filter_map(|s| Permission::from_str(s).ok())
+        .fold(0u8, |m, p| m | bit(p));
+    Grant {
+        enabled,
+        effective: manifest & allowed,
+    }
 }
 
 impl GrantRegistry {
@@ -63,7 +72,14 @@ impl GrantRegistry {
 
     /// 설치·업그레이드 시 manifest 가 선언한 권한을 등록한다. 허용 상태는 `refresh` 전까지 닫힘.
     pub fn register(&self, id: &PluginId, manifest_perms: &BTreeSet<Permission>) {
-        self.write().insert(id.as_str().to_owned(), Entry { id: id.clone(), manifest: mask(manifest_perms), grant: Arc::new(CLOSED) });
+        self.write().insert(
+            id.as_str().to_owned(),
+            Entry {
+                id: id.clone(),
+                manifest: mask(manifest_perms),
+                grant: Arc::new(CLOSED),
+            },
+        );
     }
 
     pub fn unregister(&self, id: &PluginId) {
@@ -81,18 +97,33 @@ impl GrantRegistry {
 
     /// 호출 1회의 검사. 모르는·비활성·권한 없음은 `false` (읽기 락 1회, `Arc` 를 쥐고 나가지 않는다)
     pub fn allows(&self, id: &str, perm: Permission) -> bool {
-        self.read().get(id).is_some_and(|e| e.grant.enabled && e.grant.effective & bit(perm) != 0)
+        self.read()
+            .get(id)
+            .is_some_and(|e| e.grant.enabled && e.grant.effective & bit(perm) != 0)
     }
 
     /// 설정 키 2개를 DB 에서 한 번 읽어 반영한다. 읽기에 실패하면 닫고 오류를 돌려준다(실패 시 닫힘).
-    pub fn refresh(&self, pool: &DbPool, id: &PluginId, deadline: Instant) -> Result<(), PoolError> {
+    pub fn refresh(
+        &self,
+        pool: &DbPool,
+        id: &PluginId,
+        deadline: Instant,
+    ) -> Result<(), PoolError> {
         let key = id.as_str().to_owned();
-        let read = pool.read_until(deadline, |c| Ok((get(c, ENABLED, &key)?, get(c, GRANTED, &key)?)));
+        let read = pool.read_until(deadline, |c| {
+            Ok((get(c, ENABLED, &key)?, get(c, GRANTED, &key)?))
+        });
         let mut map = self.write();
-        let Some(entry) = map.get_mut(id.as_str()) else { return read.map(|_| ()) };
+        let Some(entry) = map.get_mut(id.as_str()) else {
+            return read.map(|_| ());
+        };
         match read {
             Ok((enabled, granted)) => {
-                entry.grant = Arc::new(compute_grant(entry.manifest, enabled.as_deref(), granted.as_deref()));
+                entry.grant = Arc::new(compute_grant(
+                    entry.manifest,
+                    enabled.as_deref(),
+                    granted.as_deref(),
+                ));
                 Ok(())
             }
             Err(e) => {

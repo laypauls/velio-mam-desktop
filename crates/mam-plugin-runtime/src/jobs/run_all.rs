@@ -75,7 +75,12 @@ impl Drop for Running<'_> {
     }
 }
 
-pub(super) fn start(core: &Arc<Core>, reg: &Arc<Registry>, plugin: &str, provider: &str) -> Result<RunAllResult, RunAllError> {
+pub(super) fn start(
+    core: &Arc<Core>,
+    reg: &Arc<Registry>,
+    plugin: &str,
+    provider: &str,
+) -> Result<RunAllResult, RunAllError> {
     let spec = core.invoker.provider(plugin, provider)?;
     if spec.kind == ProviderKind::Export {
         return Err(RunAllError::ExportProvider);
@@ -86,10 +91,15 @@ pub(super) fn start(core: &Arc<Core>, reg: &Arc<Registry>, plugin: &str, provide
     }
     let kinds: Vec<&'static str> = spec.asset_kinds.iter().map(|k| media_type(*k)).collect();
     let (c, r, k) = (Arc::clone(core), Arc::clone(reg), key.clone());
-    match std::thread::Builder::new().name("mam-plugin-run-all".into()).spawn(move || {
-        let _running = Running { reg: &r, key: k.clone() };
-        worker(&c, &k.0, &k.1, &kinds);
-    }) {
+    match std::thread::Builder::new()
+        .name("mam-plugin-run-all".into())
+        .spawn(move || {
+            let _running = Running {
+                reg: &r,
+                key: k.clone(),
+            };
+            worker(&c, &k.0, &k.1, &kinds);
+        }) {
         Ok(h) => {
             reg.keep(h);
             Ok(RunAllResult { started: true })
@@ -109,9 +119,21 @@ fn worker(core: &Core, plugin: &str, provider: &str, kinds: &[&'static str]) {
             return;
         }
         let t = core.tuning();
-        let (id, prov, ks, limit) = (plugin.to_owned(), provider.to_owned(), kinds.to_vec(), t.run_all_batch);
+        let (id, prov, ks, limit) = (
+            plugin.to_owned(),
+            provider.to_owned(),
+            kinds.to_vec(),
+            t.run_all_batch,
+        );
         let done = core.write_installed(plugin, move |tx, now| {
-            let page = run_all_batch(tx, &id, &[(prov.as_str(), ks.as_slice())], after, limit, now)?;
+            let page = run_all_batch(
+                tx,
+                &id,
+                &[(prov.as_str(), ks.as_slice())],
+                after,
+                limit,
+                now,
+            )?;
             enqueue_jobs_tx(tx, &page.pending, priority, now)?;
             Ok((page.last, page.scanned, page.pending.len()))
         });
@@ -127,7 +149,9 @@ fn worker(core: &Core, plugin: &str, provider: &str, kinds: &[&'static str]) {
                     _ => return,
                 }
             }
-            Err(e) => return tracing::warn!(plugin, provider, error = %e, "run-all batch failed; stopped"),
+            Err(e) => {
+                return tracing::warn!(plugin, provider, error = %e, "run-all batch failed; stopped");
+            }
         }
         // 쓰기 스레드를 다른 쓰기에 양보하고 정지 신호를 듣는다
         if core.stopper.sleep(t.feed_busy_pause) {
@@ -148,10 +172,16 @@ mod tests {
         let a = ("p".to_owned(), "x".to_owned());
         let b = ("p".to_owned(), "y".to_owned());
         assert!(reg.begin(&a));
-        assert!(!reg.begin(&a), "same plugin+provider is rejected while running");
+        assert!(
+            !reg.begin(&a),
+            "same plugin+provider is rejected while running"
+        );
         assert!(reg.begin(&b), "another provider is independent");
         {
-            let _g = Running { reg: &reg, key: a.clone() };
+            let _g = Running {
+                reg: &reg,
+                key: a.clone(),
+            };
         }
         assert!(reg.begin(&a), "guard drop frees the slot");
     }

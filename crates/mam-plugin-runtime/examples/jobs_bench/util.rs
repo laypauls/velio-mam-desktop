@@ -73,7 +73,11 @@ pub fn dir_size(dir: &Path) -> u64 {
     if let Ok(rd) = std::fs::read_dir(dir) {
         for e in rd.flatten() {
             let p = e.path();
-            total += if p.is_dir() { dir_size(&p) } else { e.metadata().map_or(0, |m| m.len()) };
+            total += if p.is_dir() {
+                dir_size(&p)
+            } else {
+                e.metadata().map_or(0, |m| m.len())
+            };
         }
     }
     total
@@ -132,6 +136,10 @@ impl Load {
 pub fn report_pair(phase: &str, read: Load, write: Load) {
     let (r, rf) = read.finish();
     let (w, wf) = write.finish();
-    say(r.line(&format!("  [{phase}] High read  hydrate_page(50 random ids) (fail {rf})")));
-    say(w.line(&format!("  [{phase}] High write update_asset_tags (fail {wf})")));
+    say(r.line(&format!(
+        "  [{phase}] High read  hydrate_page(50 random ids) (fail {rf})"
+    )));
+    say(w.line(&format!(
+        "  [{phase}] High write update_asset_tags (fail {wf})"
+    )));
 }

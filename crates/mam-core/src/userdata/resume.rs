@@ -189,7 +189,11 @@ impl UserData {
     }
 
     /// 관리 폴더의 이어보기 사용 여부 설정. 기록은 건드리지 않는다. 없는·등록 해제 중인 폴더는 `NotFound`.
-    pub fn resume_set_folder_enabled(&self, folder_id: i64, enabled: bool) -> Result<(), IngestError> {
+    pub fn resume_set_folder_enabled(
+        &self,
+        folder_id: i64,
+        enabled: bool,
+    ) -> Result<(), IngestError> {
         self.write(move |tx, _now| {
             let n = tx.execute(
                 "UPDATE managed_folders SET resume_enabled = ?2 WHERE folder_id = ?1 AND enabled = 1",
@@ -293,7 +297,9 @@ impl UserData {
         self.write(move |tx, _now| {
             let (volume_id, lo, hi) = folder_range(tx, folder_id)?;
             let n = tx.execute(
-                &format!("DELETE FROM asset_resume_positions WHERE asset_id IN ({FOLDER_SCOPE_SQL})"),
+                &format!(
+                    "DELETE FROM asset_resume_positions WHERE asset_id IN ({FOLDER_SCOPE_SQL})"
+                ),
                 params![volume_id, lo, hi],
             )?;
             Ok(n as i64)

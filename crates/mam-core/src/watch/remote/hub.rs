@@ -11,13 +11,15 @@ use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use mam_db::DbPool;
 
-use super::collector::{Attached, BatchCommitter, Collector, Deps, Feed, Folders, SourceLoader, Timings};
-use super::ses_collector::SesCollector;
+use super::SourceKind;
+use super::collector::{
+    Attached, BatchCommitter, Collector, Deps, Feed, Folders, SourceLoader, Timings,
+};
 use super::mapper::map_reaches;
 use super::runner::RemoteConnector;
+use super::ses_collector::SesCollector;
 use super::stop::{StopSignal, Woke};
 use super::store;
-use super::SourceKind;
 use crate::SharedClock;
 use crate::secret::SecretBox;
 use crate::volume::strip_verbatim;
@@ -47,7 +49,9 @@ pub struct RemoteHub {
 
 impl std::fmt::Debug for RemoteHub {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RemoteHub").field("bound", &self.deps.get().is_some()).finish_non_exhaustive()
+        f.debug_struct("RemoteHub")
+            .field("bound", &self.deps.get().is_some())
+            .finish_non_exhaustive()
     }
 }
 
@@ -70,7 +74,12 @@ impl RemoteHub {
     }
 
     pub fn with_timings(connector: Arc<dyn RemoteConnector>, timings: Timings) -> Arc<Self> {
-        Arc::new(Self { connector, timings, deps: OnceLock::new(), running: Mutex::new(HashMap::new()) })
+        Arc::new(Self {
+            connector,
+            timings,
+            deps: OnceLock::new(),
+            running: Mutex::new(HashMap::new()),
+        })
     }
 
     /// DB·시계·기록기를 꽂는다 (처음 한 번만 — 이미 꽂혀 있으면 무시).
@@ -121,22 +130,38 @@ impl RemoteHub {
         root: &Path,
         sink: ChangeSink,
     ) -> Result<AttachGuard, DetectError> {
-        let d = self.deps.get().ok_or_else(|| DetectError::Start("remote hub is not ready".into()))?;
+        let d = self
+            .deps
+            .get()
+            .ok_or_else(|| DetectError::Start("remote hub is not ready".into()))?;
         let loader = loader_for(d);
-        let src = loader(source_id).ok_or_else(|| DetectError::Start("remote source not found".into()))?;
+        let src = loader(source_id)
+            .ok_or_else(|| DetectError::Start("remote source not found".into()))?;
         if src.kind != kind {
             return Err(DetectError::Start("remote source kind mismatch".into()));
         }
         let root = strip_verbatim(&root.to_string_lossy());
         if !map_reaches(&src.path_map, &root) {
-            return Err(DetectError::Start("path map does not reach the folder".into()));
+            return Err(DetectError::Start(
+                "path map does not reach the folder".into(),
+            ));
         }
         let mut map = self.running();
         if let Some(r) = map.get(&source_id) {
             let started = r.started.load(Ordering::SeqCst);
-            lock(&r.folders).push(Attached { folder_id, root, sink, needs_rescan: started });
+            lock(&r.folders).push(Attached {
+                folder_id,
+                root,
+                sink,
+                needs_rescan: started,
+            });
         } else {
-            let folders: Folders = Arc::new(Mutex::new(vec![Attached { folder_id, root, sink, needs_rescan: false }]));
+            let folders: Folders = Arc::new(Mutex::new(vec![Attached {
+                folder_id,
+                root,
+                sink,
+                needs_rescan: false,
+            }]));
             let stop = Arc::new(StopSignal::default());
             let started = Arc::new(AtomicBool::new(false));
             let deps = Deps {
@@ -155,10 +180,23 @@ impl RemoteHub {
             std::thread::Builder::new()
                 .name(format!("mam-remote-{source_id}"))
                 .spawn(move || collector_loop(collector, &s, &st, &loader, source_id))
-                .map_err(|e| DetectError::Start(format!("cannot start the remote collector: {e}")))?;
-            map.insert(source_id, Running { folders, stop, started });
+                .map_err(|e| {
+                    DetectError::Start(format!("cannot start the remote collector: {e}"))
+                })?;
+            map.insert(
+                source_id,
+                Running {
+                    folders,
+                    stop,
+                    started,
+                },
+            );
         }
-        Ok(AttachGuard { hub: Arc::clone(self), source_id, folder_id })
+        Ok(AttachGuard {
+            hub: Arc::clone(self),
+            source_id,
+            folder_id,
+        })
     }
 
     fn detach(&self, source_id: i64, folder_id: i64) {
@@ -187,21 +225,29 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 
 fn loader_for(d: &HubDeps) -> SourceLoader {
     let (pool, secrets) = (Arc::clone(&d.pool), Arc::clone(&d.secrets));
-    Arc::new(move |id| match pool.read(|c| Ok(store::load(c, id, secrets.as_ref()))) {
-        Ok(Ok(s)) => Some(s),
-        Ok(Err(e)) => {
-            // 비밀·입력 값은 오류에 없다 (필드 이름·종류만)
-            tracing::warn!(source_id = id, error = %e, "cannot load the remote source");
-            None
-        }
-        Err(e) => {
-            tracing::warn!(source_id = id, error = %e, "cannot read the remote source");
-            None
-        }
-    })
+    Arc::new(
+        move |id| match pool.read(|c| Ok(store::load(c, id, secrets.as_ref()))) {
+            Ok(Ok(s)) => Some(s),
+            Ok(Err(e)) => {
+                // 비밀·입력 값은 오류에 없다 (필드 이름·종류만)
+                tracing::warn!(source_id = id, error = %e, "cannot load the remote source");
+                None
+            }
+            Err(e) => {
+                tracing::warn!(source_id = id, error = %e, "cannot read the remote source");
+                None
+            }
+        },
+    )
 }
 
-fn collector_loop(mut c: Box<dyn Feed>, stop: &StopSignal, started: &AtomicBool, loader: &SourceLoader, id: i64) {
+fn collector_loop(
+    mut c: Box<dyn Feed>,
+    stop: &StopSignal,
+    started: &AtomicBool,
+    loader: &SourceLoader,
+    id: i64,
+) {
     loop {
         if stop.is_stopped() {
             break;

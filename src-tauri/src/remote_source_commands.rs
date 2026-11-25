@@ -13,13 +13,18 @@ use crate::ingest_commands::run_blocking;
 
 /// 저장된 접속 목록 (이름 순, 비밀 없음).
 #[tauri::command]
-pub async fn list_remote_sources(ingest: State<'_, Arc<Ingest>>) -> Result<Vec<SourceView>, CommandError> {
+pub async fn list_remote_sources(
+    ingest: State<'_, Arc<Ingest>>,
+) -> Result<Vec<SourceView>, CommandError> {
     run_blocking(Arc::clone(&ingest), |i| i.list_remote_sources()).await
 }
 
 /// 접속 생성 — `secret` 필수. 이름 중복은 `already_registered`, 잘못된 값은 `invalid_input`(필드 이름).
 #[tauri::command]
-pub async fn create_remote_source(ingest: State<'_, Arc<Ingest>>, input: RemoteSourceInput) -> Result<SourceView, CommandError> {
+pub async fn create_remote_source(
+    ingest: State<'_, Arc<Ingest>>,
+    input: RemoteSourceInput,
+) -> Result<SourceView, CommandError> {
     run_blocking(Arc::clone(&ingest), move |i| i.create_remote_source(input)).await
 }
 
@@ -30,13 +35,22 @@ pub async fn update_remote_source(
     source_id: i64,
     input: RemoteSourceInput,
 ) -> Result<SourceView, CommandError> {
-    run_blocking(Arc::clone(&ingest), move |i| i.update_remote_source(source_id, input)).await
+    run_blocking(Arc::clone(&ingest), move |i| {
+        i.update_remote_source(source_id, input)
+    })
+    .await
 }
 
 /// 접속 삭제 — 쓰는 폴더가 있으면 `busy`, 없는 접속은 `not_found`.
 #[tauri::command]
-pub async fn delete_remote_source(ingest: State<'_, Arc<Ingest>>, source_id: i64) -> Result<(), CommandError> {
-    run_blocking(Arc::clone(&ingest), move |i| i.delete_remote_source(source_id)).await
+pub async fn delete_remote_source(
+    ingest: State<'_, Arc<Ingest>>,
+    source_id: i64,
+) -> Result<(), CommandError> {
+    run_blocking(Arc::clone(&ingest), move |i| {
+        i.delete_remote_source(source_id)
+    })
+    .await
 }
 
 /// 접속 시험 (네트워크 사용 — 사용자가 누른 경우에만). 연결·인증·지문 문제는 오류가 아니라 결과(`errorKey`)로 돌아온다.
@@ -47,7 +61,10 @@ pub async fn test_remote_source(
     source_id: Option<i64>,
     input: RemoteSourceInput,
 ) -> Result<RemoteTestResult, CommandError> {
-    run_blocking(Arc::clone(&ingest), move |i| i.test_remote_source(source_id, input)).await
+    run_blocking(Arc::clone(&ingest), move |i| {
+        i.test_remote_source(source_id, input)
+    })
+    .await
 }
 
 #[cfg(test)]

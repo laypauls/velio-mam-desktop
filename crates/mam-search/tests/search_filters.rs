@@ -240,14 +240,24 @@ fn t_capfb_fts_01_captured_fallback_flag_switches_sort_and_range_field_on_the_sa
     let idx = indexed(
         &dir,
         &[
-            with(1, "a.jpg", |d| { d.captured_at = Some(100); d.modified_at = 9_000_000; }),
-            with(2, "a.jpg", |d| { d.captured_at = Some(300); d.modified_at = 9_000_000; }),
+            with(1, "a.jpg", |d| {
+                d.captured_at = Some(100);
+                d.modified_at = 9_000_000;
+            }),
+            with(2, "a.jpg", |d| {
+                d.captured_at = Some(300);
+                d.modified_at = 9_000_000;
+            }),
             with(3, "a.jpg", |d| d.modified_at = 250_999),
             with(4, "a.jpg", |d| d.modified_at = 50_000),
         ],
     );
     let run = |fallback: bool, sort: Sort, min: Option<i64>, max: Option<i64>| {
-        let mut r = SearchRequest { text: "a".into(), sort, ..Default::default() };
+        let mut r = SearchRequest {
+            text: "a".into(),
+            sort,
+            ..Default::default()
+        };
         r.filters.captured_fallback = fallback;
         r.filters.captured_at = Range { min, max };
         ids_sorted(&idx, &r)
@@ -255,13 +265,19 @@ fn t_capfb_fts_01_captured_fallback_flag_switches_sort_and_range_field_on_the_sa
 
     // Act + Assert: 꺼짐 = 기존 captured_at (값 없는 문서는 뒤, 구간에서 제외)
     assert_eq!(run(false, Sort::CapturedAtDesc, None, None), [2, 1, 3, 4]);
-    assert_eq!(run(false, Sort::CapturedAtDesc, Some(0), Some(1_000)), [2, 1]);
+    assert_eq!(
+        run(false, Sort::CapturedAtDesc, Some(0), Some(1_000)),
+        [2, 1]
+    );
     // 켜짐 = captured_or_modified: 300 > 250(내림) > 100 > 50
     assert_eq!(run(true, Sort::CapturedAtDesc, None, None), [2, 3, 1, 4]);
     assert_eq!(run(true, Sort::CapturedAtAsc, None, None), [4, 1, 3, 2]);
     // 경계: 250.999초 -> 250 이므로 [250, 250] 구간에 걸리고 [251, ..] 에는 걸리지 않는다
     assert_eq!(run(true, Sort::CapturedAtDesc, Some(250), Some(250)), [3]);
-    assert_eq!(run(true, Sort::CapturedAtDesc, Some(251), Some(299)), Vec::<u64>::new());
+    assert_eq!(
+        run(true, Sort::CapturedAtDesc, Some(251), Some(299)),
+        Vec::<u64>::new()
+    );
 }
 
 /// 정렬 순서를 보존해 asset_id 목록을 돌려준다.

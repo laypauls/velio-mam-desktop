@@ -25,7 +25,11 @@ struct Probe {
 }
 
 impl ContentHasher for Probe {
-    fn hash_file(&self, path: &std::path::Path, cancel: &AtomicBool) -> Result<HashedFile, CoreError> {
+    fn hash_file(
+        &self,
+        path: &std::path::Path,
+        cancel: &AtomicBool,
+    ) -> Result<HashedFile, CoreError> {
         self.full.fetch_add(1, Ordering::SeqCst);
         if self.fail_full.load(Ordering::SeqCst) {
             return Err(CoreError::Io {
@@ -35,7 +39,11 @@ impl ContentHasher for Probe {
         }
         Blake3Hasher.hash_file(path, cancel)
     }
-    fn edge_signature(&self, path: &std::path::Path, cancel: &AtomicBool) -> Result<EdgeFile, CoreError> {
+    fn edge_signature(
+        &self,
+        path: &std::path::Path,
+        cancel: &AtomicBool,
+    ) -> Result<EdgeFile, CoreError> {
         self.edge.fetch_add(1, Ordering::SeqCst);
         mam_core::edge_signature(path, cancel)
     }
@@ -69,7 +77,14 @@ fn add_and_drain(p: &ProcEnv, rel: &str) -> i64 {
 fn rescan_and_drain(p: &ProcEnv, folder: i64) {
     let _quiet = p.env.ingest.suppress_watch(&p.env.path("lib"));
     p.env.clock.advance(60_000);
-    match scan_folder(p.env.ingest.env(), folder, &|| false, &AtomicBool::new(false)).unwrap() {
+    match scan_folder(
+        p.env.ingest.env(),
+        folder,
+        &|| false,
+        &AtomicBool::new(false),
+    )
+    .unwrap()
+    {
         ScanOutcome::Completed { .. } => {}
         other => panic!("expected Completed, got {other:?}"),
     }
@@ -110,11 +125,21 @@ fn t_hash_edge_07_unique_size_stores_only_the_edge_sig_and_skips_the_full_hash()
     assert!(edge_set(&p, "a.jpg"));
     assert_eq!(hash_of(&p, "a.jpg"), None);
     assert_eq!(
-        p.env.count("SELECT COUNT(*) FROM media_assets WHERE hash_state = 'pending'"),
+        p.env
+            .count("SELECT COUNT(*) FROM media_assets WHERE hash_state = 'pending'"),
         1
     );
-    assert_eq!((probe.edge.load(Ordering::SeqCst), probe.full.load(Ordering::SeqCst)), (1, 0));
-    assert_eq!(p.env.count("SELECT COUNT(*) FROM jobs WHERE kind = 'hash'"), 0);
+    assert_eq!(
+        (
+            probe.edge.load(Ordering::SeqCst),
+            probe.full.load(Ordering::SeqCst)
+        ),
+        (1, 0)
+    );
+    assert_eq!(
+        p.env.count("SELECT COUNT(*) FROM jobs WHERE kind = 'hash'"),
+        0
+    );
 }
 
 #[test]
@@ -135,17 +160,29 @@ fn t_hash_edge_05_same_size_and_edges_with_a_different_middle_are_not_duplicates
     assert_eq!(probe.full.load(Ordering::SeqCst), 2);
     let (ida, idb) = (p.asset_of("a.jpg"), p.asset_of("b.jpg"));
     for id in [ida, idb] {
-        assert!(p.env.read(|c| asset_detail(c, id).unwrap()).duplicates.is_empty());
+        assert!(
+            p.env
+                .read(|c| asset_detail(c, id).unwrap())
+                .duplicates
+                .is_empty()
+        );
     }
     assert_eq!(
-        p.env.count("SELECT COUNT(*) FROM media_assets WHERE status = 'active'"),
+        p.env
+            .count("SELECT COUNT(*) FROM media_assets WHERE status = 'active'"),
         2
     );
     assert_eq!(
-        p.env.count("SELECT COUNT(*) FROM file_locations WHERE detached_at IS NULL AND presence = 'present'"),
+        p.env.count(
+            "SELECT COUNT(*) FROM file_locations WHERE detached_at IS NULL AND presence = 'present'"
+        ),
         2
     );
-    assert_eq!(before, common::env::snapshot(&p.env.path("lib")), "originals untouched");
+    assert_eq!(
+        before,
+        common::env::snapshot(&p.env.path("lib")),
+        "originals untouched"
+    );
 }
 
 #[test]
@@ -190,7 +227,11 @@ fn t_hash_edge_08a_late_arrival_with_the_same_edge_makes_both_assets_hash_fully(
     // Assert: 상대 파일을 다시 읽지 않고도(edge 는 저장돼 있다) 양쪽 모두 전체 해시를 얻는다
     assert!(hash_of(&p, "a.jpg").is_some());
     assert_eq!(hash_of(&p, "a.jpg"), hash_of(&p, "late.jpg"));
-    assert_eq!(probe.edge.load(Ordering::SeqCst), 2, "each file's edge is read once");
+    assert_eq!(
+        probe.edge.load(Ordering::SeqCst),
+        2,
+        "each file's edge is read once"
+    );
     assert_eq!(probe.full.load(Ordering::SeqCst), 2);
 }
 
@@ -225,8 +266,10 @@ fn t_hash_edge_10_rerunning_hash_jobs_changes_nothing() {
         (
             p.env.count("SELECT SUM(revision) FROM media_assets"),
             p.env.count("SELECT COUNT(*) FROM search_outbox"),
-            p.env.count("SELECT COUNT(*) FROM media_assets WHERE content_hash IS NOT NULL"),
-            p.env.count("SELECT COUNT(*) FROM media_assets WHERE edge_sig IS NOT NULL"),
+            p.env
+                .count("SELECT COUNT(*) FROM media_assets WHERE content_hash IS NOT NULL"),
+            p.env
+                .count("SELECT COUNT(*) FROM media_assets WHERE edge_sig IS NOT NULL"),
             probe.edge.load(Ordering::SeqCst),
             probe.full.load(Ordering::SeqCst),
         )
@@ -275,15 +318,21 @@ fn t_hash_edge_11_network_volume_asset_with_a_unique_size_gets_no_full_hash() {
 
     // Assert
     assert_eq!(
-        p.env.count("SELECT COUNT(*) FROM volumes WHERE kind = 'network'"),
+        p.env
+            .count("SELECT COUNT(*) FROM volumes WHERE kind = 'network'"),
         1
     );
     assert_eq!(
-        p.env.count("SELECT COUNT(*) FROM media_assets WHERE edge_sig IS NOT NULL AND content_hash IS NULL"),
+        p.env.count(
+            "SELECT COUNT(*) FROM media_assets WHERE edge_sig IS NOT NULL AND content_hash IS NULL"
+        ),
         1
     );
     assert_eq!(probe.full.load(Ordering::SeqCst), 0);
-    assert_eq!(p.env.count("SELECT COUNT(*) FROM jobs WHERE kind = 'hash'"), 0);
+    assert_eq!(
+        p.env.count("SELECT COUNT(*) FROM jobs WHERE kind = 'hash'"),
+        0
+    );
 }
 
 #[test]
@@ -300,14 +349,20 @@ fn t_hash_edge_10b_full_hash_failure_is_retried_then_recorded_as_failed() {
 
     // Assert: 재시도 소진 뒤 둘 다 failed, 해시는 기록되지 않았다 (수동 재시도 대상)
     assert_eq!(
-        p.env.count("SELECT COUNT(*) FROM media_assets WHERE hash_state = 'failed' AND content_hash IS NULL"),
+        p.env.count(
+            "SELECT COUNT(*) FROM media_assets WHERE hash_state = 'failed' AND content_hash IS NULL"
+        ),
         2
     );
-    assert_eq!(p.env.count("SELECT COUNT(*) FROM jobs WHERE kind = 'hash'"), 0);
+    assert_eq!(
+        p.env.count("SELECT COUNT(*) FROM jobs WHERE kind = 'hash'"),
+        0
+    );
 }
 
 #[test]
-fn t_hash_edge_15b_backfill_fills_edge_sig_once_and_does_not_requeue_assets_that_need_no_full_hash() {
+fn t_hash_edge_15b_backfill_fills_edge_sig_once_and_does_not_requeue_assets_that_need_no_full_hash()
+{
     // Arrange: 처리 기능이 없던 시절에 스캔한 자산 (edge_sig NULL = V11 이전과 같은 상태)
     let env = Env::new();
     for (i, name) in ["a.jpg", "b.jpg", "c.jpg"].iter().enumerate() {
@@ -323,7 +378,11 @@ fn t_hash_edge_15b_backfill_fills_edge_sig_once_and_does_not_requeue_assets_that
     scan_folder(env.ingest.env(), folder, &|| false, &AtomicBool::new(false)).unwrap();
     let probe = Arc::new(Probe::default());
     let p = ProcEnv::with_hasher(env, no_tools(), probe.clone());
-    assert_eq!(p.env.count("SELECT COUNT(*) FROM media_assets WHERE edge_sig IS NULL"), 3);
+    assert_eq!(
+        p.env
+            .count("SELECT COUNT(*) FROM media_assets WHERE edge_sig IS NULL"),
+        3
+    );
 
     // Act: 보충 등록 -> 실행
     let report = p.env.ingest.supervise_once().unwrap().backfill.unwrap();
@@ -337,8 +396,16 @@ fn t_hash_edge_15b_backfill_fills_edge_sig_once_and_does_not_requeue_assets_that
 
     // Assert: edge_sig 가 채워졌고, 전체 해시는 없고(크기 유일), 다시 등록되지 않는다
     assert_eq!(report.hash, 3);
-    assert_eq!(p.env.count("SELECT COUNT(*) FROM media_assets WHERE edge_sig IS NOT NULL"), 3);
-    assert_eq!(p.env.count("SELECT COUNT(*) FROM media_assets WHERE content_hash IS NOT NULL"), 0);
+    assert_eq!(
+        p.env
+            .count("SELECT COUNT(*) FROM media_assets WHERE edge_sig IS NOT NULL"),
+        3
+    );
+    assert_eq!(
+        p.env
+            .count("SELECT COUNT(*) FROM media_assets WHERE content_hash IS NOT NULL"),
+        0
+    );
     assert_eq!(again.hash, 0);
     assert_eq!(probe.full.load(Ordering::SeqCst), 0);
 }
@@ -350,16 +417,16 @@ fn t_hash_edge_15c_backfill_selects_only_assets_that_still_need_a_hash_job() {
     let e = |n: u32| format!("CAST(printf('%032d', {n}) AS BLOB)");
     let rows: Vec<(i64, &str, i64, String)> = vec![
         // (id, 상태/해시, 크기, edge_sig)
-        (1, "pending", 100, "NULL".into()),               // edge 없음 -> 등록
-        (2, "pending", 100, e(1)),                        // 크기 100·sig 1, 상대 없음 -> 제외
-        (3, "pending", 200, e(2)),                        // 같은 크기·같은 sig 쌍 -> 등록
-        (4, "pending", 200, e(2)),                        // 쌍 -> 등록
-        (5, "failed", 100, "NULL".into()),                // failed 는 건드리지 않는다
-        (6, "done", 100, "NULL".into()),                  // 해시는 있고 edge 없음 -> 등록
-        (7, "done", 100, e(3)),                           // 해시·edge 모두 있음 -> 제외
-        (8, "pending", 100, e(4)),                        // 2 와 크기 같고 sig 다름 -> 제외
-        (9, "superseded", 100, "NULL".into()),            // 비활성 -> 제외
-        (10, "pending", 300, e(5)),                       // 상대(11)가 deleted -> 제외
+        (1, "pending", 100, "NULL".into()),    // edge 없음 -> 등록
+        (2, "pending", 100, e(1)),             // 크기 100·sig 1, 상대 없음 -> 제외
+        (3, "pending", 200, e(2)),             // 같은 크기·같은 sig 쌍 -> 등록
+        (4, "pending", 200, e(2)),             // 쌍 -> 등록
+        (5, "failed", 100, "NULL".into()),     // failed 는 건드리지 않는다
+        (6, "done", 100, "NULL".into()),       // 해시는 있고 edge 없음 -> 등록
+        (7, "done", 100, e(3)),                // 해시·edge 모두 있음 -> 제외
+        (8, "pending", 100, e(4)),             // 2 와 크기 같고 sig 다름 -> 제외
+        (9, "superseded", 100, "NULL".into()), // 비활성 -> 제외
+        (10, "pending", 300, e(5)),            // 상대(11)가 deleted -> 제외
         (11, "deleted", 300, e(5)),
     ];
     env.pool
@@ -384,14 +451,18 @@ fn t_hash_edge_15c_backfill_selects_only_assets_that_still_need_a_hash_job() {
     // Act
     let clock = Arc::clone(&env.clock);
     let report =
-        mam_core::processing::backfill_jobs(&env.pool, move || mam_db::Clock::now_ms(&*clock)).unwrap();
+        mam_core::processing::backfill_jobs(&env.pool, move || mam_db::Clock::now_ms(&*clock))
+            .unwrap();
 
     // Assert
     let queued: Vec<i64> = env.read(|c| {
         let mut stmt = c
             .prepare("SELECT asset_id FROM jobs WHERE kind = 'hash' ORDER BY asset_id")
             .unwrap();
-        stmt.query_map([], |r| r.get(0)).unwrap().map(Result::unwrap).collect()
+        stmt.query_map([], |r| r.get(0))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
     });
     assert_eq!(queued, vec![1, 3, 4, 6]);
     assert_eq!(report.hash, 4);

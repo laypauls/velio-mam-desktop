@@ -86,7 +86,11 @@ pub struct GuardedFs {
 }
 
 impl GuardedFs {
-    fn call<T>(&self, key: String, f: impl Fn(&dyn PollFs) -> Result<T, PollError> + Clone + Send + 'static) -> Result<T, PollError>
+    fn call<T>(
+        &self,
+        key: String,
+        f: impl Fn(&dyn PollFs) -> Result<T, PollError> + Clone + Send + 'static,
+    ) -> Result<T, PollError>
     where
         T: Clone + Send + 'static,
     {
@@ -97,8 +101,15 @@ impl GuardedFs {
             }
             let (inner, f) = (Arc::clone(&self.inner), f.clone());
             let slice_started = Instant::now();
-            let slice = self.slice.min(self.timeout.saturating_sub(started.elapsed()).max(Duration::from_millis(1)));
-            match self.guard.guarded(&key, self.lane, slice, move || f(&*inner)) {
+            let slice = self.slice.min(
+                self.timeout
+                    .saturating_sub(started.elapsed())
+                    .max(Duration::from_millis(1)),
+            );
+            match self
+                .guard
+                .guarded(&key, self.lane, slice, move || f(&*inner))
+            {
                 crate::scan::io_guard::Guarded::Done(r) => return r,
                 crate::scan::io_guard::Guarded::TimedOut => {
                     // 상한 때문에 걸지 않았다면(곧바로 돌아옴) 더 기다려도 소용없다
@@ -114,11 +125,15 @@ impl GuardedFs {
 impl PollFs for GuardedFs {
     fn dir_mtime(&self, dir: &Path) -> Result<i64, PollError> {
         let p: PathBuf = dir.to_path_buf();
-        self.call(format!("poll:mtime:{}", dir.display()), move |fs| fs.dir_mtime(&p))
+        self.call(format!("poll:mtime:{}", dir.display()), move |fs| {
+            fs.dir_mtime(&p)
+        })
     }
 
     fn list_dir(&self, dir: &Path) -> Result<Listing, PollError> {
         let p: PathBuf = dir.to_path_buf();
-        self.call(format!("poll:list:{}", dir.display()), move |fs| fs.list_dir(&p))
+        self.call(format!("poll:list:{}", dir.display()), move |fs| {
+            fs.list_dir(&p)
+        })
     }
 }

@@ -58,7 +58,10 @@ fn t_scene_34_success_stores_selected_cuts_once_and_never_touches_the_originals(
     assert_eq!(row.state, SceneState::Done);
     assert_eq!(row.auto, vec![1000, 5000]);
     assert_eq!(row.sensitivity.as_deref(), Some("medium"));
-    assert_eq!(row.detector_version, Some(mam_db::scene_cuts::SCENE_DETECTOR_VERSION));
+    assert_eq!(
+        row.detector_version,
+        Some(mam_db::scene_cuts::SCENE_DETECTOR_VERSION)
+    );
     assert!(row.error.is_none() && row.requested_sensitivity.is_none());
     assert_eq!(f.updated_ids(), vec![vid]);
     assert_eq!(f.runner.calls(), 1);

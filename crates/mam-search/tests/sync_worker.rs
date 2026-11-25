@@ -1023,8 +1023,15 @@ fn t_sync_17_title_is_loaded_from_sqlite_and_searchable_like_a_file_name() {
         ids(w.index().unwrap(), &r)
     };
     assert_eq!(find_title(&w, "일출"), [titled], "title is indexed");
-    assert!(find(&w, "일출").is_empty(), "title search is gated off by default");
-    assert_eq!(find(&w, "img_0001").len(), 1, "file name is still searchable");
+    assert!(
+        find(&w, "일출").is_empty(),
+        "title search is gated off by default"
+    );
+    assert_eq!(
+        find(&w, "img_0001").len(),
+        1,
+        "file name is still searchable"
+    );
 
     // 제목을 지우면(NULL) 같은 revision 규칙으로 다시 색인되어 더 이상 찾지 못한다
     env.conn
@@ -1155,6 +1162,9 @@ fn t_search_rating_09_index_built_before_the_rating_field_is_rebuilt() {
         "{rebuilt:?}"
     );
     let mut r = req("old_index", A);
-    r.filters.rating = mam_search::Range { min: Some(3), max: Some(3) };
+    r.filters.rating = mam_search::Range {
+        min: Some(3),
+        max: Some(3),
+    };
     assert_eq!(ids(w.index().unwrap(), &r), [id]);
 }

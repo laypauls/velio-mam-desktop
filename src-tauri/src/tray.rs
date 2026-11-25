@@ -55,12 +55,18 @@ enum HideMode {
 }
 
 fn hide_mode(tray_installed: bool) -> HideMode {
-    if tray_installed { HideMode::Hide } else { HideMode::Minimize }
+    if tray_installed {
+        HideMode::Hide
+    } else {
+        HideMode::Minimize
+    }
 }
 
 /// 숨기기 단축키: 메인 창을 트레이로 숨긴다(트레이가 없으면 최소화)
 fn hide_window(app: &AppHandle) -> tauri::Result<()> {
-    let Some(w) = app.get_webview_window(MAIN_WINDOW) else { return Ok(()) };
+    let Some(w) = app.get_webview_window(MAIN_WINDOW) else {
+        return Ok(());
+    };
     // 보이지 않는 동안 워커 렌더를 멈춘다 (최소화·숨김은 JS 의 rAF 를 멈추지 않는다)
     crate::player_commands::set_window_active(app, false);
     match hide_mode(INSTALLED.load(Ordering::Relaxed)) {
@@ -71,13 +77,22 @@ fn hide_window(app: &AppHandle) -> tauri::Result<()> {
 
 /// command `hide_main_window` - 재생 중인 플레이어를 사용자 일시정지로 멈춘 뒤 창을 숨긴다 (자동 재개 없음)
 #[tauri::command]
-pub async fn hide_main_window(app: AppHandle, svc: tauri::State<'_, Arc<PlayerService>>) -> Result<(), CommandError> {
+pub async fn hide_main_window(
+    app: AppHandle,
+    svc: tauri::State<'_, Arc<PlayerService>>,
+) -> Result<(), CommandError> {
     let svc = Arc::clone(&svc);
     // 일시정지 실패는 창 숨김을 막지 않는다
     if let Err(e) = tauri::async_runtime::spawn_blocking(move || svc.pause_for_hide()).await {
         tracing::error!(%e, "hide: pause task failed");
     }
-    hide_window(&app).map_err(|e| CommandError::logged(crate::error::ErrorCode::Internal, "cannot hide the window", &e))
+    hide_window(&app).map_err(|e| {
+        CommandError::logged(
+            crate::error::ErrorCode::Internal,
+            "cannot hide the window",
+            &e,
+        )
+    })
 }
 
 /// 종료 중 진행 중인 외부 AI 요청을 기다리는 동안 트레이 툴팁으로 알린다 (알림 풍선은 플러그인이 필요해 쓰지 않는다).
@@ -165,7 +180,12 @@ pub fn install(app: &AppHandle, ingest: Arc<Ingest>) -> tauri::Result<()> {
         builder = builder.icon(icon.clone());
     }
     builder.build(app)?;
-    let _ = HANDLES.set(MenuHandles { open, toggle, quit, ingest });
+    let _ = HANDLES.set(MenuHandles {
+        open,
+        toggle,
+        quit,
+        ingest,
+    });
     INSTALLED.store(true, Ordering::Relaxed);
     Ok(())
 }

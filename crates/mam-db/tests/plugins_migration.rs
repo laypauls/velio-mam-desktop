@@ -33,14 +33,24 @@ fn v25_db() -> TestDb {
 }
 
 /// `plugin_ref` 를 직접 받는 원시 삽입 (제약 시험용)
-fn kv_ref(conn: &Connection, plugin_ref: i64, asset: Option<i64>, key: &str) -> rusqlite::Result<usize> {
+fn kv_ref(
+    conn: &Connection,
+    plugin_ref: i64,
+    asset: Option<i64>,
+    key: &str,
+) -> rusqlite::Result<usize> {
     conn.execute(
         "INSERT INTO plugin_kv (plugin_ref, asset_id, key, value, updated_at) VALUES (?1, ?2, ?3, '1', 0)",
         (plugin_ref, asset, key),
     )
 }
 
-fn task_ref(conn: &Connection, plugin_ref: i64, provider_ref: i64, asset: i64) -> rusqlite::Result<usize> {
+fn task_ref(
+    conn: &Connection,
+    plugin_ref: i64,
+    provider_ref: i64,
+    asset: i64,
+) -> rusqlite::Result<usize> {
     conn.execute(
         "INSERT INTO plugin_tasks (plugin_ref, provider_ref, asset_id, target_revision, updated_at)
          VALUES (?1, ?2, ?3, 1, 0)",
@@ -70,14 +80,20 @@ fn t_pdb_01_empty_db_has_strict_tables_partial_indexes_and_is_idempotent() {
     for table in ["plugins", "plugin_providers", "plugin_kv", "plugin_tasks"] {
         let strict: bool = db
             .conn
-            .query_row("SELECT strict FROM pragma_table_list(?1)", [table], |r| r.get(0))
+            .query_row("SELECT strict FROM pragma_table_list(?1)", [table], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert!(strict, "{table} must be STRICT");
     }
     let sql_of = |name: &str| -> String {
         let sql: String = db
             .conn
-            .query_row("SELECT sql FROM sqlite_master WHERE name = ?1", [name], |r| r.get(0))
+            .query_row(
+                "SELECT sql FROM sqlite_master WHERE name = ?1",
+                [name],
+                |r| r.get(0),
+            )
             .unwrap();
         norm_sql(&sql)
     };
@@ -147,12 +163,18 @@ fn t_pdb_02_upgrade_from_v25_preserves_every_job_row_column_and_index() {
     assert_eq!(jobs_columns(&db.conn), cols);
     assert_eq!(jobs_indexes(&db.conn), idx);
     assert_eq!(count(&db.conn, "PRAGMA foreign_keys"), 1);
-    assert_eq!(count(&db.conn, "SELECT COUNT(*) FROM pragma_foreign_key_check"), 0);
+    assert_eq!(
+        count(&db.conn, "SELECT COUNT(*) FROM pragma_foreign_key_check"),
+        0
+    );
     assert!(count(&db.conn, "SELECT COUNT(*) FROM jobs WHERE folder_id = 1") > 0);
     db.conn
         .execute("DELETE FROM managed_folders WHERE folder_id = 1", [])
         .unwrap();
-    assert_eq!(count(&db.conn, "SELECT COUNT(*) FROM jobs WHERE folder_id = 1"), 0);
+    assert_eq!(
+        count(&db.conn, "SELECT COUNT(*) FROM jobs WHERE folder_id = 1"),
+        0
+    );
 }
 
 #[test]
@@ -170,14 +192,23 @@ fn t_pdb_03_constraints_reject_bad_rows_and_allow_valid_combinations() {
 
     // Act / Assert: jobs.kind
     assert!(job("plugin", a).is_ok());
-    assert!(job("plugin", a).is_err(), "pending (kind, asset) is still unique");
+    assert!(
+        job("plugin", a).is_err(),
+        "pending (kind, asset) is still unique"
+    );
     assert!(job("bogus", a).is_err());
     // plugin_kv: 중복 거부 / 다른 자산·전역 vs 자산 허용
     assert!(kv(c, "p", None, "k").is_ok());
     assert!(kv(c, "p", None, "k").is_err(), "global duplicate");
-    assert!(kv(c, "p", Some(a), "k").is_ok(), "global vs asset key may coincide");
+    assert!(
+        kv(c, "p", Some(a), "k").is_ok(),
+        "global vs asset key may coincide"
+    );
     assert!(kv(c, "p", Some(a), "k").is_err(), "asset duplicate");
-    assert!(kv(c, "p", Some(b), "k").is_ok(), "same key on another asset");
+    assert!(
+        kv(c, "p", Some(b), "k").is_ok(),
+        "same key on another asset"
+    );
     assert!(kv(c, "q", None, "k").is_ok(), "same key for another plugin");
     // 빈 값·없는 자산 FK
     assert!(kv(c, "", None, "k").is_err());
@@ -185,12 +216,18 @@ fn t_pdb_03_constraints_reject_bad_rows_and_allow_valid_combinations() {
     assert!(kv(c, "p", Some(999), "k2").is_err(), "FK");
     // plugin_tasks
     assert!(task(c, "p", "prov", a).is_ok());
-    assert!(task(c, "p", "prov", a).is_err(), "(plugin, provider, asset) unique");
+    assert!(
+        task(c, "p", "prov", a).is_err(),
+        "(plugin, provider, asset) unique"
+    );
     assert!(task(c, "p", "other", a).is_ok());
     assert!(task(c, "", "prov", b).is_err());
     assert!(task(c, "p", "", b).is_err());
     assert!(task(c, "p", "prov", 999).is_err(), "FK");
-    let (pr, vr) = (ensure(c, "p").unwrap(), ensure_provider(c, ensure(c, "p").unwrap(), "x").unwrap());
+    let (pr, vr) = (
+        ensure(c, "p").unwrap(),
+        ensure_provider(c, ensure(c, "p").unwrap(), "x").unwrap(),
+    );
     let bad = |values: &str| {
         c.execute(
             &format!(
@@ -200,8 +237,14 @@ fn t_pdb_03_constraints_reject_bad_rows_and_allow_valid_combinations() {
         )
     };
     assert!(bad(&format!("({pr}, {vr}, {a}, 1, 0, 'bogus', 0)")).is_err());
-    assert!(bad(&format!("({pr}, {vr}, {a}, 0, 0, 'pending', 0)")).is_err(), "target_revision >= 1");
-    assert!(bad(&format!("({pr}, {vr}, {a}, 1, -1, 'pending', 0)")).is_err(), "done_revision >= 0");
+    assert!(
+        bad(&format!("({pr}, {vr}, {a}, 0, 0, 'pending', 0)")).is_err(),
+        "target_revision >= 1"
+    );
+    assert!(
+        bad(&format!("({pr}, {vr}, {a}, 1, -1, 'pending', 0)")).is_err(),
+        "done_revision >= 0"
+    );
     assert!(bad(&format!("({pr}, {vr}, {a}, 1, 0, 'failed', 0)")).is_ok());
 }
 
@@ -222,11 +265,26 @@ fn t_pdb_04_hard_deleting_an_asset_cascades_both_tables_but_keeps_global_kv() {
         .unwrap();
 
     // Assert
-    assert_eq!(count(&db.conn, "SELECT COUNT(*) FROM plugin_kv WHERE asset_id IS NOT NULL"), 1);
-    assert_eq!(count(&db.conn, "SELECT COUNT(*) FROM plugin_kv WHERE asset_id IS NULL"), 1);
+    assert_eq!(
+        count(
+            &db.conn,
+            "SELECT COUNT(*) FROM plugin_kv WHERE asset_id IS NOT NULL"
+        ),
+        1
+    );
+    assert_eq!(
+        count(
+            &db.conn,
+            "SELECT COUNT(*) FROM plugin_kv WHERE asset_id IS NULL"
+        ),
+        1
+    );
     assert_eq!(count(&db.conn, "SELECT COUNT(*) FROM plugin_tasks"), 1);
     assert_eq!(
-        count(&db.conn, &format!("SELECT COUNT(*) FROM plugin_tasks WHERE asset_id = {b}")),
+        count(
+            &db.conn,
+            &format!("SELECT COUNT(*) FROM plugin_tasks WHERE asset_id = {b}")
+        ),
         1
     );
 }
@@ -245,20 +303,33 @@ fn t_pdb_05_upserts_match_the_unique_indexes_and_never_lower_target_revision() {
     let c = &db.conn;
     let a = insert_asset(c);
     let pr = ensure(c, "p").unwrap();
-    assert_eq!((pr, ensure_provider(c, pr, "prov").unwrap()), (1, 1), "UPSERT_TASK 상수가 쓰는 첫 정수 키");
+    assert_eq!(
+        (pr, ensure_provider(c, pr, "prov").unwrap()),
+        (1, 1),
+        "UPSERT_TASK 상수가 쓰는 첫 정수 키"
+    );
     let row = |c: &Connection| -> (i64, String) {
-        c.query_row("SELECT target_revision, status FROM plugin_tasks", [], |r| {
-            Ok((r.get(0)?, r.get(1)?))
-        })
+        c.query_row(
+            "SELECT target_revision, status FROM plugin_tasks",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
         .unwrap()
     };
 
     // Act / Assert: 작업 — 같은 키 한 행, target 감소 없음, target > done 일 때만 pending 복귀
     c.execute(UPSERT_TASK, (a, 3)).unwrap();
-    c.execute("UPDATE plugin_tasks SET done_revision = 3, status = 'done'", [])
-        .unwrap();
+    c.execute(
+        "UPDATE plugin_tasks SET done_revision = 3, status = 'done'",
+        [],
+    )
+    .unwrap();
     c.execute(UPSERT_TASK, (a, 2)).unwrap();
-    assert_eq!(row(c), (3, "done".into()), "older revision must not reopen or lower");
+    assert_eq!(
+        row(c),
+        (3, "done".into()),
+        "older revision must not reopen or lower"
+    );
     c.execute(UPSERT_TASK, (a, 3)).unwrap();
     assert_eq!(row(c), (3, "done".into()), "same revision stays done");
     c.execute(UPSERT_TASK, (a, 5)).unwrap();
@@ -276,11 +347,19 @@ fn t_pdb_05_upserts_match_the_unique_indexes_and_never_lower_target_revision() {
     c.execute(per_asset, ("\"b\"", a)).unwrap();
     assert_eq!(count(c, "SELECT COUNT(*) FROM plugin_kv"), 2);
     let v: String = c
-        .query_row("SELECT value FROM plugin_kv WHERE asset_id IS NULL", [], |r| r.get(0))
+        .query_row(
+            "SELECT value FROM plugin_kv WHERE asset_id IS NULL",
+            [],
+            |r| r.get(0),
+        )
         .unwrap();
     assert_eq!(v, "2");
     let v: String = c
-        .query_row("SELECT value FROM plugin_kv WHERE asset_id IS NOT NULL", [], |r| r.get(0))
+        .query_row(
+            "SELECT value FROM plugin_kv WHERE asset_id IS NOT NULL",
+            [],
+            |r| r.get(0),
+        )
         .unwrap();
     assert_eq!(v, "\"b\"");
 }

@@ -85,7 +85,12 @@ fn t_cpos_db_01_v12_ranks_existing_rows_per_collection_by_added_at_then_asset_id
     let report = migrate(&mut db.conn, &db.backup_dir, &FixedClock(T0 + 1)).unwrap();
 
     // Assert
-    assert_eq!(report.applied, vec![12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]);
+    assert_eq!(
+        report.applied,
+        vec![
+            12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27
+        ]
+    );
     assert!(report.backup.is_some_and(|b| b.is_file()));
     assert_eq!(
         positions(&db.conn, 1),
@@ -123,7 +128,10 @@ fn t_cpos_db_03_neighbour_and_ordered_scan_queries_use_the_position_index() {
     let mut db = v11_db();
     migrate(&mut db.conn, &db.backup_dir, &FixedClock(T0 + 1)).unwrap();
     let plan = |sql: &str| -> String {
-        let mut stmt = db.conn.prepare(&format!("EXPLAIN QUERY PLAN {sql}")).unwrap();
+        let mut stmt = db
+            .conn
+            .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))
+            .unwrap();
         stmt.query_map([], |r| r.get::<_, String>(3))
             .unwrap()
             .map(Result::unwrap)
@@ -139,7 +147,9 @@ fn t_cpos_db_03_neighbour_and_ordered_scan_queries_use_the_position_index() {
     println!("PLAN neighbour lo: {lo}");
     assert!(lo.contains("idx_collection_assets_position"), "{lo}");
     // 맨 앞/맨 뒤 이웃
-    let hi = plan("SELECT min(position) FROM collection_assets WHERE collection_id = 1 AND position > 5");
+    let hi = plan(
+        "SELECT min(position) FROM collection_assets WHERE collection_id = 1 AND position > 5",
+    );
     println!("PLAN neighbour hi: {hi}");
     assert!(hi.contains("idx_collection_assets_position"), "{hi}");
     let last = plan("SELECT max(position) FROM collection_assets WHERE collection_id = 1");

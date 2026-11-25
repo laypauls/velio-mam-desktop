@@ -5,8 +5,8 @@
 use std::sync::Arc;
 
 use mam_core::query::{
-    AssetDetail, QueryService, RecentSearch, SearchFilters, SearchIndex,
-    SearchIndexRequest, SearchPage, SearchRequest,
+    AssetDetail, QueryService, RecentSearch, SearchFilters, SearchIndex, SearchIndexRequest,
+    SearchPage, SearchRequest,
 };
 use mam_core::scan::IngestError;
 use tauri::State;

@@ -144,9 +144,14 @@ impl CancellableProcessRunner {
         cancel: &dyn Fn() -> bool,
     ) -> Result<CommandOutput> {
         let Some(gate) = &self.gate else {
-            return run_process(tool, program, args, opts, &|| {
-                self.cancel.load(Ordering::SeqCst) || cancel()
-            }, &|_| {});
+            return run_process(
+                tool,
+                program,
+                args,
+                opts,
+                &|| self.cancel.load(Ordering::SeqCst) || cancel(),
+                &|_| {},
+            );
         };
         let Some(entry) = gate.enter(args) else {
             return Err(MediaError::Cancelled { tool: tool.name() });

@@ -11,16 +11,25 @@ pub fn stride_for(w: u32) -> u32 {
 /// 캔버스 장치 픽셀 크기 → 렌더 크기. 종횡비를 유지한 채 `cap` 안으로 줄이고 최소 2×2. 줄일 필요가 없으면 그대로
 pub fn fit_render_size(w: u32, h: u32, cap: (u32, u32)) -> (u32, u32) {
     let (w, h) = (w.max(2), h.max(2));
-    let scale = (cap.0 as f64 / w as f64).min(cap.1 as f64 / h as f64).min(1.0);
+    let scale = (cap.0 as f64 / w as f64)
+        .min(cap.1 as f64 / h as f64)
+        .min(1.0);
     if scale >= 1.0 {
         return (w, h);
     }
-    (((w as f64 * scale).round() as u32).max(2), ((h as f64 * scale).round() as u32).max(2))
+    (
+        ((w as f64 * scale).round() as u32).max(2),
+        ((h as f64 * scale).round() as u32).max(2),
+    )
 }
 
 /// 초 → 정수 ms (반올림). 유한하지 않으면 0
 pub fn ms_from_secs(s: f64) -> i64 {
-    if s.is_finite() { (s * 1000.0).round() as i64 } else { 0 }
+    if s.is_finite() {
+        (s * 1000.0).round() as i64
+    } else {
+        0
+    }
 }
 
 /// 시각(초, 파일 pts 영역)을 가장 가까운 프레임 시작 시각 `start + k/fps` 로 맞춘다. `start` = 첫 프레임의 pts (mpv `demuxer-start-time`;
@@ -30,7 +39,9 @@ pub fn ms_from_secs(s: f64) -> i64 {
 pub fn snap_to_frame_start(t_s: f64, fps: Option<f64>, start_s: f64) -> f64 {
     let start = if start_s.is_finite() { start_s } else { 0.0 };
     match fps {
-        Some(f) if f.is_finite() && f > 0.0 && t_s.is_finite() && t_s >= start => start + ((t_s - start) * f).round() / f,
+        Some(f) if f.is_finite() && f > 0.0 && t_s.is_finite() && t_s >= start => {
+            start + ((t_s - start) * f).round() / f
+        }
         _ => t_s,
     }
 }
@@ -52,7 +63,9 @@ impl LastFrameGuard {
     /// 첫 프레임 pts 가 0 이 아닌 파일은 EOF 의 `time-pos` 가 `duration` 과 달라질 수 있어 호출자가 `eof-reached` 로 직접 부른다
     pub fn eof_time(&self, duration: Option<f64>, fps: Option<f64>) -> f64 {
         self.max_below.unwrap_or_else(|| match (duration, fps) {
-            (Some(d), Some(f)) if d.is_finite() && f.is_finite() && f > 0.0 => (d - 1.0 / f).max(0.0),
+            (Some(d), Some(f)) if d.is_finite() && f.is_finite() && f > 0.0 => {
+                (d - 1.0 / f).max(0.0)
+            }
             (Some(d), _) if d.is_finite() => d.max(0.0),
             _ => 0.0,
         })
@@ -92,7 +105,10 @@ pub fn back_cache_frames(cap_bytes: u64, stride: u32, h: u32) -> usize {
 /// 장GOP 코덱인가 (mpv `video-format` 값). 뒤로 이동 캐시는 장GOP 에만 쓴다 — 인트라(ProRes·MJPEG·DNxHD)·짧은 GOP(MPEG-2)는
 /// PoC 에서 이미 20ms 대라 캐시(프레임당 수 MB 복사)가 이득 없이 CPU 만 쓴다
 pub fn is_long_gop(video_format: &str) -> bool {
-    matches!(video_format.to_ascii_lowercase().as_str(), "h264" | "avc" | "hevc" | "h265" | "vp8" | "vp9" | "av1" | "mpeg4" | "vc1" | "wmv3")
+    matches!(
+        video_format.to_ascii_lowercase().as_str(),
+        "h264" | "avc" | "hevc" | "h265" | "vp8" | "vp9" | "av1" | "mpeg4" | "vc1" | "wmv3"
+    )
 }
 
 #[cfg(test)]
@@ -129,7 +145,10 @@ mod tests {
     fn t_player_time_01_snap_to_frame_start() {
         // UI 는 ms 로 반올림한 프레임 시작을 보낸다 (30fps 의 1번 프레임 = 33.33ms → 0.033)
         assert!((snap_to_frame_start(0.033, Some(30.0), 0.0) - 1.0 / 30.0).abs() < 1e-12);
-        assert!((snap_to_frame_start(1.0, Some(29.97002997), 0.0) - 30.0 / 29.97002997).abs() < 1e-9, "NTSC");
+        assert!(
+            (snap_to_frame_start(1.0, Some(29.97002997), 0.0) - 30.0 / 29.97002997).abs() < 1e-9,
+            "NTSC"
+        );
         assert_eq!(snap_to_frame_start(0.0, Some(30.0), 0.0), 0.0);
         // 프레임 사이는 가까운 쪽으로
         assert!((snap_to_frame_start(0.0499, Some(30.0), 0.0) - 1.0 / 30.0).abs() < 1e-12);
@@ -155,10 +174,20 @@ mod tests {
 
     #[test]
     fn t_player_time_02_unknown_or_invalid_fps_does_not_snap() {
-        for fps in [None, Some(0.0), Some(-1.0), Some(f64::NAN), Some(f64::INFINITY)] {
+        for fps in [
+            None,
+            Some(0.0),
+            Some(-1.0),
+            Some(f64::NAN),
+            Some(f64::INFINITY),
+        ] {
             assert_eq!(snap_to_frame_start(1.2345, fps, 0.0), 1.2345, "{fps:?}");
         }
-        assert_eq!(snap_to_frame_start(-1.0, Some(30.0), 0.0), -1.0, "음수는 건드리지 않는다");
+        assert_eq!(
+            snap_to_frame_start(-1.0, Some(30.0), 0.0),
+            -1.0,
+            "음수는 건드리지 않는다"
+        );
         assert!(snap_to_frame_start(f64::NAN, Some(30.0), 0.0).is_nan());
     }
 
@@ -170,16 +199,29 @@ mod tests {
         // Act / Assert
         assert_eq!(g.correct(29.9, Some(30.0), fps), 29.9);
         assert!((g.correct(29.9667, Some(30.0), fps) - 29.9667).abs() < 1e-9);
-        assert!((g.correct(30.0, Some(30.0), fps) - 29.9667).abs() < 1e-9, "EOF 에서는 본 값 중 최대");
-        assert!((g.correct(30.0, Some(30.0), fps) - 29.9667).abs() < 1e-9, "반복 호출도 같은 값");
+        assert!(
+            (g.correct(30.0, Some(30.0), fps) - 29.9667).abs() < 1e-9,
+            "EOF 에서는 본 값 중 최대"
+        );
+        assert!(
+            (g.correct(30.0, Some(30.0), fps) - 29.9667).abs() < 1e-9,
+            "반복 호출도 같은 값"
+        );
     }
 
     #[test]
     fn t_player_time_04_last_frame_without_history_uses_duration_minus_one_frame() {
         let mut g = LastFrameGuard::default();
-        assert!((g.correct(30.0, Some(30.0), Some(30.0)) - (30.0 - 1.0 / 30.0)).abs() < 1e-9, "마지막 프레임으로 바로 seek 한 경우");
+        assert!(
+            (g.correct(30.0, Some(30.0), Some(30.0)) - (30.0 - 1.0 / 30.0)).abs() < 1e-9,
+            "마지막 프레임으로 바로 seek 한 경우"
+        );
         let mut g = LastFrameGuard::default();
-        assert_eq!(g.correct(30.0, Some(30.0), None), 30.0, "fps 를 모르면 보정 불가");
+        assert_eq!(
+            g.correct(30.0, Some(30.0), None),
+            30.0,
+            "fps 를 모르면 보정 불가"
+        );
         // reset 은 이전 파일의 관측을 버린다
         let mut g = LastFrameGuard::default();
         g.correct(10.0, Some(30.0), Some(30.0));
@@ -193,7 +235,10 @@ mod tests {
         let mut g = LastFrameGuard::default();
         g.correct(29.8, Some(30.0), Some(30.0));
         assert_eq!(g.eof_time(Some(30.0), Some(30.0)), 29.8, "본 최대값");
-        assert!((LastFrameGuard::default().eof_time(Some(30.0), Some(25.0)) - 29.96).abs() < 1e-9, "본 적 없으면 duration - 1 프레임");
+        assert!(
+            (LastFrameGuard::default().eof_time(Some(30.0), Some(25.0)) - 29.96).abs() < 1e-9,
+            "본 적 없으면 duration - 1 프레임"
+        );
         assert_eq!(LastFrameGuard::default().eof_time(None, None), 0.0);
     }
 
@@ -204,7 +249,11 @@ mod tests {
         assert_eq!(g.correct(-1.0, Some(30.0), Some(30.0)), 0.0);
         assert_eq!(g.correct(1.0, None, None), 1.0, "길이를 모르면 그대로");
         assert_eq!(g.correct(5.0, Some(0.0), None), 5.0, "길이 0 은 무효");
-        assert_eq!(LastFrameGuard::default().correct(0.5, Some(0.3), Some(30.0)), 0.3 - 1.0 / 30.0, "길이보다 큰 값도 EOF 로 본다");
+        assert_eq!(
+            LastFrameGuard::default().correct(0.5, Some(0.3), Some(30.0)),
+            0.3 - 1.0 / 30.0,
+            "길이보다 큰 값도 EOF 로 본다"
+        );
     }
 
     #[test]
@@ -234,9 +283,17 @@ mod tests {
         assert_eq!(back_cache_frames(cap, 5120, 720), 72, "720p");
         assert_eq!(back_cache_frames(cap, 256, 64), 120, "상한 120장");
         assert_eq!(back_cache_frames(cap, 0, 1080), 0);
-        assert_eq!(back_cache_frames(8 * 1024 * 1024, 7680, 1080), 0, "한 장 크기 이하면 사용 안 함");
+        assert_eq!(
+            back_cache_frames(8 * 1024 * 1024, 7680, 1080),
+            0,
+            "한 장 크기 이하면 사용 안 함"
+        );
         assert_eq!(back_cache_frames(cap, 7680 * 4, 4320), 2, "8K 는 2장");
-        assert_eq!(back_cache_frames(cap, 7680 * 8, 4320), 0, "2장 미만이면 사용 안 함");
+        assert_eq!(
+            back_cache_frames(cap, 7680 * 8, 4320),
+            0,
+            "2장 미만이면 사용 안 함"
+        );
     }
 
     #[test]

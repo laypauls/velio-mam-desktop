@@ -219,7 +219,9 @@ fn t_id_13_pending_asset_changed_becomes_a_new_asset() {
     assert_eq!(
         count(
             &w.db.conn,
-            &format!("SELECT count(*) FROM media_assets WHERE asset_id = {new_asset_id} AND edge_sig IS NOT NULL")
+            &format!(
+                "SELECT count(*) FROM media_assets WHERE asset_id = {new_asset_id} AND edge_sig IS NOT NULL"
+            )
         ),
         1
     );

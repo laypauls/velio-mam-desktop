@@ -26,7 +26,12 @@ fn presence(r: &Reloc, name: &str) -> String {
 
 fn status(r: &Reloc, asset: i64) -> String {
     r.env.read(|c| {
-        c.query_row("SELECT status FROM media_assets WHERE asset_id = ?1", [asset], |row| row.get(0)).unwrap()
+        c.query_row(
+            "SELECT status FROM media_assets WHERE asset_id = ?1",
+            [asset],
+            |row| row.get(0),
+        )
+        .unwrap()
     })
 }
 
@@ -35,22 +40,39 @@ fn t_relocate_01_copy_to_another_volume_relinks_the_same_assets_and_keeps_tags()
     // Arrange: vol-a 의 lib 를 vol-b 로 복사해 두었다
     let r = Reloc::new();
     let id = r.seeded();
-    let (a, b, c) = (r.asset_id("a.jpg"), r.asset_id("b.jpg"), r.asset_id("c.png"));
+    let (a, b, c) = (
+        r.asset_id("a.jpg"),
+        r.asset_id("b.jpg"),
+        r.asset_id("c.png"),
+    );
     r.tag(a, "keep");
     r.copy_tree(&r.env.path("lib"), &r.path_b("lib"));
     let (old_before, new_before) = (snapshot(&r.env.path("lib")), snapshot(&r.path_b("lib")));
 
     // Act
     let out = r.relocate(id, &r.path_b("lib")).unwrap();
-    let cleared = r.env.count("SELECT COUNT(*) FROM file_locations WHERE file_identity IS NULL");
+    let cleared = r
+        .env
+        .count("SELECT COUNT(*) FROM file_locations WHERE file_identity IS NULL");
     let counts = r.completed(id);
 
     // Assert: 같은 자산이 새 볼륨·새 경로에 연결되고 태그가 유지된다
     assert_eq!(out.relocated, 3);
-    assert!(out.folder.path.ends_with(r"vol_b\lib"), "{}", out.folder.path);
+    assert!(
+        out.folder.path.ends_with(r"vol_b\lib"),
+        "{}",
+        out.folder.path
+    );
     assert_eq!(cleared, 3, "identity is refilled by the scan");
     assert_eq!((counts.created, counts.moved, counts.missing), (0, 0, 0));
-    assert_eq!([r.asset_id("a.jpg"), r.asset_id("b.jpg"), r.asset_id("c.png")], [a, b, c]);
+    assert_eq!(
+        [
+            r.asset_id("a.jpg"),
+            r.asset_id("b.jpg"),
+            r.asset_id("c.png")
+        ],
+        [a, b, c]
+    );
     assert_eq!(r.env.count("SELECT COUNT(*) FROM media_assets"), 3);
     let vol_b = r.volume_id("vol-b");
     assert_eq!(
@@ -60,9 +82,21 @@ fn t_relocate_01_copy_to_another_volume_relinks_the_same_assets_and_keeps_tags()
         )),
         3
     );
-    assert_eq!(r.env.count(&format!("SELECT COUNT(*) FROM asset_tags WHERE asset_id = {a}")), 1);
-    assert_eq!(r.env.count("SELECT COUNT(*) FROM jobs WHERE kind = 'scan' AND status = 'pending'"), 1);
-    assert_eq!((old_before, new_before), (snapshot(&r.env.path("lib")), snapshot(&r.path_b("lib"))));
+    assert_eq!(
+        r.env.count(&format!(
+            "SELECT COUNT(*) FROM asset_tags WHERE asset_id = {a}"
+        )),
+        1
+    );
+    assert_eq!(
+        r.env
+            .count("SELECT COUNT(*) FROM jobs WHERE kind = 'scan' AND status = 'pending'"),
+        1
+    );
+    assert_eq!(
+        (old_before, new_before),
+        (snapshot(&r.env.path("lib")), snapshot(&r.path_b("lib")))
+    );
 }
 
 #[test]
@@ -81,8 +115,16 @@ fn t_relocate_02_changed_file_identity_does_not_trigger_hashing_or_new_assets() 
     assert_eq!(counts.created, 0);
     assert_eq!(r.env.count("SELECT COUNT(*) FROM media_assets"), 3);
     assert_eq!(r.env.count("SELECT COUNT(*) FROM asset_relations"), 0);
-    assert_eq!(r.env.count("SELECT COUNT(*) FROM media_assets WHERE status <> 'active'"), 0);
-    assert_eq!(r.probe.full.load(Ordering::SeqCst), reads_before, "no full-hash reads");
+    assert_eq!(
+        r.env
+            .count("SELECT COUNT(*) FROM media_assets WHERE status <> 'active'"),
+        0
+    );
+    assert_eq!(
+        r.probe.full.load(Ordering::SeqCst),
+        reads_before,
+        "no full-hash reads"
+    );
 }
 
 #[test]
@@ -115,8 +157,16 @@ fn t_relocate_03_file_absent_at_the_new_location_turns_missing_only_after_the_sc
         )
         .unwrap()
     });
-    assert_eq!((vol, key.as_str()), (r.volume_id("vol-b"), "lib/sub/deep/c.png"));
-    assert_eq!(r.env.count(&format!("SELECT COUNT(*) FROM asset_tags WHERE asset_id = {c}")), 1);
+    assert_eq!(
+        (vol, key.as_str()),
+        (r.volume_id("vol-b"), "lib/sub/deep/c.png")
+    );
+    assert_eq!(
+        r.env.count(&format!(
+            "SELECT COUNT(*) FROM asset_tags WHERE asset_id = {c}"
+        )),
+        1
+    );
 }
 
 #[test]
@@ -148,14 +198,37 @@ fn t_relocate_07_mtime_changed_copy_follows_the_normal_content_change_rules() {
     // Assert: 해시 없는 쪽은 새 자산 + 옛 자산 superseded(+관계, 태그는 옛 자산에 남음)
     assert_eq!(status(&r, a), "superseded");
     assert_ne!(r.asset_id("a.jpg"), a);
-    assert_eq!(r.env.count(&format!("SELECT COUNT(*) FROM asset_relations WHERE from_asset_id = {a}")), 1);
-    assert_eq!(r.env.count(&format!("SELECT COUNT(*) FROM asset_tags WHERE asset_id = {a}")), 1);
+    assert_eq!(
+        r.env.count(&format!(
+            "SELECT COUNT(*) FROM asset_relations WHERE from_asset_id = {a}"
+        )),
+        1
+    );
+    assert_eq!(
+        r.env.count(&format!(
+            "SELECT COUNT(*) FROM asset_tags WHERE asset_id = {a}"
+        )),
+        1
+    );
     // 전체 해시가 있는 쪽은 해시가 같아 같은 자산의 Touched
     assert_eq!(r.asset_id("b.jpg"), b);
     assert_eq!(status(&r, b), "active");
-    assert_eq!(r.env.count("SELECT COUNT(*) FROM media_assets"), 4, "one new asset (ContentChanged), counted as updated: {counts:?}");
-    assert_eq!(r.env.count(&format!("SELECT COUNT(*) FROM asset_relations WHERE from_asset_id = {b}")), 0);
-    assert_eq!(r.probe.full.load(Ordering::SeqCst), 1, "only the hashed asset was re-hashed");
+    assert_eq!(
+        r.env.count("SELECT COUNT(*) FROM media_assets"),
+        4,
+        "one new asset (ContentChanged), counted as updated: {counts:?}"
+    );
+    assert_eq!(
+        r.env.count(&format!(
+            "SELECT COUNT(*) FROM asset_relations WHERE from_asset_id = {b}"
+        )),
+        0
+    );
+    assert_eq!(
+        r.probe.full.load(Ordering::SeqCst),
+        1,
+        "only the hashed asset was re-hashed"
+    );
 }
 
 #[test]
@@ -163,7 +236,8 @@ fn t_relocate_09_paused_scan_cursor_is_cancelled_so_the_next_scan_covers_everyth
     // Arrange: 스캔이 두 번째 디렉터리쯤에서 멈춘 상태 (커서 있음)
     let r = Reloc::new();
     for (i, d) in ["a", "b", "c", "d"].into_iter().enumerate() {
-        r.env.write(&format!("lib/{d}/f.jpg"), 10 + u8::try_from(i).unwrap());
+        r.env
+            .write(&format!("lib/{d}/f.jpg"), 10 + u8::try_from(i).unwrap());
     }
     let id = r.add("lib");
     let calls = Cell::new(0);
@@ -177,7 +251,9 @@ fn t_relocate_09_paused_scan_cursor_is_cancelled_so_the_next_scan_covers_everyth
 
     // Act
     r.relocate(id, &r.path_b("lib")).unwrap();
-    let cancelled = r.env.count("SELECT COUNT(*) FROM scan_runs WHERE status = 'cancelled'");
+    let cancelled = r
+        .env
+        .count("SELECT COUNT(*) FROM scan_runs WHERE status = 'cancelled'");
     let counts = r.completed(id);
 
     // Assert: 커서를 이어받지 않고 루트부터 전부 훑었다
@@ -185,7 +261,9 @@ fn t_relocate_09_paused_scan_cursor_is_cancelled_so_the_next_scan_covers_everyth
     assert_eq!(counts.processed, 4);
     assert_eq!(r.env.count("SELECT COUNT(*) FROM media_assets"), 4);
     assert_eq!(
-        r.env.count("SELECT COUNT(*) FROM file_locations WHERE presence = 'present' AND detached_at IS NULL"),
+        r.env.count(
+            "SELECT COUNT(*) FROM file_locations WHERE presence = 'present' AND detached_at IS NULL"
+        ),
         4
     );
 }
@@ -200,7 +278,10 @@ fn t_relocate_12_old_volume_offline_still_relocates_and_the_scan_restores_presen
     r.env
         .pool
         .write(mam_db::Priority::High, |c| {
-            c.execute("UPDATE volumes SET availability = 'offline' WHERE volume_key = 'vol-a'", [])?;
+            c.execute(
+                "UPDATE volumes SET availability = 'offline' WHERE volume_key = 'vol-a'",
+                [],
+            )?;
             Ok(())
         })
         .unwrap();
@@ -208,13 +289,19 @@ fn t_relocate_12_old_volume_offline_still_relocates_and_the_scan_restores_presen
 
     // Act
     let out = r.relocate(id, &r.path_b("lib")).unwrap();
-    let before_scan = r.env.count("SELECT COUNT(*) FROM file_locations WHERE presence = 'present'");
+    let before_scan = r
+        .env
+        .count("SELECT COUNT(*) FROM file_locations WHERE presence = 'present'");
     let counts = r.completed(id);
 
     // Assert: 이전 중에는 present 그대로, 스캔 후 새 파일 기준으로 present
     assert_eq!(out.relocated, 3);
     assert_eq!(before_scan, 3);
     assert_eq!(counts.missing, 0);
-    assert_eq!(r.env.count("SELECT COUNT(*) FROM file_locations WHERE presence = 'present'"), 3);
+    assert_eq!(
+        r.env
+            .count("SELECT COUNT(*) FROM file_locations WHERE presence = 'present'"),
+        3
+    );
     assert_eq!(r.env.count("SELECT COUNT(*) FROM media_assets"), 3);
 }

@@ -36,7 +36,10 @@ pub enum InstallError {
     #[error(transparent)]
     Engine(#[from] EngineError),
     #[error("invalid locale file `{file_stem}`: {source}")]
-    Locale { file_stem: String, source: LocaleError },
+    Locale {
+        file_stem: String,
+        source: LocaleError,
+    },
     #[error("main script not found")]
     MainMissing,
     #[error("main script is outside the plugin folder")]

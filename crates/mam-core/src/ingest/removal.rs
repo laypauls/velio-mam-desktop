@@ -15,8 +15,8 @@ use serde::Serialize;
 
 use super::{Ingest, lock};
 use crate::purge::{
-    EmbeddingKey, FolderRemovalImpact, RangeSpec, count_in_range, folder_removal_impact, purge_range_batch,
-    remove_cache_files,
+    EmbeddingKey, FolderRemovalImpact, RangeSpec, count_in_range, folder_removal_impact,
+    purge_range_batch, remove_cache_files,
 };
 use crate::scan::{IngestError, detach_folder, load_all, load_folder};
 
@@ -138,7 +138,10 @@ impl Ingest {
     }
 
     /// 제거 확인 Dialog 용: 지워질 항목 수. 없는 폴더·제거 중인 폴더는 `NotFound`.
-    pub fn folder_removal_impact(&self, folder_id: i64) -> Result<FolderRemovalImpact, IngestError> {
+    pub fn folder_removal_impact(
+        &self,
+        folder_id: i64,
+    ) -> Result<FolderRemovalImpact, IngestError> {
         self.env.pool.read(|c| {
             Ok((|| {
                 let f = load_folder(c, folder_id)?;

@@ -8,8 +8,8 @@ use std::collections::HashMap;
 
 use rusqlite::{Connection, Row, params};
 
-use crate::doc::{AssetDoc, MediaType, Presence};
 use super::user_values::load_user_values;
+use crate::doc::{AssetDoc, MediaType, Presence};
 
 /// 자산당 1행 (태그는 상관 부질의로 `char(31)` 구분 연결). 인자는 `media_assets a` 를 만드는 FROM 절.
 macro_rules! doc_select {

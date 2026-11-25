@@ -108,7 +108,10 @@ mod imp {
 
     pub fn protect(plain: &[u8]) -> Result<Vec<u8>, SecretError> {
         let (input, entropy) = (blob(plain), blob(ENTROPY));
-        let mut out = CRYPT_INTEGER_BLOB { cbData: 0, pbData: std::ptr::null_mut() };
+        let mut out = CRYPT_INTEGER_BLOB {
+            cbData: 0,
+            pbData: std::ptr::null_mut(),
+        };
         // SAFETY: 입력 blob 들은 호출 동안 살아 있고, out 은 유효한 쓰기 대상이다.
         let ok = unsafe {
             CryptProtectData(
@@ -129,7 +132,10 @@ mod imp {
 
     pub fn unprotect(cipher: &[u8]) -> Result<Zeroizing<Vec<u8>>, SecretError> {
         let (input, entropy) = (blob(cipher), blob(ENTROPY));
-        let mut out = CRYPT_INTEGER_BLOB { cbData: 0, pbData: std::ptr::null_mut() };
+        let mut out = CRYPT_INTEGER_BLOB {
+            cbData: 0,
+            pbData: std::ptr::null_mut(),
+        };
         // SAFETY: protect 와 같다. 설명 문자열 출력은 요청하지 않는다(null).
         let ok = unsafe {
             CryptUnprotectData(

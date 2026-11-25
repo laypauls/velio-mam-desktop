@@ -69,12 +69,27 @@ fn t_known_01_list_merges_volume_rows_and_ignored_entries_one_row_per_key() {
     assert_eq!(list[0].kind, Some(mam_core::VolumeKind::Fixed));
     assert_eq!(list[0].folder_count, 1);
     assert!(list[0].ignored);
-    assert_eq!(list[0].label.as_deref(), Some("vol-a"), "volumes row wins over the ignored entry");
+    assert_eq!(
+        list[0].label.as_deref(),
+        Some("vol-a"),
+        "volumes row wins over the ignored entry"
+    );
     assert!(list[0].last_seen_at.is_some());
     let old = &list[1];
     assert_eq!(old.volume_key, "usb-old");
-    assert_eq!((old.kind, old.availability, old.last_seen_at), (None, None, None));
-    assert_eq!((old.label.as_deref(), old.last_mount_point.as_deref(), old.folder_count, old.ignored), (Some("OLD USB"), Some(r"H:\"), 0, true));
+    assert_eq!(
+        (old.kind, old.availability, old.last_seen_at),
+        (None, None, None)
+    );
+    assert_eq!(
+        (
+            old.label.as_deref(),
+            old.last_mount_point.as_deref(),
+            old.folder_count,
+            old.ignored
+        ),
+        (Some("OLD USB"), Some(r"H:\"), 0, true)
+    );
 }
 
 #[test]
@@ -90,7 +105,10 @@ fn t_known_02_folder_count_excludes_folders_being_removed_but_forget_still_refus
     // Assert
     assert_eq!(known(&env)[0].folder_count, 1);
     env.ingest.run_folder_removal(a, &|| false).unwrap();
-    assert!(matches!(env.ingest.forget_volume_record("vol-a"), Err(IngestError::VolumeHasFolders)));
+    assert!(matches!(
+        env.ingest.forget_volume_record("vol-a"),
+        Err(IngestError::VolumeHasFolders)
+    ));
 }
 
 #[test]
@@ -101,14 +119,22 @@ fn t_known_03_forgetting_a_disk_without_folders_removes_row_ignored_entry_and_ol
     let vid = volume_id(&env, "vol-a");
     let gone = insert_assets(&env, "vol-a", "x", 1, "image");
     seed_linked(&env, &gone);
-    exec(&env, &format!(
-        "UPDATE media_assets SET status = 'deleted' WHERE asset_id = {0};
-         UPDATE file_locations SET detached_at = 5 WHERE volume_id = {vid};", gone[0]));
+    exec(
+        &env,
+        &format!(
+            "UPDATE media_assets SET status = 'deleted' WHERE asset_id = {0};
+         UPDATE file_locations SET detached_at = 5 WHERE volume_id = {vid};",
+            gone[0]
+        ),
+    );
     ignore(&env, "vol-a", "x");
     let linked_before = total_linked(&env, &gone);
     let calls = Arc::new(Mutex::new(0));
     let c = Arc::clone(&calls);
-    env.ingest.set_backup_hook(Arc::new(move || { *c.lock().unwrap() += 1; Ok(()) }));
+    env.ingest.set_backup_hook(Arc::new(move || {
+        *c.lock().unwrap() += 1;
+        Ok(())
+    }));
 
     // Act
     env.ingest.forget_volume_record("vol-a").unwrap();
@@ -120,7 +146,11 @@ fn t_known_03_forgetting_a_disk_without_folders_removes_row_ignored_entry_and_ol
     assert_eq!(total_linked(&env, &gone), linked_before);
     assert_eq!(*calls.lock().unwrap(), 0);
     assert!(known(&env).is_empty());
-    assert_eq!(status_counts(&env, &gone, "deleted"), 1, "the asset row itself stays");
+    assert_eq!(
+        status_counts(&env, &gone, "deleted"),
+        1,
+        "the asset row itself stays"
+    );
 }
 
 #[test]
@@ -162,8 +192,14 @@ fn t_known_06_unknown_key_is_a_noop_and_invalid_keys_are_rejected() {
     add(&env, "lib");
 
     assert!(env.ingest.forget_volume_record("never-seen").is_ok());
-    assert!(matches!(env.ingest.forget_volume_record(""), Err(IngestError::InvalidInput(_))));
-    assert!(matches!(env.ingest.forget_volume_record("a\0b"), Err(IngestError::InvalidInput(_))));
+    assert!(matches!(
+        env.ingest.forget_volume_record(""),
+        Err(IngestError::InvalidInput(_))
+    ));
+    assert!(matches!(
+        env.ingest.forget_volume_record("a\0b"),
+        Err(IngestError::InvalidInput(_))
+    ));
     assert_eq!(volume_rows(&env), 1);
 }
 
@@ -177,7 +213,10 @@ fn t_known_07_leftover_legacy_assets_on_the_disk_are_purged_with_a_backup_before
     exec(&env, "UPDATE file_locations SET detached_at = 5");
     let calls = Arc::new(Mutex::new(0));
     let c = Arc::clone(&calls);
-    env.ingest.set_backup_hook(Arc::new(move || { *c.lock().unwrap() += 1; Ok(()) }));
+    env.ingest.set_backup_hook(Arc::new(move || {
+        *c.lock().unwrap() += 1;
+        Ok(())
+    }));
 
     // Act
     env.ingest.forget_volume_record("vol-a").unwrap();
@@ -194,7 +233,10 @@ fn t_known_07_leftover_legacy_assets_on_the_disk_are_purged_with_a_backup_before
     seed_linked(&env2, &l2);
     exec(&env2, "UPDATE file_locations SET detached_at = 5");
     env2.ingest.set_backup_hook(Arc::new(|| Err("full".into())));
-    assert!(matches!(env2.ingest.forget_volume_record("vol-a"), Err(IngestError::BackupFailed)));
+    assert!(matches!(
+        env2.ingest.forget_volume_record("vol-a"),
+        Err(IngestError::BackupFailed)
+    ));
     assert_eq!(volume_rows(&env2), 1);
     assert_eq!(status_counts(&env2, &l2, "active"), 1);
 }
@@ -206,10 +248,14 @@ fn t_known_08_a_forgotten_disk_that_is_connected_is_asked_again_like_a_new_disk(
     env.ingest.supervise_once().unwrap();
     emptied_volume(&env);
     env.ingest.supervise_once().unwrap();
-    assert!(env.ingest.pending_volumes().is_empty(), "removing the last folder does not prompt by itself");
+    assert!(
+        env.ingest.pending_volumes().is_empty(),
+        "removing the last folder does not prompt by itself"
+    );
     let events: Arc<Mutex<Vec<usize>>> = Arc::default();
     let sink = Arc::clone(&events);
-    env.ingest.set_pending_listener(Arc::new(move |v| sink.lock().unwrap().push(v.len())));
+    env.ingest
+        .set_pending_listener(Arc::new(move |v| sink.lock().unwrap().push(v.len())));
 
     // Act
     env.ingest.forget_volume_record("vol-a").unwrap();
@@ -220,7 +266,11 @@ fn t_known_08_a_forgotten_disk_that_is_connected_is_asked_again_like_a_new_disk(
     assert_eq!(pending[0].volume_key, "vol-a");
     assert_eq!(pending[0].kind, VolumeKind::Fixed);
     assert_eq!(events.lock().unwrap().as_slice(), [1]);
-    assert_eq!(volume_rows(&env), 0, "a pending disk never enters the volumes table");
+    assert_eq!(
+        volume_rows(&env),
+        0,
+        "a pending disk never enters the volumes table"
+    );
 }
 
 #[test]

@@ -41,7 +41,9 @@ unsafe impl GlobalAlloc for Counting {
 static A: Counting = Counting;
 
 fn now_ms() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis() as i64)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as i64)
 }
 
 fn pct(v: &mut [f64], p: f64) -> f64 {
@@ -69,7 +71,10 @@ fn generate(dir: &Path, top: usize, mid: usize, leaf: usize, files: usize) -> st
                     for t in (w..top).step_by(threads) {
                         for m in 0..mid {
                             for l in 0..leaf {
-                                let d = dir.join(format!("t{t:02}")).join(format!("m{m:02}")).join(format!("l{l:03}"));
+                                let d = dir
+                                    .join(format!("t{t:02}"))
+                                    .join(format!("m{m:02}"))
+                                    .join(format!("l{l:03}"));
                                 fs::create_dir_all(&d)?;
                                 for f in 0..files {
                                     File::create(d.join(format!("IMG_{f:06}.jpg")))?;
@@ -81,7 +86,8 @@ fn generate(dir: &Path, top: usize, mid: usize, leaf: usize, files: usize) -> st
                 })
             })
             .collect();
-        hs.into_iter().try_for_each(|h| h.join().expect("gen thread"))
+        hs.into_iter()
+            .try_for_each(|h| h.join().expect("gen thread"))
     })
 }
 
@@ -101,7 +107,9 @@ fn plain_listing(root: &Path) -> (usize, usize) {
 
 fn leaf_path(root: &Path, k: usize, mid: usize, leaf: usize) -> PathBuf {
     let (t, rest) = (k / (mid * leaf), k % (mid * leaf));
-    root.join(format!("t{t:02}")).join(format!("m{:02}", rest / leaf)).join(format!("l{:03}", rest % leaf))
+    root.join(format!("t{t:02}"))
+        .join(format!("m{:02}", rest / leaf))
+        .join(format!("l{:03}", rest % leaf))
 }
 
 fn cmd_list(root: &Path, runs: usize) {
@@ -118,8 +126,16 @@ fn cmd_list(root: &Path, runs: usize) {
         base.push(t.elapsed().as_secs_f64() * 1000.0);
         let snap = snap.expect("baseline");
         if r == 0 {
-            mem = (d, e, LIVE.load(Ordering::Relaxed) - before, snap.approx_heap_bytes());
-            println!("<!-- dirs={d} entries={e} stats={} lists={} -->", stats.stats, stats.lists);
+            mem = (
+                d,
+                e,
+                LIVE.load(Ordering::Relaxed) - before,
+                snap.approx_heap_bytes(),
+            );
+            println!(
+                "<!-- dirs={d} entries={e} stats={} lists={} -->",
+                stats.stats, stats.lists
+            );
         }
     }
     report("full listing (no store)", &mut plain);
@@ -139,7 +155,9 @@ fn cmd_prune(root: &Path, runs: usize, tops: usize) {
     let (snap, _) = Snapshot::baseline(&StdFs, root, now_ms(), &|| false);
     let mut snap = snap.expect("baseline");
     println!("dirs={} entries={}", snap.dir_count(), snap.entry_count());
-    println!("| changed dirs | runs | P50 ms | P95 ms | P99 ms | max ms |\n|---|---|---|---|---|---|");
+    println!(
+        "| changed dirs | runs | P50 ms | P95 ms | P99 ms | max ms |\n|---|---|---|---|---|---|"
+    );
     for n in [0usize, 10, 1000] {
         let mut ms = Vec::new();
         let mut verify_ms = Vec::new();
@@ -156,14 +174,21 @@ fn cmd_prune(root: &Path, runs: usize, tops: usize) {
             let t = Instant::now();
             let out = snap.tick(&StdFs, root, now_ms(), &|| false);
             ms.push(t.elapsed().as_secs_f64() * 1000.0);
-            let paths = out.changes.iter().filter(|c| matches!(c, Change::Path(_))).count();
+            let paths = out
+                .changes
+                .iter()
+                .filter(|c| matches!(c, Change::Path(_)))
+                .count();
             counts = (paths, out.stats.lists);
             assert_eq!(paths, n, "every created file is reported exactly once");
             let t = Instant::now();
             let _ = snap.tick(&StdFs, root, now_ms(), &|| false); // 확인용 재읽기 주기
             verify_ms.push(t.elapsed().as_secs_f64() * 1000.0);
         }
-        report(&format!("{n} (paths={}, listed dirs={})", counts.0, counts.1), &mut ms);
+        report(
+            &format!("{n} (paths={}, listed dirs={})", counts.0, counts.1),
+            &mut ms,
+        );
         report(&format!("{n} — following verify tick"), &mut verify_ms);
     }
 }
@@ -179,44 +204,85 @@ fn cmd_dirmtime(scratch: &Path) {
         let (a, b0) = (mt(&d), mt(&d.join("sub")));
         f();
         let (b, b1) = (mt(&d), mt(&d.join("sub")));
-        println!("| {name} | {} | {} |", if a != b { "changed" } else { "unchanged" }, if b0 != b1 { "changed" } else { "unchanged" });
+        println!(
+            "| {name} | {} | {} |",
+            if a != b { "changed" } else { "unchanged" },
+            if b0 != b1 { "changed" } else { "unchanged" }
+        );
     };
     println!("| operation | parent dir mtime | sub dir mtime |\n|---|---|---|");
-    step("create child file in dir", &|| fs::write(d.join("new.bin"), b"x").expect("create"));
-    step("delete child file in dir", &|| fs::remove_file(d.join("new.bin")).expect("rm"));
-    step("rename child file in dir", &|| fs::rename(d.join("file.bin"), d.join("renamed.bin")).expect("mv"));
+    step("create child file in dir", &|| {
+        fs::write(d.join("new.bin"), b"x").expect("create")
+    });
+    step("delete child file in dir", &|| {
+        fs::remove_file(d.join("new.bin")).expect("rm")
+    });
+    step("rename child file in dir", &|| {
+        fs::rename(d.join("file.bin"), d.join("renamed.bin")).expect("mv")
+    });
     step("in-place append to child file", &|| {
         use std::io::Write;
-        let mut f = fs::OpenOptions::new().append(true).open(d.join("renamed.bin")).expect("open");
+        let mut f = fs::OpenOptions::new()
+            .append(true)
+            .open(d.join("renamed.bin"))
+            .expect("open");
         f.write_all(b"more").expect("write");
         f.sync_all().expect("sync");
     });
     step("in-place overwrite same size", &|| {
         use std::io::{Seek, Write};
-        let mut f = fs::OpenOptions::new().write(true).open(d.join("renamed.bin")).expect("open");
+        let mut f = fs::OpenOptions::new()
+            .write(true)
+            .open(d.join("renamed.bin"))
+            .expect("open");
         f.seek(std::io::SeekFrom::Start(0)).expect("seek");
         f.write_all(b"ZZ").expect("write");
         f.sync_all().expect("sync");
     });
-    step("truncate child file (set_len)", &|| fs::OpenOptions::new().write(true).open(d.join("renamed.bin")).expect("open").set_len(3).expect("len"));
+    step("truncate child file (set_len)", &|| {
+        fs::OpenOptions::new()
+            .write(true)
+            .open(d.join("renamed.bin"))
+            .expect("open")
+            .set_len(3)
+            .expect("len")
+    });
     step("set child readonly attribute", &|| {
-        let mut p = fs::metadata(d.join("renamed.bin")).expect("meta").permissions();
+        let mut p = fs::metadata(d.join("renamed.bin"))
+            .expect("meta")
+            .permissions();
         p.set_readonly(true);
         fs::set_permissions(d.join("renamed.bin"), p).expect("perm");
     });
-    step("create file inside sub (grandchild of dir)", &|| fs::write(d.join("sub").join("g.bin"), b"x").expect("create"));
-    step("create subdirectory in dir", &|| fs::create_dir(d.join("sub2")).expect("mkdir"));
-    step("remove subdirectory from dir", &|| fs::remove_dir(d.join("sub2")).expect("rmdir"));
+    step("create file inside sub (grandchild of dir)", &|| {
+        fs::write(d.join("sub").join("g.bin"), b"x").expect("create")
+    });
+    step("create subdirectory in dir", &|| {
+        fs::create_dir(d.join("sub2")).expect("mkdir")
+    });
+    step("remove subdirectory from dir", &|| {
+        fs::remove_dir(d.join("sub2")).expect("rmdir")
+    });
 }
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let a = |i: usize| args.get(i).map(String::as_str);
-    let num = |i: usize| a(i).and_then(|s| s.parse::<usize>().ok()).expect("number argument");
+    let num = |i: usize| {
+        a(i).and_then(|s| s.parse::<usize>().ok())
+            .expect("number argument")
+    };
     match a(0) {
         Some("gen") => {
             let t = Instant::now();
-            generate(Path::new(a(1).expect("dir")), num(2), num(3), num(4), num(5)).expect("gen");
+            generate(
+                Path::new(a(1).expect("dir")),
+                num(2),
+                num(3),
+                num(4),
+                num(5),
+            )
+            .expect("gen");
             println!("generated in {:?}", t.elapsed());
         }
         Some("list") => cmd_list(Path::new(a(1).expect("dir")), num(2)),

@@ -30,7 +30,11 @@ pub fn pump_lines<R: Read>(mut r: R, max: usize, tx: &SyncSender<LineEvent>) {
         };
         for piece in buf[..n].split_inclusive(|b| *b == b'\n') {
             let complete = piece.last() == Some(&b'\n');
-            let body = if complete { &piece[..piece.len() - 1] } else { piece };
+            let body = if complete {
+                &piece[..piece.len() - 1]
+            } else {
+                piece
+            };
             if line.len() + body.len() > max {
                 let _ = tx.send(LineEvent::Oversize);
                 return;
@@ -65,7 +69,16 @@ mod tests {
     #[test]
     fn t_phost_line_01_splits_lines_and_strips_crlf() {
         let ev = run(b"a\r\nbb\n\nccc\n", 16);
-        assert_eq!(ev, vec![LineEvent::Line(b"a".to_vec()), LineEvent::Line(b"bb".to_vec()), LineEvent::Line(vec![]), LineEvent::Line(b"ccc".to_vec()), LineEvent::Eof]);
+        assert_eq!(
+            ev,
+            vec![
+                LineEvent::Line(b"a".to_vec()),
+                LineEvent::Line(b"bb".to_vec()),
+                LineEvent::Line(vec![]),
+                LineEvent::Line(b"ccc".to_vec()),
+                LineEvent::Eof
+            ]
+        );
     }
 
     #[test]
@@ -84,6 +97,9 @@ mod tests {
 
     #[test]
     fn t_phost_line_04_partial_last_line_without_newline_is_dropped_at_eof() {
-        assert_eq!(run(b"ok\npartial", 64), vec![LineEvent::Line(b"ok".to_vec()), LineEvent::Eof]);
+        assert_eq!(
+            run(b"ok\npartial", 64),
+            vec![LineEvent::Line(b"ok".to_vec()), LineEvent::Eof]
+        );
     }
 }

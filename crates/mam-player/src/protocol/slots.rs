@@ -39,7 +39,14 @@ pub struct SlotTable {
 
 impl SlotTable {
     pub fn new(epoch: u64, count: usize) -> Self {
-        Self { epoch, slots: vec![SlotState::Free; count], next_seq: 0, cursor: 0, skipped: 0, ignored: 0 }
+        Self {
+            epoch,
+            slots: vec![SlotState::Free; count],
+            next_seq: 0,
+            cursor: 0,
+            skipped: 0,
+            ignored: 0,
+        }
     }
 
     pub fn epoch(&self) -> u64 {
@@ -121,7 +128,11 @@ pub type DisplayPlan = (Option<SlotSeq>, Vec<SlotSeq>);
 /// JS 표시 정책의 기준 구현 (`frameQueue.ts` 가 같은 규칙을 따른다 — 시험에서 쌍둥이 비교): 가장 새 READY 만 그리고 나머지는 버린다
 pub fn plan_display(ready: &[SlotSeq]) -> DisplayPlan {
     let newest = ready.iter().copied().max_by_key(|&(_, seq)| seq);
-    let dropped = ready.iter().copied().filter(|&r| Some(r) != newest).collect();
+    let dropped = ready
+        .iter()
+        .copied()
+        .filter(|&r| Some(r) != newest)
+        .collect();
     (newest, dropped)
 }
 
@@ -196,7 +207,11 @@ mod tests {
         let s2 = new.acquire().unwrap();
         let seq2 = new.publish(s2).unwrap();
         assert_eq!(new.release(1, s, seq), Outcome::StaleEpoch);
-        assert_eq!(new.state(s2), Some(SlotState::Ready(seq2)), "새 epoch 슬롯은 그대로");
+        assert_eq!(
+            new.state(s2),
+            Some(SlotState::Ready(seq2)),
+            "새 epoch 슬롯은 그대로"
+        );
         assert_eq!(new.ignored(), 1);
     }
 

@@ -23,15 +23,27 @@ pub enum UserFieldCondition {
     /// keyword — 여러 값 중 하나 (대소문자·NFC 무시). 값 하나 일치는 값 1개짜리 목록으로 표현한다.
     KeywordAnyOf { field_id: u64, values: Vec<String> },
     /// number — 닫힌 구간. 한쪽만 주면 그쪽은 열려 있다 (둘 다 `None` 이면 "아무 숫자나", 값 있음과 비슷하나 `Has` 가 정석).
-    NumberRange { field_id: u64, min: Option<f64>, max: Option<f64> },
+    NumberRange {
+        field_id: u64,
+        min: Option<f64>,
+        max: Option<f64>,
+    },
     /// date — 닫힌 구간, `YYYYMMDD` 정수.
-    DateRange { field_id: u64, min: Option<i64>, max: Option<i64> },
+    DateRange {
+        field_id: u64,
+        min: Option<i64>,
+        max: Option<i64>,
+    },
     /// boolean
     Bool { field_id: u64, value: bool },
     /// enum — 여러 선택지 중 하나
     EnumAnyOf { field_id: u64, option_ids: Vec<u64> },
     /// multi_enum — `all` 이면 모두 포함, 아니면 하나라도 포함
-    MultiEnum { field_id: u64, option_ids: Vec<u64>, all: bool },
+    MultiEnum {
+        field_id: u64,
+        option_ids: Vec<u64>,
+        all: bool,
+    },
     /// 값 있음 (모든 타입 공통)
     Has { field_id: u64 },
     /// 값 없음 (모든 타입 공통)
@@ -44,7 +56,9 @@ fn invalid(msg: String) -> SearchError {
 
 fn option_ids_ok(field_id: u64, ids: &[u64]) -> Result<()> {
     if ids.is_empty() {
-        return Err(invalid(format!("f{field_id}: option id list must not be empty")));
+        return Err(invalid(format!(
+            "f{field_id}: option id list must not be empty"
+        )));
     }
     if ids.iter().any(|id| i64::try_from(*id).is_err()) {
         return Err(invalid(format!("f{field_id}: option id out of range")));
@@ -86,7 +100,9 @@ fn str_term(f: Field, field_id: u64, v: &str) -> Term {
 }
 
 fn combine(occur: Occur, parts: Vec<Box<dyn Query>>) -> Box<dyn Query> {
-    Box::new(BooleanQuery::new(parts.into_iter().map(|q| (occur, q)).collect()))
+    Box::new(BooleanQuery::new(
+        parts.into_iter().map(|q| (occur, q)).collect(),
+    ))
 }
 
 impl UserFieldCondition {
@@ -108,7 +124,9 @@ impl UserFieldCondition {
         match self {
             Self::KeywordAnyOf { field_id, values } => {
                 if values.is_empty() {
-                    return Err(invalid(format!("f{field_id}: keyword list must not be empty")));
+                    return Err(invalid(format!(
+                        "f{field_id}: keyword list must not be empty"
+                    )));
                 }
                 if values.iter().any(|v| keyword_key(v).is_empty()) {
                     return Err(invalid(format!("f{field_id}: keyword must not be blank")));
@@ -126,7 +144,15 @@ impl UserFieldCondition {
                     return Err(invalid(format!("f{field_id}: min must be <= max")));
                 }
             }
-            Self::EnumAnyOf { field_id, option_ids } | Self::MultiEnum { field_id, option_ids, .. } => {
+            Self::EnumAnyOf {
+                field_id,
+                option_ids,
+            }
+            | Self::MultiEnum {
+                field_id,
+                option_ids,
+                ..
+            } => {
                 option_ids_ok(*field_id, option_ids)?;
             }
             Self::Bool { .. } | Self::Has { .. } | Self::Missing { .. } => {}
@@ -147,7 +173,9 @@ impl UserFieldCondition {
                 keys.dedup();
                 combine(
                     Occur::Should,
-                    keys.iter().map(|k| term_query(str_term(u, *field_id, k))).collect(),
+                    keys.iter()
+                        .map(|k| term_query(str_term(u, *field_id, k)))
+                        .collect(),
                 )
             }
             // 열린 쪽은 타입의 극값으로 닫는다 — JSON 범위 질의는 양쪽 term 에서 경로·타입을 읽는다
@@ -160,14 +188,21 @@ impl UserFieldCondition {
                 i64_term(u, *field_id, max.unwrap_or(i64::MAX)),
             ),
             Self::Bool { field_id, value } => term_query(i64_term(u, *field_id, i64::from(*value))),
-            Self::EnumAnyOf { field_id, option_ids } => combine(
+            Self::EnumAnyOf {
+                field_id,
+                option_ids,
+            } => combine(
                 Occur::Should,
                 option_ids
                     .iter()
                     .map(|o| term_query(i64_term(u, *field_id, *o as i64)))
                     .collect(),
             ),
-            Self::MultiEnum { field_id, option_ids, all } => combine(
+            Self::MultiEnum {
+                field_id,
+                option_ids,
+                all,
+            } => combine(
                 if *all { Occur::Must } else { Occur::Should },
                 option_ids
                     .iter()

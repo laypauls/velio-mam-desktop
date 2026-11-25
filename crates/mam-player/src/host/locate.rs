@@ -35,7 +35,11 @@ fn exe_dir_candidates(exe_dir: &Path) -> Vec<PathBuf> {
 }
 
 /// 순수 함수 — 환경변수 값·exe 폴더·개발 후보를 인자로 받는다
-pub fn locate_worker(env: Option<OsString>, exe_dir: Option<&Path>, dev_dirs: &[PathBuf]) -> Option<PathBuf> {
+pub fn locate_worker(
+    env: Option<OsString>,
+    exe_dir: Option<&Path>,
+    dev_dirs: &[PathBuf],
+) -> Option<PathBuf> {
     if let Some(v) = env.filter(|v| !v.is_empty()) {
         let p = PathBuf::from(v);
         if is_worker(&p) {
@@ -43,31 +47,53 @@ pub fn locate_worker(env: Option<OsString>, exe_dir: Option<&Path>, dev_dirs: &[
         }
     }
     let from_exe = exe_dir.map(exe_dir_candidates).unwrap_or_default();
-    from_exe.iter().chain(dev_dirs.iter()).map(|d| d.join(WORKER_EXE)).find(|p| is_worker(p))
+    from_exe
+        .iter()
+        .chain(dev_dirs.iter())
+        .map(|d| d.join(WORKER_EXE))
+        .find(|p| is_worker(p))
 }
 
 /// 순수 함수 — `libmpv-2.dll` 이 있는 폴더
-pub fn locate_libmpv_dir(env: Option<OsString>, exe_dir: Option<&Path>, dev_dirs: &[PathBuf]) -> Option<PathBuf> {
+pub fn locate_libmpv_dir(
+    env: Option<OsString>,
+    exe_dir: Option<&Path>,
+    dev_dirs: &[PathBuf],
+) -> Option<PathBuf> {
     if let Some(v) = env.filter(|v| !v.is_empty()) {
         let d = PathBuf::from(v);
         if has_mpv(&d) {
             return Some(d);
         }
     }
-    exe_dir.map(|d| d.join(LIBMPV_SUBDIR)).into_iter().chain(dev_dirs.iter().cloned()).find(|d| has_mpv(d))
+    exe_dir
+        .map(|d| d.join(LIBMPV_SUBDIR))
+        .into_iter()
+        .chain(dev_dirs.iter().cloned())
+        .find(|d| has_mpv(d))
 }
 
 fn current_exe_dir() -> Option<PathBuf> {
-    std::env::current_exe().ok().and_then(|p| p.parent().map(Path::to_path_buf))
+    std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(Path::to_path_buf))
 }
 
 /// 실제 프로세스 환경 기준
 pub fn locate_worker_default(dev_dirs: &[PathBuf]) -> Option<PathBuf> {
-    locate_worker(std::env::var_os(WORKER_ENV), current_exe_dir().as_deref(), dev_dirs)
+    locate_worker(
+        std::env::var_os(WORKER_ENV),
+        current_exe_dir().as_deref(),
+        dev_dirs,
+    )
 }
 
 pub fn locate_libmpv_default(dev_dirs: &[PathBuf]) -> Option<PathBuf> {
-    locate_libmpv_dir(std::env::var_os(LIBMPV_ENV), current_exe_dir().as_deref(), dev_dirs)
+    locate_libmpv_dir(
+        std::env::var_os(LIBMPV_ENV),
+        current_exe_dir().as_deref(),
+        dev_dirs,
+    )
 }
 
 #[cfg(test)]
@@ -84,13 +110,30 @@ mod tests {
     #[test]
     fn t_player_locate_01_worker_env_wins_then_exe_dir_then_dev() {
         let t = tempfile::tempdir().unwrap();
-        let (env, exe, dev) = (t.path().join("env").join("w.exe"), t.path().join("exe"), t.path().join("dev"));
+        let (env, exe, dev) = (
+            t.path().join("env").join("w.exe"),
+            t.path().join("exe"),
+            t.path().join("dev"),
+        );
         touch(&env);
         touch(&exe.join(WORKER_EXE));
         touch(&dev.join(WORKER_EXE));
-        assert_eq!(locate_worker(Some(env.clone().into()), Some(&exe), std::slice::from_ref(&dev)), Some(env));
-        assert_eq!(locate_worker(None, Some(&exe), std::slice::from_ref(&dev)), Some(exe.join(WORKER_EXE)));
-        assert_eq!(locate_worker(None, None, std::slice::from_ref(&dev)), Some(dev.join(WORKER_EXE)));
+        assert_eq!(
+            locate_worker(
+                Some(env.clone().into()),
+                Some(&exe),
+                std::slice::from_ref(&dev)
+            ),
+            Some(env)
+        );
+        assert_eq!(
+            locate_worker(None, Some(&exe), std::slice::from_ref(&dev)),
+            Some(exe.join(WORKER_EXE))
+        );
+        assert_eq!(
+            locate_worker(None, None, std::slice::from_ref(&dev)),
+            Some(dev.join(WORKER_EXE))
+        );
     }
 
     #[test]
@@ -98,9 +141,18 @@ mod tests {
         let t = tempfile::tempdir().unwrap();
         let exe = t.path().join("exe");
         touch(&exe.join(WORKER_EXE));
-        assert_eq!(locate_worker(Some(t.path().join("missing.exe").into()), Some(&exe), &[]), Some(exe.join(WORKER_EXE)));
-        assert_eq!(locate_worker(Some(OsString::new()), Some(&exe), &[]), Some(exe.join(WORKER_EXE)));
-        assert_eq!(locate_worker(None, Some(&t.path().join("empty")), &[]), None);
+        assert_eq!(
+            locate_worker(Some(t.path().join("missing.exe").into()), Some(&exe), &[]),
+            Some(exe.join(WORKER_EXE))
+        );
+        assert_eq!(
+            locate_worker(Some(OsString::new()), Some(&exe), &[]),
+            Some(exe.join(WORKER_EXE))
+        );
+        assert_eq!(
+            locate_worker(None, Some(&t.path().join("empty")), &[]),
+            None
+        );
         assert_eq!(locate_worker(None, None, &[]), None);
     }
 
@@ -110,21 +162,48 @@ mod tests {
         let deps = t.path().join("debug").join("deps");
         std::fs::create_dir_all(&deps).unwrap();
         touch(&t.path().join("debug").join(WORKER_EXE));
-        assert_eq!(locate_worker(None, Some(&deps), &[]), Some(t.path().join("debug").join(WORKER_EXE)));
+        assert_eq!(
+            locate_worker(None, Some(&deps), &[]),
+            Some(t.path().join("debug").join(WORKER_EXE))
+        );
     }
 
     #[test]
     fn t_player_locate_04_libmpv_env_exe_subdir_and_dev_candidates() {
         let t = tempfile::tempdir().unwrap();
-        let (env, exe, dev) = (t.path().join("env"), t.path().join("exe"), t.path().join("dev"));
+        let (env, exe, dev) = (
+            t.path().join("env"),
+            t.path().join("exe"),
+            t.path().join("dev"),
+        );
         touch(&env.join(LIBMPV_DLL));
         touch(&exe.join(LIBMPV_SUBDIR).join(LIBMPV_DLL));
         touch(&dev.join(LIBMPV_DLL));
-        assert_eq!(locate_libmpv_dir(Some(env.clone().into()), Some(&exe), std::slice::from_ref(&dev)), Some(env));
-        assert_eq!(locate_libmpv_dir(None, Some(&exe), std::slice::from_ref(&dev)), Some(exe.join(LIBMPV_SUBDIR)));
-        assert_eq!(locate_libmpv_dir(None, None, std::slice::from_ref(&dev)), Some(dev.clone()));
+        assert_eq!(
+            locate_libmpv_dir(
+                Some(env.clone().into()),
+                Some(&exe),
+                std::slice::from_ref(&dev)
+            ),
+            Some(env)
+        );
+        assert_eq!(
+            locate_libmpv_dir(None, Some(&exe), std::slice::from_ref(&dev)),
+            Some(exe.join(LIBMPV_SUBDIR))
+        );
+        assert_eq!(
+            locate_libmpv_dir(None, None, std::slice::from_ref(&dev)),
+            Some(dev.clone())
+        );
         // 잘못된 환경변수(DLL 없는 폴더)는 폴백
-        assert_eq!(locate_libmpv_dir(Some(t.path().join("nothing").into()), None, std::slice::from_ref(&dev)), Some(dev));
+        assert_eq!(
+            locate_libmpv_dir(
+                Some(t.path().join("nothing").into()),
+                None,
+                std::slice::from_ref(&dev)
+            ),
+            Some(dev)
+        );
     }
 
     #[test]
@@ -132,6 +211,9 @@ mod tests {
         let t = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(t.path().join("libmpv")).unwrap();
         assert_eq!(locate_libmpv_dir(None, Some(t.path()), &[]), None);
-        assert_eq!(locate_libmpv_dir(None, None, &[t.path().join("missing")]), None);
+        assert_eq!(
+            locate_libmpv_dir(None, None, &[t.path().join("missing")]),
+            None
+        );
     }
 }

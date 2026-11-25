@@ -14,22 +14,44 @@ pub const ROW_OVERHEAD: i64 = 64;
 const COST: &str = "length(CAST(key AS BLOB)) + length(CAST(value AS BLOB)) + 64";
 
 fn select(cols: &str, global: bool) -> String {
-    let scope = if global { "asset_id IS NULL AND key = ?2" } else { "asset_id = ?2 AND key = ?3" };
+    let scope = if global {
+        "asset_id IS NULL AND key = ?2"
+    } else {
+        "asset_id = ?2 AND key = ?3"
+    };
     format!("SELECT {cols} FROM plugin_kv WHERE plugin_ref = ?1 AND {scope}")
 }
 
 /// `asset_id` 가 `None` 이면 플러그인 전역 키. 값은 JSON 텍스트
-pub fn get(conn: &Connection, plugin_id: &str, asset_id: Option<i64>, key: &str) -> rusqlite::Result<Option<String>> {
+pub fn get(
+    conn: &Connection,
+    plugin_id: &str,
+    asset_id: Option<i64>,
+    key: &str,
+) -> rusqlite::Result<Option<String>> {
     one(conn, "value", plugin_id, asset_id, key)
 }
 
 /// 기존 행의 비용(없으면 `None`) — 덮어쓰기 delta 계산용
-pub fn row_cost(conn: &Connection, plugin_id: &str, asset_id: Option<i64>, key: &str) -> rusqlite::Result<Option<i64>> {
+pub fn row_cost(
+    conn: &Connection,
+    plugin_id: &str,
+    asset_id: Option<i64>,
+    key: &str,
+) -> rusqlite::Result<Option<i64>> {
     one(conn, COST, plugin_id, asset_id, key)
 }
 
-fn one<T: rusqlite::types::FromSql>(conn: &Connection, cols: &str, plugin_id: &str, asset_id: Option<i64>, key: &str) -> rusqlite::Result<Option<T>> {
-    let Some(plugin_ref) = plugin_registry::lookup(conn, plugin_id)? else { return Ok(None) };
+fn one<T: rusqlite::types::FromSql>(
+    conn: &Connection,
+    cols: &str,
+    plugin_id: &str,
+    asset_id: Option<i64>,
+    key: &str,
+) -> rusqlite::Result<Option<T>> {
+    let Some(plugin_ref) = plugin_registry::lookup(conn, plugin_id)? else {
+        return Ok(None);
+    };
     let mut stmt = conn.prepare_cached(&select(cols, asset_id.is_none()))?;
     match asset_id {
         None => stmt.query_row(params![plugin_ref, key], |r| r.get(0)),
@@ -39,7 +61,14 @@ fn one<T: rusqlite::types::FromSql>(conn: &Connection, cols: &str, plugin_id: &s
 }
 
 /// 있으면 덮어쓰고 없으면 넣는다 (`updated_at` 은 호출자가 시계에서 읽어 준다)
-pub fn upsert(conn: &Connection, plugin_id: &str, asset_id: Option<i64>, key: &str, value: &str, now_ms: i64) -> rusqlite::Result<()> {
+pub fn upsert(
+    conn: &Connection,
+    plugin_id: &str,
+    asset_id: Option<i64>,
+    key: &str,
+    value: &str,
+    now_ms: i64,
+) -> rusqlite::Result<()> {
     let plugin_ref = plugin_registry::ensure_rs(conn, plugin_id)?;
     match asset_id {
         None => conn.prepare_cached(
@@ -55,11 +84,26 @@ pub fn upsert(conn: &Connection, plugin_id: &str, asset_id: Option<i64>, key: &s
 }
 
 /// 지웠으면 `true` (없으면 `false` — 멱등)
-pub fn delete(conn: &Connection, plugin_id: &str, asset_id: Option<i64>, key: &str) -> rusqlite::Result<bool> {
-    let Some(plugin_ref) = plugin_registry::lookup(conn, plugin_id)? else { return Ok(false) };
+pub fn delete(
+    conn: &Connection,
+    plugin_id: &str,
+    asset_id: Option<i64>,
+    key: &str,
+) -> rusqlite::Result<bool> {
+    let Some(plugin_ref) = plugin_registry::lookup(conn, plugin_id)? else {
+        return Ok(false);
+    };
     let n = match asset_id {
-        None => conn.prepare_cached("DELETE FROM plugin_kv WHERE plugin_ref = ?1 AND asset_id IS NULL AND key = ?2")?.execute(params![plugin_ref, key])?,
-        Some(a) => conn.prepare_cached("DELETE FROM plugin_kv WHERE plugin_ref = ?1 AND asset_id = ?2 AND key = ?3")?.execute(params![plugin_ref, a, key])?,
+        None => conn
+            .prepare_cached(
+                "DELETE FROM plugin_kv WHERE plugin_ref = ?1 AND asset_id IS NULL AND key = ?2",
+            )?
+            .execute(params![plugin_ref, key])?,
+        Some(a) => conn
+            .prepare_cached(
+                "DELETE FROM plugin_kv WHERE plugin_ref = ?1 AND asset_id = ?2 AND key = ?3",
+            )?
+            .execute(params![plugin_ref, a, key])?,
     };
     Ok(n > 0)
 }
@@ -83,16 +127,35 @@ pub fn prefix_upper_bound(prefix: &str) -> Option<String> {
 
 /// `list_keys` 가 쓰는 SQL — 조각은 모두 고정 문자열(입력은 바인딩만). 시험이 EXPLAIN QUERY PLAN 으로 확인한다
 pub fn list_sql(global: bool, lo_inclusive: bool, has_hi: bool) -> String {
-    let (scope, n) = if global { ("asset_id IS NULL", 2) } else { ("asset_id = ?2", 3) };
+    let (scope, n) = if global {
+        ("asset_id IS NULL", 2)
+    } else {
+        ("asset_id = ?2", 3)
+    };
     let lo_op = if lo_inclusive { ">=" } else { ">" };
-    let hi_sql = if has_hi { format!(" AND key < ?{}", n + 1) } else { String::new() };
+    let hi_sql = if has_hi {
+        format!(" AND key < ?{}", n + 1)
+    } else {
+        String::new()
+    };
     let limit_n = n + 1 + usize::from(has_hi);
-    format!("SELECT key FROM plugin_kv WHERE plugin_ref = ?1 AND {scope} AND key {lo_op} ?{n}{hi_sql} ORDER BY key LIMIT ?{limit_n}")
+    format!(
+        "SELECT key FROM plugin_kv WHERE plugin_ref = ?1 AND {scope} AND key {lo_op} ?{n}{hi_sql} ORDER BY key LIMIT ?{limit_n}"
+    )
 }
 
 /// 키 목록(키셋 페이지) — `key > cursor`(또는 `key >= prefix`) 부터 `prefix` 범위 안에서 `limit` 개. 키 순서(바이트).
-pub fn list_keys(conn: &Connection, plugin_id: &str, asset_id: Option<i64>, prefix: Option<&str>, cursor: Option<&str>, limit: usize) -> rusqlite::Result<Vec<String>> {
-    let Some(plugin_ref) = plugin_registry::lookup(conn, plugin_id)? else { return Ok(Vec::new()) };
+pub fn list_keys(
+    conn: &Connection,
+    plugin_id: &str,
+    asset_id: Option<i64>,
+    prefix: Option<&str>,
+    cursor: Option<&str>,
+    limit: usize,
+) -> rusqlite::Result<Vec<String>> {
+    let Some(plugin_ref) = plugin_registry::lookup(conn, plugin_id)? else {
+        return Ok(Vec::new());
+    };
     let prefix = prefix.filter(|p| !p.is_empty());
     // 하한: 커서가 접두사 범위 안이면 `key > cursor`, 아니면 `key >= prefix`, 둘 다 없으면 `key > ''` (키는 비어 있지 않다)
     let (lo, lo_inclusive) = match (cursor, prefix) {
@@ -114,16 +177,23 @@ pub fn list_keys(conn: &Connection, plugin_id: &str, asset_id: Option<i64>, pref
         binds.push(h.into());
     }
     binds.push(limit.into());
-    stmt.query_map(rusqlite::params_from_iter(binds), |r| r.get(0))?.collect()
+    stmt.query_map(rusqlite::params_from_iter(binds), |r| r.get(0))?
+        .collect()
 }
 
 /// 플러그인의 총 사용량(행 비용 합) — 자산·전역 행을 따로 훑어 각 부분 인덱스를 쓴다. 세션 첫 `kv.set`·재계산 때만 호출
 pub fn sum_cost(conn: &Connection, plugin_id: &str) -> rusqlite::Result<i64> {
-    let Some(plugin_ref) = plugin_registry::lookup(conn, plugin_id)? else { return Ok(0) };
+    let Some(plugin_ref) = plugin_registry::lookup(conn, plugin_id)? else {
+        return Ok(0);
+    };
     let mut total = 0i64;
     for scope in ["asset_id IS NULL", "asset_id IS NOT NULL"] {
-        let sql = format!("SELECT COALESCE(SUM({COST}), 0) FROM plugin_kv WHERE plugin_ref = ?1 AND {scope}");
-        let n: i64 = conn.prepare_cached(&sql)?.query_row([plugin_ref], |r| r.get(0))?;
+        let sql = format!(
+            "SELECT COALESCE(SUM({COST}), 0) FROM plugin_kv WHERE plugin_ref = ?1 AND {scope}"
+        );
+        let n: i64 = conn
+            .prepare_cached(&sql)?
+            .query_row([plugin_ref], |r| r.get(0))?;
         total = total.saturating_add(n);
     }
     Ok(total)
@@ -131,7 +201,8 @@ pub fn sum_cost(conn: &Connection, plugin_id: &str) -> rusqlite::Result<i64> {
 
 /// 자산에 붙은 태그 수 (`asset_tags` 기본키 인덱스) — 자산당 상한 검사용
 pub fn count_asset_tags(conn: &Connection, asset_id: i64) -> rusqlite::Result<i64> {
-    conn.prepare_cached("SELECT COUNT(*) FROM asset_tags WHERE asset_id = ?1")?.query_row([asset_id], |r| r.get(0))
+    conn.prepare_cached("SELECT COUNT(*) FROM asset_tags WHERE asset_id = ?1")?
+        .query_row([asset_id], |r| r.get(0))
 }
 
 #[cfg(test)]

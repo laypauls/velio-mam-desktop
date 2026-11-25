@@ -15,6 +15,8 @@ mod worker_proc;
 pub use activity::HostActivity;
 pub use breaker::{Breaker, BreakerConfig, Clock, SystemClock};
 pub use error::InvokeError;
-pub use host_api::{CallCx, HostApi, HostError, InvokeScope, MAX_SCOPE_ASSETS, ScopeTooLarge, codes};
+pub use host_api::{
+    CallCx, HostApi, HostError, InvokeScope, MAX_SCOPE_ASSETS, ScopeTooLarge, codes,
+};
 pub use protocol::{InvokeKind, Limits, LogLevel};
 pub use supervisor::{HostConfig, HostState, PluginHost};

@@ -137,7 +137,8 @@ pub struct Mpv {
 /// `dir` 아래 `libmpv-2.dll` 을 로드한다
 pub fn load_api(dir: &Path) -> Result<Arc<Api>, String> {
     let dll = dir.join("libmpv-2.dll");
-    let lib = unsafe { Library::new(&dll) }.map_err(|e| format!("libmpv 로드 실패 {}: {e}", dll.display()))?;
+    let lib = unsafe { Library::new(&dll) }
+        .map_err(|e| format!("libmpv 로드 실패 {}: {e}", dll.display()))?;
     Ok(Arc::new(Api::load(lib)?))
 }
 
@@ -148,47 +149,87 @@ fn cstr(s: &str) -> Result<CString, String> {
 impl Mpv {
     pub fn err_text(&self, code: c_int) -> String {
         let p = unsafe { (self.api.error_string)(code) };
-        if p.is_null() { format!("mpv error {code}") } else { unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned() }
+        if p.is_null() {
+            format!("mpv error {code}")
+        } else {
+            unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned()
+        }
     }
 
     fn check(&self, what: &str, code: c_int) -> Result<(), String> {
-        if code < 0 { Err(format!("{what}: {}", self.err_text(code))) } else { Ok(()) }
+        if code < 0 {
+            Err(format!("{what}: {}", self.err_text(code)))
+        } else {
+            Ok(())
+        }
     }
 
     /// 초기화 전 옵션
     pub fn set_option(&self, name: &str, value: &str) -> Result<(), String> {
         let (n, v) = (cstr(name)?, cstr(value)?);
-        self.check(&format!("option {name}"), unsafe { (self.api.set_option_string)(self.handle.0, n.as_ptr(), v.as_ptr()) })
+        self.check(&format!("option {name}"), unsafe {
+            (self.api.set_option_string)(self.handle.0, n.as_ptr(), v.as_ptr())
+        })
     }
 
     pub fn set_prop(&self, name: &str, value: &str) -> Result<(), String> {
         let (n, v) = (cstr(name)?, cstr(value)?);
-        self.check(&format!("property {name}"), unsafe { (self.api.set_property_string)(self.handle.0, n.as_ptr(), v.as_ptr()) })
+        self.check(&format!("property {name}"), unsafe {
+            (self.api.set_property_string)(self.handle.0, n.as_ptr(), v.as_ptr())
+        })
     }
 
     pub fn set_prop_double(&self, name: &str, mut value: f64) -> Result<(), String> {
         let n = cstr(name)?;
-        self.check(&format!("property {name}"), unsafe { (self.api.set_property)(self.handle.0, n.as_ptr(), FORMAT_DOUBLE, &mut value as *mut f64 as *mut c_void) })
+        self.check(&format!("property {name}"), unsafe {
+            (self.api.set_property)(
+                self.handle.0,
+                n.as_ptr(),
+                FORMAT_DOUBLE,
+                &mut value as *mut f64 as *mut c_void,
+            )
+        })
     }
 
     pub fn get_double(&self, name: &str) -> Option<f64> {
         let n = cstr(name).ok()?;
         let mut v = 0f64;
-        let r = unsafe { (self.api.get_property)(self.handle.0, n.as_ptr(), FORMAT_DOUBLE, &mut v as *mut f64 as *mut c_void) };
+        let r = unsafe {
+            (self.api.get_property)(
+                self.handle.0,
+                n.as_ptr(),
+                FORMAT_DOUBLE,
+                &mut v as *mut f64 as *mut c_void,
+            )
+        };
         (r >= 0).then_some(v)
     }
 
     pub fn get_int(&self, name: &str) -> Option<i64> {
         let n = cstr(name).ok()?;
         let mut v = 0i64;
-        let r = unsafe { (self.api.get_property)(self.handle.0, n.as_ptr(), FORMAT_INT64, &mut v as *mut i64 as *mut c_void) };
+        let r = unsafe {
+            (self.api.get_property)(
+                self.handle.0,
+                n.as_ptr(),
+                FORMAT_INT64,
+                &mut v as *mut i64 as *mut c_void,
+            )
+        };
         (r >= 0).then_some(v)
     }
 
     pub fn get_string(&self, name: &str) -> Option<String> {
         let n = cstr(name).ok()?;
         let mut p: *mut c_char = std::ptr::null_mut();
-        let r = unsafe { (self.api.get_property)(self.handle.0, n.as_ptr(), FORMAT_STRING, &mut p as *mut *mut c_char as *mut c_void) };
+        let r = unsafe {
+            (self.api.get_property)(
+                self.handle.0,
+                n.as_ptr(),
+                FORMAT_STRING,
+                &mut p as *mut *mut c_char as *mut c_void,
+            )
+        };
         if r < 0 || p.is_null() {
             return None;
         }
@@ -200,7 +241,14 @@ impl Mpv {
     pub fn get_flag(&self, name: &str) -> Option<bool> {
         let n = cstr(name).ok()?;
         let mut v: c_int = 0;
-        let r = unsafe { (self.api.get_property)(self.handle.0, n.as_ptr(), FORMAT_FLAG, &mut v as *mut c_int as *mut c_void) };
+        let r = unsafe {
+            (self.api.get_property)(
+                self.handle.0,
+                n.as_ptr(),
+                FORMAT_FLAG,
+                &mut v as *mut c_int as *mut c_void,
+            )
+        };
         (r >= 0).then_some(v != 0)
     }
 
@@ -209,16 +257,25 @@ impl Mpv {
         let owned: Vec<CString> = args.iter().map(|a| cstr(a)).collect::<Result<_, _>>()?;
         let mut ptrs: Vec<*const c_char> = owned.iter().map(|c| c.as_ptr()).collect();
         ptrs.push(std::ptr::null());
-        self.check(&format!("command {}", args.first().copied().unwrap_or("")), unsafe { (self.api.command)(self.handle.0, ptrs.as_ptr()) })
+        self.check(
+            &format!("command {}", args.first().copied().unwrap_or("")),
+            unsafe { (self.api.command)(self.handle.0, ptrs.as_ptr()) },
+        )
     }
 
     pub fn observe(&self, id: u64, name: &str, format: c_int) -> Result<(), String> {
         let n = cstr(name)?;
-        self.check(&format!("observe {name}"), unsafe { (self.api.observe_property)(self.handle.0, id, n.as_ptr(), format) })
+        self.check(&format!("observe {name}"), unsafe {
+            (self.api.observe_property)(self.handle.0, id, n.as_ptr(), format)
+        })
     }
 }
 
 /// C 문자열 → String (NULL 이면 빈 문자열)
 pub unsafe fn lossy(p: *const c_char) -> String {
-    if p.is_null() { String::new() } else { unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned() }
+    if p.is_null() {
+        String::new()
+    } else {
+        unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned()
+    }
 }

@@ -35,7 +35,12 @@ CREATE INDEX IF NOT EXISTS idx_events_status ON events(status, id);
 ";
 
 /// SES 가 하는 것처럼 이벤트 1건을 쓴다 (`path`·`name`·`dir` 는 컨테이너 경로에서 나눈다). 만든 행의 id 를 돌려준다.
-pub fn insert_event(conn: &Connection, types: &str, path: &str, is_dir: bool) -> rusqlite::Result<i64> {
+pub fn insert_event(
+    conn: &Connection,
+    types: &str,
+    path: &str,
+    is_dir: bool,
+) -> rusqlite::Result<i64> {
     let (dir, name) = path.rsplit_once('/').unwrap_or(("", path));
     conn.execute(
         "INSERT INTO events (captured_at, event_mask, event_types, path, name, dir, is_dir, status) VALUES ('2026-11-22T00:00:00Z', 0, ?1, ?2, ?3, ?4, ?5, 'pending')",
@@ -60,7 +65,12 @@ pub struct FakeSes(Arc<Mutex<State>>);
 impl FakeSes {
     /// `file` = 실제 SQLite 파일(스키마는 호출자가 `SES_SCHEMA` 로 만든다), `logical` = 사용자가 설정한 원격 DB 경로
     pub fn new(file: &Path, logical: &str) -> Self {
-        Self(Arc::new(Mutex::new(State { file: file.to_path_buf(), logical: logical.into(), max_output: 4 * 1024 * 1024, ..State::default() })))
+        Self(Arc::new(Mutex::new(State {
+            file: file.to_path_buf(),
+            logical: logical.into(),
+            max_output: 4 * 1024 * 1024,
+            ..State::default()
+        })))
     }
 
     fn st(&self) -> MutexGuard<'_, State> {
@@ -111,14 +121,24 @@ fn render(v: ValueRef<'_>) -> String {
 }
 
 fn run_sql(file: &Path, sql: &str) -> Result<String, RunError> {
-    let conn = Connection::open_with_flags(file, OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(|e| RunError::DbUnreadable(e.to_string()))?;
+    let conn = Connection::open_with_flags(file, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .map_err(|e| RunError::DbUnreadable(e.to_string()))?;
     let mut out = String::new();
     for stmt in sql.split(';').map(str::trim).filter(|s| !s.is_empty()) {
-        let mut st = conn.prepare(stmt).map_err(|e| RunError::DbUnreadable(e.to_string()))?;
+        let mut st = conn
+            .prepare(stmt)
+            .map_err(|e| RunError::DbUnreadable(e.to_string()))?;
         let n = st.column_count();
-        let mut rows = st.query([]).map_err(|e| RunError::DbUnreadable(e.to_string()))?;
-        while let Some(r) = rows.next().map_err(|e| RunError::DbUnreadable(e.to_string()))? {
-            let cols: Vec<String> = (0..n).map(|i| r.get_ref(i).map(render).unwrap_or_default()).collect();
+        let mut rows = st
+            .query([])
+            .map_err(|e| RunError::DbUnreadable(e.to_string()))?;
+        while let Some(r) = rows
+            .next()
+            .map_err(|e| RunError::DbUnreadable(e.to_string()))?
+        {
+            let cols: Vec<String> = (0..n)
+                .map(|i| r.get_ref(i).map(render).unwrap_or_default())
+                .collect();
             out.push_str(&cols.join("|"));
             out.push('\n');
         }

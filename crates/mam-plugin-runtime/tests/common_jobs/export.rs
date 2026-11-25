@@ -53,7 +53,10 @@ impl Env {
 
     /// `root` 를 관리 폴더로 등록한다 (`FolderRow::root_path` = 볼륨 마운트 지점 + `rel_root` 가 `root` 가 되게)
     pub fn add_managed_root(&self, root: &Path) {
-        let (mount, rel) = (root.parent().unwrap().to_string_lossy().into_owned(), root.file_name().unwrap().to_string_lossy().into_owned());
+        let (mount, rel) = (
+            root.parent().unwrap().to_string_lossy().into_owned(),
+            root.file_name().unwrap().to_string_lossy().into_owned(),
+        );
         let display = root.to_string_lossy().into_owned();
         self.pool
             .write(Priority::High, move |c| {
@@ -75,8 +78,15 @@ impl Env {
         dir
     }
 
-    pub fn export(&self, plugin: &str, provider: &str, assets: &[i64], dest: &Path) -> Result<ExportResult, ExportError> {
-        self.jobs.export(plugin, provider, assets.to_vec(), &dest.to_string_lossy())
+    pub fn export(
+        &self,
+        plugin: &str,
+        provider: &str,
+        assets: &[i64],
+        dest: &Path,
+    ) -> Result<ExportResult, ExportError> {
+        self.jobs
+            .export(plugin, provider, assets.to_vec(), &dest.to_string_lossy())
     }
 
     /// 큐 condvar 로만 기다린다 (sleep 폴링 없음). 30 초 안에 조건이 안 되면 실패
@@ -105,12 +115,18 @@ impl Env {
 
 fn run_cmd(args: String) -> Option<String> {
     let out = Command::new("cmd").raw_arg(args).output().ok()?;
-    out.status.success().then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
+    out.status
+        .success()
+        .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
 }
 
 /// `mklink /J` — 실패하면 `None` (시험이 이유를 밝히고 건너뛴다)
 pub fn junction(link: &Path, target: &Path) -> Option<Junction> {
-    run_cmd(format!(r#"/C mklink /J "{}" "{}""#, link.display(), target.display()))?;
+    run_cmd(format!(
+        r#"/C mklink /J "{}" "{}""#,
+        link.display(),
+        target.display()
+    ))?;
     link.is_dir().then(|| Junction(link.to_path_buf()))
 }
 

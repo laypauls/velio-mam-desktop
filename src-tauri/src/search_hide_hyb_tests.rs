@@ -26,12 +26,16 @@ fn hidden_semantic_specs() -> Vec<Spec> {
 }
 
 #[test]
-fn t_hide_hyb_01_hybrid_semantic_and_keyword_paths_exclude_the_hidden_folder_and_toggle_invalidates_the_cache() {
+fn t_hide_hyb_01_hybrid_semantic_and_keyword_paths_exclude_the_hidden_folder_and_toggle_invalidates_the_cache()
+ {
     // Arrange
     let fx = Fx::new(&hidden_semantic_specs());
     fx.inject(embedder(Ok(dir(0.0, 0))));
     let before = hybrid_with(&fx, "beach", |_| {});
-    assert!(before.contains(&1) && before.contains(&3), "기준: {before:?}");
+    assert!(
+        before.contains(&1) && before.contains(&3),
+        "기준: {before:?}"
+    );
 
     // Act
     set_folder_hidden(&fx, true);
@@ -41,7 +45,14 @@ fn t_hide_hyb_01_hybrid_semantic_and_keyword_paths_exclude_the_hidden_folder_and
     // Assert
     assert!(!hybrid.contains(&1) && !hybrid.contains(&3), "{hybrid:?}");
     assert!(hybrid.contains(&2), "다른 폴더(밖) 자산은 유지: {hybrid:?}");
-    assert_eq!(keyword_only.items.iter().map(|i| i.asset_id).collect::<Vec<_>>(), [2]);
+    assert_eq!(
+        keyword_only
+            .items
+            .iter()
+            .map(|i| i.asset_id)
+            .collect::<Vec<_>>(),
+        [2]
+    );
 
     // Act: 해제하면 허용 집합이 다시 구성되어 복귀한다
     set_folder_hidden(&fx, false);
@@ -68,7 +79,14 @@ fn t_hide_hyb_02_folder_scope_shows_hidden_items_in_hybrid_and_keyword() {
     hybrid.sort_unstable();
     let mut kw = keyword("beach");
     scope(&mut kw);
-    let kw_ids: Vec<i64> = fx.search.search(&kw).unwrap().items.iter().map(|i| i.asset_id).collect();
+    let kw_ids: Vec<i64> = fx
+        .search
+        .search(&kw)
+        .unwrap()
+        .items
+        .iter()
+        .map(|i| i.asset_id)
+        .collect();
 
     // Assert: 범위를 지정하면 숨김 폴더 내용만 보인다 (의미 경로로만 닿는 3 포함)
     assert_eq!(hybrid, [1, 3]);
@@ -84,7 +102,12 @@ fn t_hide_hyb_03_find_similar_excludes_hidden_folder_candidates() {
     fx.inject(embedder(Ok(dir(0.0, 0))));
     fx.set_min_similarity(0.0);
     let ids = |fx: &Fx| -> Vec<i64> {
-        fx.similar(1, 50, None).unwrap().items.iter().map(|i| i.summary.asset_id).collect()
+        fx.similar(1, 50, None)
+            .unwrap()
+            .items
+            .iter()
+            .map(|i| i.summary.asset_id)
+            .collect()
     };
     assert_eq!(ids(&fx), [3, 8, 4, 5, 6], "기준");
 
@@ -103,13 +126,19 @@ fn t_hide_hyb_04_a_hybrid_cursor_issued_before_the_toggle_is_rejected_as_stale()
     let fx = Fx::new(&hidden_semantic_specs());
     fx.inject(embedder(Ok(dir(0.0, 0))));
     let cursor = fx.hybrid("beach", 1, None).unwrap().next.unwrap();
-    assert!(fx.hybrid("beach", 1, Some(cursor.clone())).is_ok(), "같은 상태에서는 유효");
+    assert!(
+        fx.hybrid("beach", 1, Some(cursor.clone())).is_ok(),
+        "같은 상태에서는 유효"
+    );
 
     // Act
     set_folder_hidden(&fx, true);
 
     // Assert
-    let err = fx.hybrid("beach", 1, Some(cursor)).err().expect("stale cursor");
+    let err = fx
+        .hybrid("beach", 1, Some(cursor))
+        .err()
+        .expect("stale cursor");
     assert_eq!(code_of(err), ErrorCode::InvalidInput);
 }
 
@@ -140,6 +169,12 @@ fn t_hide_hyb_05_hybrid_with_a_collection_shows_hidden_folder_items() {
     ids.sort_unstable();
 
     // Assert: 컬렉션 범위에서는 숨김 폴더의 1·3 도 보인다 (3 은 의미 경로로만 닿는다)
-    assert!(ids.contains(&1) && ids.contains(&2) && ids.contains(&3), "{ids:?}");
-    assert!(!hybrid_with(&fx, "beach", |_| {}).contains(&1), "컬렉션 밖에서는 숨김");
+    assert!(
+        ids.contains(&1) && ids.contains(&2) && ids.contains(&3),
+        "{ids:?}"
+    );
+    assert!(
+        !hybrid_with(&fx, "beach", |_| {}).contains(&1),
+        "컬렉션 밖에서는 숨김"
+    );
 }

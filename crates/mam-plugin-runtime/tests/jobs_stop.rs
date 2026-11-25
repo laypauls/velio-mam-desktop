@@ -42,7 +42,10 @@ fn t_pjob_12_stop_after_task_one_of_three_then_rerun_invokes_only_the_remaining_
     assert_eq!(env.invoker.call_count(), 1);
     assert_eq!(env.pending_tasks(P), 2);
     let rows = env.jobs_rows();
-    assert_eq!((rows.len(), rows[0].status.as_str(), rows[0].attempts), (1, "pending", 0));
+    assert_eq!(
+        (rows.len(), rows[0].status.as_str(), rows[0].attempts),
+        (1, "pending", 0)
+    );
 
     // Act 2: 앱 재시작 후 이어서 실행
     env.invoker.clear_hooks();
@@ -50,7 +53,12 @@ fn t_pjob_12_stop_after_task_one_of_three_then_rerun_invokes_only_the_remaining_
     env.run(1);
 
     // Assert 2: provider 3개를 정확히 한 번씩만 호출 (완료한 것을 다시 부르지 않음)
-    let mut providers: Vec<String> = env.invoker.calls().iter().map(|c| c.provider.clone()).collect();
+    let mut providers: Vec<String> = env
+        .invoker
+        .calls()
+        .iter()
+        .map(|c| c.provider.clone())
+        .collect();
     assert_eq!(providers.len(), 3);
     providers.sort();
     assert_eq!(providers, vec!["ana.c", "meta.b", "meta.run"]);
@@ -62,7 +70,11 @@ fn t_pjob_12_stop_after_task_one_of_three_then_rerun_invokes_only_the_remaining_
 fn t_pjob_18_shutdown_during_an_invoke_yields_and_leaves_task_and_job_attempts_unchanged() {
     // Arrange: 실제 워커의 JS 예외가 곧 종료와 겹친다 (종료 신호가 없었다면 script_error 로 실패했을 오류)
     let env = Env::new();
-    env.install(Plugin::new(P, "scripted").provider("meta.run", ProviderKind::Metadata, &[AssetKind::Image]));
+    env.install(Plugin::new(P, "scripted").provider(
+        "meta.run",
+        ProviderKind::Metadata,
+        &[AssetKind::Image],
+    ));
     env.invoker.script(vec![json!({"throw": "boom"})]);
     let asset = env.add_asset("image", "a.jpg");
     env.edit(asset);
@@ -76,18 +88,35 @@ fn t_pjob_18_shutdown_during_an_invoke_yields_and_leaves_task_and_job_attempts_u
     // Assert: 작업은 실패가 아니라 그대로, 시도 없음
     assert!(matches!(done[0].outcome, Ok(JobOutcome::Yielded)));
     let task = env.task(P, "meta.run", asset).unwrap();
-    assert_eq!((task.status.as_str(), task.attempts, task.last_error), ("pending", 0, None));
+    assert_eq!(
+        (task.status.as_str(), task.attempts, task.last_error),
+        ("pending", 0, None)
+    );
     let rows = env.jobs_rows();
-    assert_eq!((rows.len(), rows[0].status.as_str(), rows[0].attempts), (1, "pending", 0));
+    assert_eq!(
+        (rows.len(), rows[0].status.as_str(), rows[0].attempts),
+        (1, "pending", 0)
+    );
 }
 
 #[test]
 fn t_pjob_18_transient_errors_during_shutdown_also_yield_without_counting_an_attempt() {
     // Arrange / Act / Assert: 재시도 가능한 오류(시간 초과·크래시·busy)도 종료와 겹치면 시도를 올리지 않는다
-    let errors = [InvokeError::Timeout, InvokeError::Crashed, InvokeError::Plugin { code: "busy".into(), message: "m".into() }];
+    let errors = [
+        InvokeError::Timeout,
+        InvokeError::Crashed,
+        InvokeError::Plugin {
+            code: "busy".into(),
+            message: "m".into(),
+        },
+    ];
     for err in errors {
         let env = Env::new();
-        env.install(Plugin::new(P, "scripted").provider("meta.run", ProviderKind::Metadata, &[AssetKind::Image]));
+        env.install(Plugin::new(P, "scripted").provider(
+            "meta.run",
+            ProviderKind::Metadata,
+            &[AssetKind::Image],
+        ));
         let asset = env.add_asset("image", "a.jpg");
         env.edit(asset);
         env.jobs.feed_tick();
@@ -98,9 +127,16 @@ fn t_pjob_18_transient_errors_during_shutdown_also_yield_without_counting_an_att
 
         let done = env.run(1);
 
-        assert!(matches!(done[0].outcome, Ok(JobOutcome::Yielded)), "{label}");
+        assert!(
+            matches!(done[0].outcome, Ok(JobOutcome::Yielded)),
+            "{label}"
+        );
         let task = env.task(P, "meta.run", asset).unwrap();
-        assert_eq!((task.status.as_str(), task.attempts), ("pending", 0), "{label}");
+        assert_eq!(
+            (task.status.as_str(), task.attempts),
+            ("pending", 0),
+            "{label}"
+        );
         assert_eq!(env.jobs_rows()[0].attempts, 0, "{label}");
     }
 }

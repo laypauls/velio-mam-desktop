@@ -39,7 +39,11 @@ fn main() {
         std::process::exit(2);
     };
     let scratch = PathBuf::from(scratch);
-    util::say(format!("jobs_bench {cmd} scratch={} args={:?}", scratch.display(), &args[2..]));
+    util::say(format!(
+        "jobs_bench {cmd} scratch={} args={:?}",
+        scratch.display(),
+        &args[2..]
+    ));
     match cmd.as_str() {
         "m1" => m1::run(&scratch, num(&args, 2, 1_000_000)),
         "m2" => m2::run(&scratch, num(&args, 2, 1_000_000)),

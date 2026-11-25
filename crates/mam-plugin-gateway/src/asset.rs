@@ -17,7 +17,9 @@ use crate::params::{AssetParams, DerivedParams, asset_id, parse};
 
 impl Gateway {
     fn load_detail(&self, cx: &CallCx<'_>, id: i64) -> Result<AssetDetail, GwError> {
-        self.pool.read_until(self.read_deadline(cx), move |c| Ok(detail(c, id)?))?.ok_or(GwError::NotFound)
+        self.pool
+            .read_until(self.read_deadline(cx), move |c| Ok(detail(c, id)?))?
+            .ok_or(GwError::NotFound)
     }
 
     pub(crate) fn asset_get(&self, cx: &CallCx<'_>, params: Value) -> Result<Value, GwError> {
@@ -38,7 +40,11 @@ impl Gateway {
         }))
     }
 
-    pub(crate) fn asset_get_derived(&self, cx: &CallCx<'_>, params: Value) -> Result<Value, GwError> {
+    pub(crate) fn asset_get_derived(
+        &self,
+        cx: &CallCx<'_>,
+        params: Value,
+    ) -> Result<Value, GwError> {
         let p = parse::<DerivedParams>(params)?;
         let id = asset_id(&p.asset_id)?;
         if p.kind != "thumbnail" {
@@ -69,7 +75,10 @@ impl Gateway {
             return Err(GwError::TooLarge("derived data too large"));
         }
         let used = cx.scope.derived_bytes.load(Ordering::Acquire);
-        if used.checked_add(len).is_none_or(|n| n > self.cfg.derived_budget_bytes) {
+        if used
+            .checked_add(len)
+            .is_none_or(|n| n > self.cfg.derived_budget_bytes)
+        {
             return Err(GwError::Quota("derived data budget exceeded"));
         }
         let mut bytes = Vec::with_capacity(usize::try_from(len).unwrap_or(0));
@@ -79,11 +88,15 @@ impl Gateway {
             Err(e) => return Err(GwError::internal(e)),
         };
         // 검사 뒤 파일이 커졌어도 상한을 넘겨 읽지 않는다
-        file.take(self.cfg.derived_max_bytes + 1).read_to_end(&mut bytes).map_err(GwError::internal)?;
+        file.take(self.cfg.derived_max_bytes + 1)
+            .read_to_end(&mut bytes)
+            .map_err(GwError::internal)?;
         if bytes.len() as u64 > self.cfg.derived_max_bytes {
             return Err(GwError::TooLarge("derived data too large"));
         }
-        cx.scope.derived_bytes.fetch_add(bytes.len() as u64, Ordering::AcqRel);
+        cx.scope
+            .derived_bytes
+            .fetch_add(bytes.len() as u64, Ordering::AcqRel);
         Ok(json!({
             "kind": "thumbnail",
             "size": size_name,

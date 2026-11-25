@@ -59,7 +59,13 @@ pub enum EntryKind {
 
 impl ScanEnv {
     /// 블로킹 호출 `f` 를 이 볼륨 종류에 맞게 부른다 — 막힐 수 있는 볼륨이면 제한 시간을 건다.
-    pub fn guarded_io<T, F>(&self, kind: VolumeKind, volume_id: i64, key: String, f: F) -> Guarded<T>
+    pub fn guarded_io<T, F>(
+        &self,
+        kind: VolumeKind,
+        volume_id: i64,
+        key: String,
+        f: F,
+    ) -> Guarded<T>
     where
         T: Clone + Send + 'static,
         F: FnOnce() -> T + Send + 'static,
@@ -85,7 +91,11 @@ impl ScanEnv {
     }
 
     /// 파일 1개의 식별 정보(`identity.stat`)
-    pub(crate) fn stat_guarded(&self, folder: &FolderRow, path: &Path) -> Guarded<Result<FileMeta, Fail>> {
+    pub(crate) fn stat_guarded(
+        &self,
+        folder: &FolderRow,
+        path: &Path,
+    ) -> Guarded<Result<FileMeta, Fail>> {
         let (path, identity) = (path.to_path_buf(), Arc::clone(&self.identity));
         let key = format!("st:{}", path.display());
         self.guarded_io(folder.volume_kind, folder.volume_id, key, move || {
@@ -121,7 +131,11 @@ impl ScanEnv {
 
     /// 루트 아래 경로(`names`)의 조상 중 숨김·시스템 속성 디렉터리가 있는가 — 한 번의 제한 시간 호출로 조상 전부를 본다.
     /// 루트 자신은 검사하지 않는다 (볼륨 루트는 숨김+시스템 속성일 수 있다).
-    pub(crate) fn hidden_ancestor_guarded(&self, folder: &FolderRow, names: &[String]) -> Guarded<bool> {
+    pub(crate) fn hidden_ancestor_guarded(
+        &self,
+        folder: &FolderRow,
+        names: &[String],
+    ) -> Guarded<bool> {
         let (root, names) = (folder.root_path(), names.to_vec());
         let key = format!("hs:{}", root.join(names.join("/")).display());
         self.guarded_io(folder.volume_kind, folder.volume_id, key, move || {
@@ -138,7 +152,9 @@ impl ScanEnv {
         let root = folder.root_path();
         let key = format!("md:{}", root.display());
         self.guarded_io(folder.volume_kind, folder.volume_id, key, move || {
-            std::fs::metadata(&root).map(|_| ()).map_err(|e| Fail::io(&e))
+            std::fs::metadata(&root)
+                .map(|_| ())
+                .map_err(|e| Fail::io(&e))
         })
     }
 
@@ -147,7 +163,9 @@ impl ScanEnv {
         let root = folder.root_path();
         let key = format!("rd:{}", root.display());
         self.guarded_io(folder.volume_kind, folder.volume_id, key, move || {
-            std::fs::read_dir(&root).map(|_| ()).map_err(|e| Fail::io(&e))
+            std::fs::read_dir(&root)
+                .map(|_| ())
+                .map_err(|e| Fail::io(&e))
         })
     }
 

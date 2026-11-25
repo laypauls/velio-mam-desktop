@@ -128,9 +128,8 @@ pub fn is_hidden_or_system_dir(path: &Path) -> bool {
     #[cfg(windows)]
     {
         use std::os::windows::fs::MetadataExt;
-        std::fs::symlink_metadata(path).is_ok_and(|m| {
-            m.is_dir() && m.file_attributes() & ATTR_HIDDEN_SYSTEM != 0
-        })
+        std::fs::symlink_metadata(path)
+            .is_ok_and(|m| m.is_dir() && m.file_attributes() & ATTR_HIDDEN_SYSTEM != 0)
     }
     #[cfg(not(windows))]
     {

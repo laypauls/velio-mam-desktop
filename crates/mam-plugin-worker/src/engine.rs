@@ -3,7 +3,9 @@
 
 use std::rc::Rc;
 
-use mam_plugin_host::protocol::{CODE_LIMIT, CODE_SCRIPT, CODE_TOO_LARGE, InvokeKind, Limits, LogLevel};
+use mam_plugin_host::protocol::{
+    CODE_LIMIT, CODE_SCRIPT, CODE_TOO_LARGE, InvokeKind, Limits, LogLevel,
+};
 use rquickjs::{Context, Ctx, Error, Function, Object, Persistent, Runtime};
 use serde_json::Value;
 
@@ -37,7 +39,9 @@ fn describe(ctx: &Ctx<'_>, e: Error) -> String {
     if let Some(ex) = v.as_exception() {
         return ex.message().unwrap_or_else(|| "exception".to_owned());
     }
-    v.as_string().and_then(|s| s.to_string().ok()).unwrap_or_else(|| "exception".to_owned())
+    v.as_string()
+        .and_then(|s| s.to_string().ok())
+        .unwrap_or_else(|| "exception".to_owned())
 }
 
 impl Engine {
@@ -56,38 +60,73 @@ impl Engine {
         meter.begin();
 
         let (call_io, call_meter, log_io) = (Rc::clone(io), Rc::clone(&meter), Rc::clone(io));
-        let (internal, names) = ctx.with(|ctx| -> Result<(Persistent<Object<'static>>, String), String> {
-            let call = Function::new(ctx.clone(), move |method: String, params: String| -> String { call_io.host_call(&call_meter, &method, &params) }).map_err(|e| describe(&ctx, e))?;
-            let log = Function::new(ctx.clone(), move |level: String, msg: String| {
-                let level = match level.as_str() {
-                    "debug" => LogLevel::Debug,
-                    "warn" => LogLevel::Warn,
-                    "error" => LogLevel::Error,
-                    _ => LogLevel::Info,
-                };
-                log_io.log(level, &msg);
-            })
-            .map_err(|e| describe(&ctx, e))?;
-            let boot: Function = ctx.eval(BOOT).map_err(|e| describe(&ctx, e))?;
-            let internal: Object = boot.call((call, log)).map_err(|e| describe(&ctx, e))?;
-            ctx.eval::<(), _>(source).map_err(|e| describe(&ctx, e))?;
-            let names_fn: Function = internal.get("names").map_err(|e| describe(&ctx, e))?;
-            let names: String = names_fn.call(()).map_err(|e| describe(&ctx, e))?;
-            Ok((Persistent::save(&ctx, internal), names))
-        })?;
+        let (internal, names) = ctx.with(
+            |ctx| -> Result<(Persistent<Object<'static>>, String), String> {
+                let call = Function::new(
+                    ctx.clone(),
+                    move |method: String, params: String| -> String {
+                        call_io.host_call(&call_meter, &method, &params)
+                    },
+                )
+                .map_err(|e| describe(&ctx, e))?;
+                let log = Function::new(ctx.clone(), move |level: String, msg: String| {
+                    let level = match level.as_str() {
+                        "debug" => LogLevel::Debug,
+                        "warn" => LogLevel::Warn,
+                        "error" => LogLevel::Error,
+                        _ => LogLevel::Info,
+                    };
+                    log_io.log(level, &msg);
+                })
+                .map_err(|e| describe(&ctx, e))?;
+                let boot: Function = ctx.eval(BOOT).map_err(|e| describe(&ctx, e))?;
+                let internal: Object = boot.call((call, log)).map_err(|e| describe(&ctx, e))?;
+                ctx.eval::<(), _>(source).map_err(|e| describe(&ctx, e))?;
+                let names_fn: Function = internal.get("names").map_err(|e| describe(&ctx, e))?;
+                let names: String = names_fn.call(()).map_err(|e| describe(&ctx, e))?;
+                Ok((Persistent::save(&ctx, internal), names))
+            },
+        )?;
         let parsed: Value = serde_json::from_str(&names).map_err(|e| e.to_string())?;
-        let list = |k: &str| -> Vec<String> { parsed[k].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_owned)).collect()).unwrap_or_default() };
+        let list = |k: &str| -> Vec<String> {
+            parsed[k]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|x| x.as_str().map(str::to_owned))
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
         let (commands, providers) = (list("commands"), list("providers"));
-        Ok(Self { io: Rc::clone(io), rt, ctx, meter, internal, commands, providers })
+        Ok(Self {
+            io: Rc::clone(io),
+            rt,
+            ctx,
+            meter,
+            internal,
+            commands,
+            providers,
+        })
     }
 
     pub fn invoke(&self, kind: InvokeKind, target: &str, params: &Value) -> Result<Value, Failure> {
         self.meter.begin();
-        let kind_str = if kind == InvokeKind::Command { "command" } else { "provider" };
+        let kind_str = if kind == InvokeKind::Command {
+            "command"
+        } else {
+            "provider"
+        };
         let out = self.ctx.with(|ctx| -> Result<String, String> {
-            let internal = self.internal.clone().restore(&ctx).map_err(|e| describe(&ctx, e))?;
+            let internal = self
+                .internal
+                .clone()
+                .restore(&ctx)
+                .map_err(|e| describe(&ctx, e))?;
             let dispatch: Function = internal.get("dispatch").map_err(|e| describe(&ctx, e))?;
-            dispatch.call((kind_str, target.to_owned(), params.to_string())).map_err(|e| describe(&ctx, e))
+            dispatch
+                .call((kind_str, target.to_owned(), params.to_string()))
+                .map_err(|e| describe(&ctx, e))
         });
         // 이 호출이 남긴 Promise 작업(예: 거부된 `import()`)을 같은 한도 안에서 비운다
         for _ in 0..MAX_JOBS {
@@ -97,13 +136,30 @@ impl Engine {
         }
         match out {
             // 파싱 전에 크기부터 — 상한을 넘는 결과는 Value 로 부풀리지 않고 `too_large` 로 즉시 거절
-            Ok(json) if self.io.max_line() > 0 && json.len() > self.io.max_line() => {
-                Err(Failure { code: CODE_TOO_LARGE, message: format!("result of {} bytes exceeds the {} byte limit", json.len(), self.io.max_line()) })
-            }
-            Ok(json) => serde_json::from_str(&json).map_err(|e| Failure { code: CODE_SCRIPT, message: format!("result is not JSON: {e}") }),
-            Err(_) if self.meter.tripped() => Err(Failure { code: CODE_LIMIT, message: "cpu time limit exceeded".to_owned() }),
-            Err(m) if m.contains("out of memory") => Err(Failure { code: CODE_LIMIT, message: "memory limit exceeded".to_owned() }),
-            Err(m) => Err(Failure { code: CODE_SCRIPT, message: m }),
+            Ok(json) if self.io.max_line() > 0 && json.len() > self.io.max_line() => Err(Failure {
+                code: CODE_TOO_LARGE,
+                message: format!(
+                    "result of {} bytes exceeds the {} byte limit",
+                    json.len(),
+                    self.io.max_line()
+                ),
+            }),
+            Ok(json) => serde_json::from_str(&json).map_err(|e| Failure {
+                code: CODE_SCRIPT,
+                message: format!("result is not JSON: {e}"),
+            }),
+            Err(_) if self.meter.tripped() => Err(Failure {
+                code: CODE_LIMIT,
+                message: "cpu time limit exceeded".to_owned(),
+            }),
+            Err(m) if m.contains("out of memory") => Err(Failure {
+                code: CODE_LIMIT,
+                message: "memory limit exceeded".to_owned(),
+            }),
+            Err(m) => Err(Failure {
+                code: CODE_SCRIPT,
+                message: m,
+            }),
         }
     }
 }

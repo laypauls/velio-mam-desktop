@@ -11,7 +11,8 @@ use std::time::Duration;
 
 use common::env::{Env, T0, wait_until};
 use mam_core::watch::{
-    ChangeDetector, ChangeSink, DetectError, DetectorOptions, DetectorRegistry, ProbeResult, WatchHandle, WatchTarget,
+    ChangeDetector, ChangeSink, DetectError, DetectorOptions, DetectorRegistry, ProbeResult,
+    WatchHandle, WatchTarget,
 };
 use serde_json::json;
 
@@ -39,18 +40,34 @@ impl ChangeDetector for Capture {
 
 fn watched() -> (Env, i64, ChangeSink) {
     let slot = Arc::new(Mutex::new(None));
-    let detectors = Arc::new(DetectorRegistry::new(vec![Arc::new(Capture(Arc::clone(&slot)))], &["capture"]));
+    let detectors = Arc::new(DetectorRegistry::new(
+        vec![Arc::new(Capture(Arc::clone(&slot)))],
+        &["capture"],
+    ));
     let env = Env::with_config(move |c, _| c.detectors = detectors);
     env.write("lib/a.jpg", 1);
     env.ingest.start().unwrap();
-    let id = env.ingest.add_folder(env.path("lib").to_str().unwrap()).unwrap().folder_id;
-    assert!(wait_until(Duration::from_secs(30), || slot.lock().unwrap().is_some()));
+    let id = env
+        .ingest
+        .add_folder(env.path("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id;
+    assert!(wait_until(Duration::from_secs(30), || slot
+        .lock()
+        .unwrap()
+        .is_some()));
     let sink = slot.lock().unwrap().clone().unwrap();
     (env, id, sink)
 }
 
 fn view_json(env: &Env, id: i64) -> serde_json::Value {
-    let v = env.ingest.list_folders().unwrap().into_iter().find(|f| f.folder_id == id).unwrap();
+    let v = env
+        .ingest
+        .list_folders()
+        .unwrap()
+        .into_iter()
+        .find(|f| f.folder_id == id)
+        .unwrap();
     serde_json::to_value(v).unwrap()
 }
 
@@ -64,7 +81,10 @@ fn t_health_08_signals_and_degraded_states_reach_the_folder_view_with_the_inject
     sink.signal();
 
     // Assert 1
-    assert_eq!(view_json(&env, id)["watchHealth"], json!({"state": "ok", "lastSignalAt": T0 + 7_000}));
+    assert_eq!(
+        view_json(&env, id)["watchHealth"],
+        json!({"state": "ok", "lastSignalAt": T0 + 7_000})
+    );
 
     // Act 2: 저하 -> 복구
     env.clock.advance(1_000);

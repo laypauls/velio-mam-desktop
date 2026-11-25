@@ -21,7 +21,11 @@ const POS_MIN: i64 = -(1 << 62);
 /// 이동 위치 (계약 `ReorderTarget`): `{kind:"before",assetId} | {kind:"start"} | {kind:"end"}`.
 /// "맨 앞"을 `before(첫 항목)` 으로 표현할 수 없다 — 필터·검색·숨김 때문에 화면의 첫 항목이 진짜 첫 항목이 아닐 수 있다.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum ReorderTarget {
     Before { asset_id: i64 },
     Start,

@@ -44,7 +44,9 @@ impl Fx {
     }
 
     pub fn revision(&self, id: i64) -> i64 {
-        self.env.count(&format!("SELECT revision FROM media_assets WHERE asset_id = {id}"))
+        self.env.count(&format!(
+            "SELECT revision FROM media_assets WHERE asset_id = {id}"
+        ))
     }
 
     /// 자산의 outbox 이벤트 `(revision, priority)` 목록 (event_id 순)
@@ -69,7 +71,9 @@ impl Fx {
     }
 
     pub fn set(&self, asset: i64, field: i64, v: FieldValue) {
-        self.ud.set_metadata_values(asset, &[(field, FieldPatch::Set(v))]).unwrap();
+        self.ud
+            .set_metadata_values(asset, &[(field, FieldPatch::Set(v))])
+            .unwrap();
     }
 
     pub fn get(&self, asset: i64, field: i64) -> Option<FieldValue> {

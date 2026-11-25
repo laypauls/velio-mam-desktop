@@ -10,13 +10,13 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
+use super::RemoteSource;
 use super::collector::{health_key, is_hard, is_link_error};
 use super::contract::{Deps, Feed, FeedItem};
 use super::mapper::{Mapper, same_dir, within_dir};
 use super::runner::{RemoteRunner, RunError};
 use super::ses::{Cursor, Polled, SesFeed, classify};
 use super::stats::{Counts, KickGate};
-use super::RemoteSource;
 
 /// 대기열 행의 출처 (`watch_pending.source`)
 pub const ORIGIN: &str = "fanotify_feed";
@@ -45,7 +45,10 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 
 impl SesCollector {
     pub fn new(src: RemoteSource, d: Deps) -> Self {
-        let resumed = d.committer.load_cursor(src.source_id).and_then(|c| Cursor::from_json(&c));
+        let resumed = d
+            .committer
+            .load_cursor(src.source_id)
+            .and_then(|c| Cursor::from_json(&c));
         let now = d.clock.now_ms();
         Self {
             mapper: Mapper::new(&src.path_map),
@@ -97,7 +100,10 @@ impl SesCollector {
         let wait = match self.poll_once() {
             Ok(()) => {
                 self.fail_streak = 0;
-                self.d.timings.poll_override.unwrap_or_else(|| Duration::from_secs(u64::from(self.src.poll_sec.max(1))))
+                self.d
+                    .timings
+                    .poll_override
+                    .unwrap_or_else(|| Duration::from_secs(u64::from(self.src.poll_sec.max(1))))
             }
             Err(e) => self.on_fail(&e, now),
         };
@@ -113,7 +119,9 @@ impl SesCollector {
                 self.run = Some(self.d.connector.connect(&self.src)?);
                 fresh = true;
             }
-            let Some(run) = self.run.as_mut() else { return Err(RunError::Closed) };
+            let Some(run) = self.run.as_mut() else {
+                return Err(RunError::Closed);
+            };
             match self.feed.poll(run.as_mut()) {
                 Ok(p) => {
                     self.recover_if_degraded();
@@ -167,7 +175,9 @@ impl SesCollector {
         if is_hard(e) {
             return t.hard_retry;
         }
-        t.reconnect_base.saturating_mul(1 << (self.fail_streak - 1).min(10)).min(t.reconnect_max)
+        t.reconnect_base
+            .saturating_mul(1 << (self.fail_streak - 1).min(10))
+            .min(t.reconnect_max)
     }
 
     /// 읽은 행을 폴더별로 나눠 기록하고(대기열 + 커서), 성공하면 커서를 올린다.
@@ -179,7 +189,11 @@ impl SesCollector {
         if items.is_empty() && Some(next) == self.feed.cursor() && root_hits.is_empty() && !p.gap {
             return Ok(());
         }
-        match self.d.committer.commit_feed(self.src.source_id, &items, &next.to_json(), ORIGIN) {
+        match self
+            .d
+            .committer
+            .commit_feed(self.src.source_id, &items, &next.to_json(), ORIGIN)
+        {
             Ok(out) => {
                 self.feed.commit(next);
                 self.want.extend(out.overflowed);
@@ -200,7 +214,9 @@ impl SesCollector {
                 }
             }
             // 연결 문제가 아니다 — 커서를 올리지 않았으니 다음 주기에 같은 id 부터 다시 읽는다
-            Err(e) => tracing::warn!(source = %self.src.name, error = %e, "cannot record remote changes; will retry from the same cursor"),
+            Err(e) => {
+                tracing::warn!(source = %self.src.name, error = %e, "cannot record remote changes; will retry from the same cursor")
+            }
         }
         Ok(())
     }
@@ -216,7 +232,9 @@ impl SesCollector {
             c.bad += p.bad;
         }
         for row in &p.rows {
-            let Some(subtree) = classify(row) else { continue };
+            let Some(subtree) = classify(row) else {
+                continue;
+            };
             let Some(full) = self.mapper.map(&row.path) else {
                 // 변환 규칙 밖 (또는 위험한 경로) — 버리고 센다
                 self.window.unmapped += 1;
@@ -231,7 +249,11 @@ impl SesCollector {
                 if same_dir(&full, &f.root) {
                     root_hits.insert(f.folder_id);
                 } else if seen.insert((f.folder_id, full.clone(), subtree)) {
-                    items.push(FeedItem { folder_id: f.folder_id, path: PathBuf::from(&full), subtree });
+                    items.push(FeedItem {
+                        folder_id: f.folder_id,
+                        path: PathBuf::from(&full),
+                        subtree,
+                    });
                 }
             }
             let c = if hit { (1, 0) } else { (0, 1) };
@@ -269,7 +291,9 @@ impl SesCollector {
         }
         let gate = &mut self.gate;
         self.want.retain(|id| {
-            let Some(f) = folders.iter().find(|f| f.folder_id == *id) else { return false };
+            let Some(f) = folders.iter().find(|f| f.folder_id == *id) else {
+                return false;
+            };
             if gate.allow(*id, now) {
                 f.sink.rescan();
                 false

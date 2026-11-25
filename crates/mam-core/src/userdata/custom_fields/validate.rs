@@ -23,13 +23,28 @@ pub(super) struct Row {
 
 impl Row {
     fn text(s: String) -> Self {
-        Self { ord: 0, text: Some(s), int: None, real: None }
+        Self {
+            ord: 0,
+            text: Some(s),
+            int: None,
+            real: None,
+        }
     }
     fn int(ord: i64, v: i64) -> Self {
-        Self { ord, text: None, int: Some(v), real: None }
+        Self {
+            ord,
+            text: None,
+            int: Some(v),
+            real: None,
+        }
     }
     fn real(v: f64) -> Self {
-        Self { ord: 0, text: None, int: None, real: Some(v) }
+        Self {
+            ord: 0,
+            text: None,
+            int: None,
+            real: Some(v),
+        }
     }
 }
 

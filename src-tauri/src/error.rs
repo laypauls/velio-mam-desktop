@@ -224,7 +224,10 @@ mod tests {
             (ErrorCode::PlayerUnavailable, "player_unavailable"),
             (ErrorCode::AssetOffline, "asset_offline"),
             (ErrorCode::OpenFailed, "open_failed"),
-            (ErrorCode::AudioDeviceUnavailable, "audio_device_unavailable"),
+            (
+                ErrorCode::AudioDeviceUnavailable,
+                "audio_device_unavailable",
+            ),
             (ErrorCode::PlayerTimeout, "player_timeout"),
             (ErrorCode::PlayerRestarting, "player_restarting"),
             (ErrorCode::PlayerRestartFailed, "player_restart_failed"),
@@ -232,7 +235,10 @@ mod tests {
             (ErrorCode::PluginInvalid, "plugin_invalid"),
             (ErrorCode::PluginIncompatible, "plugin_incompatible"),
             (ErrorCode::PluginDisabled, "plugin_disabled"),
-            (ErrorCode::PluginPermissionDenied, "plugin_permission_denied"),
+            (
+                ErrorCode::PluginPermissionDenied,
+                "plugin_permission_denied",
+            ),
             (ErrorCode::PluginTimeout, "plugin_timeout"),
             (ErrorCode::PluginError, "plugin_error"),
         ];

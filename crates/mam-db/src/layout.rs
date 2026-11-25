@@ -56,9 +56,8 @@ impl LayoutSetting {
     pub fn parse(v: &Value) -> Option<Self> {
         let obj = v.as_object()?;
         let d = Self::default();
-        let flag = |name: &str, default: bool| {
-            obj.get(name).and_then(Value::as_bool).unwrap_or(default)
-        };
+        let flag =
+            |name: &str, default: bool| obj.get(name).and_then(Value::as_bool).unwrap_or(default);
         let viewer_width = obj
             .get("viewerWidth")
             .and_then(Value::as_f64)
@@ -66,7 +65,8 @@ impl LayoutSetting {
             // 반올림 뒤 clamp — `as` 는 범위 밖 f64 를 포화시키므로 먼저 f64 에서 clamp 한다
             .map(|x| {
                 x.round()
-                    .clamp(f64::from(MIN_VIEWER_WIDTH), f64::from(MAX_VIEWER_WIDTH)) as u32
+                    .clamp(f64::from(MIN_VIEWER_WIDTH), f64::from(MAX_VIEWER_WIDTH))
+                    as u32
             })
             .unwrap_or(d.viewer_width);
         let filmstrip_height = obj
@@ -74,9 +74,10 @@ impl LayoutSetting {
             .and_then(Value::as_f64)
             .filter(|x| x.is_finite())
             .map(|x| {
-                x.round()
-                    .clamp(f64::from(MIN_FILMSTRIP_HEIGHT), f64::from(MAX_FILMSTRIP_HEIGHT))
-                    as u32
+                x.round().clamp(
+                    f64::from(MIN_FILMSTRIP_HEIGHT),
+                    f64::from(MAX_FILMSTRIP_HEIGHT),
+                ) as u32
             })
             .unwrap_or(d.filmstrip_height);
         let detail_tab = match obj.get("detailTab").and_then(Value::as_str) {

@@ -3,10 +3,11 @@
 //! fixture `plugin_ipc_fixture.json` 은 프론트 `ipc-plugin.test.ts` 도 읽는다 — 한쪽만 바꾸면 이 시험이 깨진다.
 
 use mam_plugin_runtime::{
-    AssetKind, ChangeReason, CommandInfo, EngineError, ExportProviderInfo, ExportResult, InstallChange, InstallError, InstalledSummary,
-    InvokeError, LocaleError, ManifestError, MenuItemInfo, Permission, PluginChanged, PluginCommandResult, PluginContributions, PluginInfo,
-    PluginPreview, PluginProviderInfo, PluginStatus, PluginTaskCount, ProviderKind, RunAllResult, RunError, ScopeTooLarge,
-    PLUGIN_CHANGED_EVENT,
+    AssetKind, ChangeReason, CommandInfo, EngineError, ExportProviderInfo, ExportResult,
+    InstallChange, InstallError, InstalledSummary, InvokeError, LocaleError, ManifestError,
+    MenuItemInfo, PLUGIN_CHANGED_EVENT, Permission, PluginChanged, PluginCommandResult,
+    PluginContributions, PluginInfo, PluginPreview, PluginProviderInfo, PluginStatus,
+    PluginTaskCount, ProviderKind, RunAllResult, RunError, ScopeTooLarge,
 };
 use serde_json::{Value, json};
 
@@ -14,7 +15,8 @@ use crate::error::{CommandError, ErrorCode};
 
 fn fixture() -> Value {
     // 도구가 새로 만든 파일은 CRLF 일 수 있다 — 습관대로 정규화
-    serde_json::from_str(&include_str!("plugin_ipc_fixture.json").replace("\r\n", "\n")).expect("fixture parses")
+    serde_json::from_str(&include_str!("plugin_ipc_fixture.json").replace("\r\n", "\n"))
+        .expect("fixture parses")
 }
 
 fn ser<T: serde::Serialize>(v: &T) -> Value {
@@ -34,12 +36,32 @@ fn info(id: &str) -> PluginInfo {
         status: PluginStatus::Ok,
         enabled: true,
         unsigned: true,
-        permissions: p(&[Permission::AssetReadMetadata, Permission::KvWrite, Permission::TagWrite, Permission::ExportWrite]),
+        permissions: p(&[
+            Permission::AssetReadMetadata,
+            Permission::KvWrite,
+            Permission::TagWrite,
+            Permission::ExportWrite,
+        ]),
         granted: p(&[Permission::AssetReadMetadata, Permission::KvWrite]),
-        commands: vec![CommandInfo { id: "summarize".into(), title: "Summarize".into() }],
+        commands: vec![CommandInfo {
+            id: "summarize".into(),
+            title: "Summarize".into(),
+        }],
         providers: vec![
-            PluginProviderInfo { id: "exif".into(), title: "EXIF".into(), kind: ProviderKind::Metadata, asset_kinds: vec![AssetKind::Image], file_extension: None },
-            PluginProviderInfo { id: "csv".into(), title: "CSV export".into(), kind: ProviderKind::Export, asset_kinds: vec![], file_extension: Some("csv".into()) },
+            PluginProviderInfo {
+                id: "exif".into(),
+                title: "EXIF".into(),
+                kind: ProviderKind::Metadata,
+                asset_kinds: vec![AssetKind::Image],
+                file_extension: None,
+            },
+            PluginProviderInfo {
+                id: "csv".into(),
+                title: "CSV export".into(),
+                kind: ProviderKind::Export,
+                asset_kinds: vec![],
+                file_extension: Some("csv".into()),
+            },
         ],
         installed_at: 1_700_000_000_000,
         worker_available: true,
@@ -69,8 +91,15 @@ fn t_ipc_plugin_01_every_dto_serializes_to_the_shared_fixture() {
         version: "1.3.0".into(),
         display_name: "EXIF summary".into(),
         description: None,
-        permissions: p(&[Permission::AssetReadMetadata, Permission::KvWrite, Permission::TagWrite]),
-        commands: vec![CommandInfo { id: "summarize".into(), title: "Summarize".into() }],
+        permissions: p(&[
+            Permission::AssetReadMetadata,
+            Permission::KvWrite,
+            Permission::TagWrite,
+        ]),
+        commands: vec![CommandInfo {
+            id: "summarize".into(),
+            title: "Summarize".into(),
+        }],
         providers: vec![PluginProviderInfo {
             id: "exif".into(),
             title: "EXIF".into(),
@@ -79,7 +108,10 @@ fn t_ipc_plugin_01_every_dto_serializes_to_the_shared_fixture() {
             file_extension: None,
         }],
         unsigned: true,
-        installed: Some(InstalledSummary { version: "1.2.0".into(), granted: p(&[Permission::AssetReadMetadata, Permission::KvWrite]) }),
+        installed: Some(InstalledSummary {
+            version: "1.2.0".into(),
+            granted: p(&[Permission::AssetReadMetadata, Permission::KvWrite]),
+        }),
         change: InstallChange::Upgrade,
         added_permissions: p(&[Permission::TagWrite]),
         has_kept_data: false,
@@ -92,7 +124,12 @@ fn t_ipc_plugin_01_every_dto_serializes_to_the_shared_fixture() {
                 title: "Summarize".into(),
                 when: Some("asset.kind == 'image'".into()),
             },
-            MenuItemInfo { plugin_id: "com.example.exif-summary".into(), command_id: "other".into(), title: "other".into(), when: None },
+            MenuItemInfo {
+                plugin_id: "com.example.exif-summary".into(),
+                command_id: "other".into(),
+                title: "other".into(),
+                when: None,
+            },
         ],
         export_providers: vec![ExportProviderInfo {
             plugin_id: "com.example.exif-summary".into(),
@@ -102,19 +139,39 @@ fn t_ipc_plugin_01_every_dto_serializes_to_the_shared_fixture() {
             asset_kinds: vec![AssetKind::Image],
         }],
     };
-    let changed = PluginChanged { plugin_id: "com.example.exif-summary".into(), reason: ChangeReason::AutoDisabled };
+    let changed = PluginChanged {
+        plugin_id: "com.example.exif-summary".into(),
+        reason: ChangeReason::AutoDisabled,
+    };
 
     // Act / Assert
     assert_eq!(ser(&info("com.example.exif-summary")), fx["pluginInfo"]);
     assert_eq!(ser(&broken), fx["pluginInfoBroken"]);
     assert_eq!(ser(&preview), fx["pluginPreview"]);
     assert_eq!(ser(&contributions), fx["pluginContributions"]);
-    assert_eq!(ser(&PluginCommandResult { message: Some("done".into()) }), fx["commandResult"]);
-    assert_eq!(ser(&PluginCommandResult { message: None }), fx["commandResultNull"]);
-    assert_eq!(ser(&RunAllResult { started: true }), fx["runAllResult"]);
-    assert_eq!(ser(&ExportResult { bytes_written: 1234 }), fx["exportResult"]);
     assert_eq!(
-        ser(&vec![PluginTaskCount { plugin_id: "com.example.exif-summary".into(), pending: 12, failed: 1 }]),
+        ser(&PluginCommandResult {
+            message: Some("done".into())
+        }),
+        fx["commandResult"]
+    );
+    assert_eq!(
+        ser(&PluginCommandResult { message: None }),
+        fx["commandResultNull"]
+    );
+    assert_eq!(ser(&RunAllResult { started: true }), fx["runAllResult"]);
+    assert_eq!(
+        ser(&ExportResult {
+            bytes_written: 1234
+        }),
+        fx["exportResult"]
+    );
+    assert_eq!(
+        ser(&vec![PluginTaskCount {
+            plugin_id: "com.example.exif-summary".into(),
+            pending: 12,
+            failed: 1
+        }]),
         fx["taskCounts"]
     );
     assert_eq!(ser(&changed), fx["changedEvent"]);
@@ -145,7 +202,11 @@ fn t_ipc_plugin_02_permission_list_change_reasons_and_error_codes_match_the_fixt
 
     // Act / Assert
     let perms: Vec<&str> = Permission::ALL.iter().map(|p| p.as_str()).collect();
-    assert_eq!(json!(perms), fx["permissions"], "Permission::ALL must equal the TS PluginPermission list");
+    assert_eq!(
+        json!(perms),
+        fx["permissions"],
+        "Permission::ALL must equal the TS PluginPermission list"
+    );
     assert_eq!(ser(&reasons.to_vec()), fx["changeReasons"]);
     assert_eq!(ser(&codes.to_vec()), fx["errorCodes"]);
 }
@@ -164,14 +225,38 @@ fn t_ipc_plugin_03_run_errors_map_to_contract_codes_without_plugin_text() {
         (RunError::NotInstalled, ErrorCode::NotFound),
         (RunError::UnknownTarget, ErrorCode::NotFound),
         (RunError::Disabled, ErrorCode::PluginDisabled),
-        (RunError::Invoke(InvokeError::Disabled), ErrorCode::PluginDisabled),
-        (RunError::PermissionDenied(Permission::ExportWrite), ErrorCode::PluginPermissionDenied),
+        (
+            RunError::Invoke(InvokeError::Disabled),
+            ErrorCode::PluginDisabled,
+        ),
+        (
+            RunError::PermissionDenied(Permission::ExportWrite),
+            ErrorCode::PluginPermissionDenied,
+        ),
         (RunError::Scope(ScopeTooLarge), ErrorCode::InvalidInput),
-        (RunError::Invoke(InvokeError::Timeout), ErrorCode::PluginTimeout),
-        (RunError::Invoke(InvokeError::Script(secret.into())), ErrorCode::PluginError),
-        (RunError::Invoke(InvokeError::Plugin { code: "busy".into(), message: secret.into() }), ErrorCode::PluginError),
-        (RunError::Invoke(InvokeError::Start(secret.into())), ErrorCode::PluginError),
-        (RunError::Invoke(InvokeError::Crashed), ErrorCode::PluginError),
+        (
+            RunError::Invoke(InvokeError::Timeout),
+            ErrorCode::PluginTimeout,
+        ),
+        (
+            RunError::Invoke(InvokeError::Script(secret.into())),
+            ErrorCode::PluginError,
+        ),
+        (
+            RunError::Invoke(InvokeError::Plugin {
+                code: "busy".into(),
+                message: secret.into(),
+            }),
+            ErrorCode::PluginError,
+        ),
+        (
+            RunError::Invoke(InvokeError::Start(secret.into())),
+            ErrorCode::PluginError,
+        ),
+        (
+            RunError::Invoke(InvokeError::Crashed),
+            ErrorCode::PluginError,
+        ),
     ];
 
     // Act / Assert
@@ -179,9 +264,15 @@ fn t_ipc_plugin_03_run_errors_map_to_contract_codes_without_plugin_text() {
         let label = format!("{err:?}");
         let (code, message) = code_of(err);
         assert_eq!(code, want, "{label}");
-        assert!(!message.contains("Users") && !message.contains("secret") && !message.contains("boom"), "{label}: {message}");
+        assert!(
+            !message.contains("Users") && !message.contains("secret") && !message.contains("boom"),
+            "{label}: {message}"
+        );
         if code == ErrorCode::PluginError {
-            assert!(message.starts_with("plugin.error."), "static i18n key expected: {message}");
+            assert!(
+                message.starts_with("plugin.error."),
+                "static i18n key expected: {message}"
+            );
         }
     }
 }
@@ -197,10 +288,28 @@ fn t_ipc_plugin_04_install_errors_map_to_contract_codes_without_host_paths() {
         (InstallError::PreviewMismatch, ErrorCode::InvalidInput),
         (InstallError::UnknownPermission, ErrorCode::InvalidInput),
         (InstallError::ManifestMissing, ErrorCode::PluginInvalid),
-        (InstallError::Manifest(ManifestError::MissingField { path: "id".into() }), ErrorCode::PluginInvalid),
-        (InstallError::Manifest(ManifestError::UnsupportedApiVersion { found: "9".into() }), ErrorCode::PluginIncompatible),
-        (InstallError::Engine(EngineError::Incompatible { required: ">=9".into(), app: "0.1.0".into() }), ErrorCode::PluginIncompatible),
-        (InstallError::Locale { file_stem: long_stem, source: LocaleError::TooLarge }, ErrorCode::PluginInvalid),
+        (
+            InstallError::Manifest(ManifestError::MissingField { path: "id".into() }),
+            ErrorCode::PluginInvalid,
+        ),
+        (
+            InstallError::Manifest(ManifestError::UnsupportedApiVersion { found: "9".into() }),
+            ErrorCode::PluginIncompatible,
+        ),
+        (
+            InstallError::Engine(EngineError::Incompatible {
+                required: ">=9".into(),
+                app: "0.1.0".into(),
+            }),
+            ErrorCode::PluginIncompatible,
+        ),
+        (
+            InstallError::Locale {
+                file_stem: long_stem,
+                source: LocaleError::TooLarge,
+            },
+            ErrorCode::PluginInvalid,
+        ),
         (InstallError::MainMissing, ErrorCode::PluginInvalid),
         (InstallError::MainEscapes, ErrorCode::PluginInvalid),
         (InstallError::MainTooLarge, ErrorCode::PluginInvalid),
@@ -208,9 +317,18 @@ fn t_ipc_plugin_04_install_errors_map_to_contract_codes_without_host_paths() {
         (InstallError::TooManyLocaleFiles, ErrorCode::PluginInvalid),
         (InstallError::NotInstalled, ErrorCode::NotFound),
         (InstallError::Busy, ErrorCode::Busy),
-        (InstallError::Io(std::io::Error::other(r"C:\Users\someone\src\plugin")), ErrorCode::Io),
-        (InstallError::Io(std::io::Error::from(std::io::ErrorKind::StorageFull)), ErrorCode::DiskFull),
-        (InstallError::Io(std::io::Error::from_raw_os_error(112)), ErrorCode::DiskFull),
+        (
+            InstallError::Io(std::io::Error::other(r"C:\Users\someone\src\plugin")),
+            ErrorCode::Io,
+        ),
+        (
+            InstallError::Io(std::io::Error::from(std::io::ErrorKind::StorageFull)),
+            ErrorCode::DiskFull,
+        ),
+        (
+            InstallError::Io(std::io::Error::from_raw_os_error(112)),
+            ErrorCode::DiskFull,
+        ),
     ];
 
     // Act / Assert
@@ -218,7 +336,10 @@ fn t_ipc_plugin_04_install_errors_map_to_contract_codes_without_host_paths() {
         let label: String = format!("{err:?}").chars().take(60).collect();
         let (code, message) = code_of(err);
         assert_eq!(code, want, "{label}");
-        assert!(!message.contains("Users") && !message.contains(":\\"), "{label}: {message}");
+        assert!(
+            !message.contains("Users") && !message.contains(":\\"),
+            "{label}: {message}"
+        );
         assert!(message.chars().count() < 400, "{label}: message too long");
     }
 }

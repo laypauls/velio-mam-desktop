@@ -54,7 +54,10 @@ fn sorted_keys(v: &Value) -> Vec<&str> {
 }
 
 fn add(fx: &Fx) -> i64 {
-    fx.ingest.add_folder(fx.media.to_str().unwrap()).unwrap().folder_id
+    fx.ingest
+        .add_folder(fx.media.to_str().unwrap())
+        .unwrap()
+        .folder_id
 }
 
 #[test]
@@ -64,7 +67,10 @@ fn t_ipc_detect_01_view_carries_the_six_detection_fields_in_camel_case() {
     let id = add(&fx);
 
     // Act
-    let view = fx.ingest.set_folder_watch_mode(id, Some("scan_only".into()), None).unwrap();
+    let view = fx
+        .ingest
+        .set_folder_watch_mode(id, Some("scan_only".into()), None)
+        .unwrap();
     let v = serde_json::to_value(&view).unwrap();
 
     // Assert
@@ -73,8 +79,18 @@ fn t_ipc_detect_01_view_carries_the_six_detection_fields_in_camel_case() {
     for null in ["watchOptions", "watchFallbackKey", "rescanPolicy"] {
         assert!(v[null].is_null(), "{null}");
     }
-    assert!(v["nextRescanAt"].is_i64(), "never-scanned folder is due now");
-    for k in ["watchMode", "watchOptions", "watchActive", "watchFallbackKey", "rescanPolicy", "nextRescanAt"] {
+    assert!(
+        v["nextRescanAt"].is_i64(),
+        "never-scanned folder is due now"
+    );
+    for k in [
+        "watchMode",
+        "watchOptions",
+        "watchActive",
+        "watchFallbackKey",
+        "rescanPolicy",
+        "nextRescanAt",
+    ] {
         assert!(sorted_keys(&v).contains(&k), "{k}");
     }
 }
@@ -90,13 +106,26 @@ fn t_ipc_detect_02_detector_info_has_the_contract_keys_in_registry_order() {
     assert_eq!(items[0]["id"], "os_events");
     assert_eq!(items.last().unwrap()["id"], "scan_only");
     for item in items {
-        assert_eq!(sorted_keys(item), ["available", "experimental", "id", "optionFields", "reasonKey"]);
+        assert_eq!(
+            sorted_keys(item),
+            [
+                "available",
+                "experimental",
+                "id",
+                "optionFields",
+                "reasonKey"
+            ]
+        );
         assert_eq!(item["available"], true);
         assert!(item["reasonKey"].is_null());
         // polling(확인 간격)·ddp_audit·fanotify_feed(원격 접속 참조) 만 실험 표시 + 옵션을 선언한다
-        let declares = item["id"] == "polling" || item["id"] == "ddp_audit" || item["id"] == "fanotify_feed";
+        let declares =
+            item["id"] == "polling" || item["id"] == "ddp_audit" || item["id"] == "fanotify_feed";
         assert_eq!(item["experimental"], declares);
-        assert_eq!(item["optionFields"].as_array().unwrap().is_empty(), !declares);
+        assert_eq!(
+            item["optionFields"].as_array().unwrap().is_empty(),
+            !declares
+        );
         if item["id"] == "ddp_audit" || item["id"] == "fanotify_feed" {
             assert_eq!(item["optionFields"][0]["kind"], "ref");
         }
@@ -108,9 +137,21 @@ fn t_ipc_detect_03_invalid_input_and_missing_folder_map_to_contract_codes() {
     let fx = fixture();
     let id = add(&fx);
 
-    let bad_mode = CommandError::from(fx.ingest.set_folder_watch_mode(id, Some("ghost".into()), None).unwrap_err());
-    let bad_opts = CommandError::from(fx.ingest.set_folder_watch_mode(id, None, Some(json!({"a": 1}))).unwrap_err());
-    let missing = CommandError::from(fx.ingest.set_folder_watch_mode(999, None, None).unwrap_err());
+    let bad_mode = CommandError::from(
+        fx.ingest
+            .set_folder_watch_mode(id, Some("ghost".into()), None)
+            .unwrap_err(),
+    );
+    let bad_opts = CommandError::from(
+        fx.ingest
+            .set_folder_watch_mode(id, None, Some(json!({"a": 1})))
+            .unwrap_err(),
+    );
+    let missing = CommandError::from(
+        fx.ingest
+            .set_folder_watch_mode(999, None, None)
+            .unwrap_err(),
+    );
     let missing_list = CommandError::from(fx.ingest.list_change_detectors(999).unwrap_err());
 
     assert_eq!(bad_mode.code(), ErrorCode::InvalidInput);
@@ -131,7 +172,10 @@ fn t_ipc_detect_04_ts_shaped_policy_is_accepted_and_unknown_kind_names_the_field
     });
 
     // Act
-    let ok = fx.ingest.set_folder_rescan_policy(id, Some(ts.clone())).unwrap();
+    let ok = fx
+        .ingest
+        .set_folder_rescan_policy(id, Some(ts.clone()))
+        .unwrap();
     let err = CommandError::from(
         fx.ingest
             .set_folder_rescan_policy(id, Some(json!({"trigger": {"kind": "weekly"}})))
@@ -141,21 +185,37 @@ fn t_ipc_detect_04_ts_shaped_policy_is_accepted_and_unknown_kind_names_the_field
     // Assert
     assert_eq!(ok.rescan_policy, Some(ts));
     assert_eq!(err.code(), ErrorCode::InvalidInput);
-    assert_eq!(serde_json::to_value(&err).unwrap()["message"], "invalid input: rescanPolicy.trigger.kind");
+    assert_eq!(
+        serde_json::to_value(&err).unwrap()["message"],
+        "invalid input: rescanPolicy.trigger.kind"
+    );
 }
 
 #[test]
 fn t_ipc_detect_05_list_folders_round_trips_the_saved_settings() {
     let fx = fixture();
     let id = add(&fx);
-    fx.ingest.set_folder_rescan_policy(id, Some(json!({"trigger": {"kind": "manual"}, "onStart": true}))).unwrap();
-    fx.ingest.set_folder_watch_mode(id, Some("scan_only".into()), None).unwrap();
+    fx.ingest
+        .set_folder_rescan_policy(
+            id,
+            Some(json!({"trigger": {"kind": "manual"}, "onStart": true})),
+        )
+        .unwrap();
+    fx.ingest
+        .set_folder_watch_mode(id, Some("scan_only".into()), None)
+        .unwrap();
 
     let listed = serde_json::to_value(fx.ingest.list_folders().unwrap()).unwrap();
 
-    assert_eq!(listed[0]["rescanPolicy"], json!({"trigger": {"kind": "manual"}, "window": null, "onStart": true}));
+    assert_eq!(
+        listed[0]["rescanPolicy"],
+        json!({"trigger": {"kind": "manual"}, "window": null, "onStart": true})
+    );
     assert_eq!(listed[0]["watchMode"], "scan_only");
-    assert!(listed[0]["nextRescanAt"].is_i64(), "never scanned -> due now even under manual");
+    assert!(
+        listed[0]["nextRescanAt"].is_i64(),
+        "never scanned -> due now even under manual"
+    );
 }
 
 #[test]
@@ -165,12 +225,28 @@ fn t_ipc_detect_06_auto_mode_takes_the_common_bool_option_and_round_trips_it_in_
     let id = add(&fx);
 
     // Act
-    let saved = serde_json::to_value(fx.ingest.set_folder_watch_mode(id, None, Some(json!({"exclusiveOpenCheck": false}))).unwrap()).unwrap();
-    let bad = CommandError::from(fx.ingest.set_folder_watch_mode(id, None, Some(json!({"intervalSec": 60}))).unwrap_err());
+    let saved = serde_json::to_value(
+        fx.ingest
+            .set_folder_watch_mode(id, None, Some(json!({"exclusiveOpenCheck": false})))
+            .unwrap(),
+    )
+    .unwrap();
+    let bad = CommandError::from(
+        fx.ingest
+            .set_folder_watch_mode(id, None, Some(json!({"intervalSec": 60})))
+            .unwrap_err(),
+    );
 
     // Assert: 모드 null, 옵션은 불리언 그대로 (목록에도 같은 값)
     assert!(saved["watchMode"].is_null());
     assert_eq!(saved["watchOptions"], json!({"exclusiveOpenCheck": false}));
-    assert_eq!(serde_json::to_value(fx.ingest.list_folders().unwrap()).unwrap()[0]["watchOptions"], json!({"exclusiveOpenCheck": false}));
-    assert_eq!(bad.code(), ErrorCode::InvalidInput, "detector-specific options stay rejected for auto");
+    assert_eq!(
+        serde_json::to_value(fx.ingest.list_folders().unwrap()).unwrap()[0]["watchOptions"],
+        json!({"exclusiveOpenCheck": false})
+    );
+    assert_eq!(
+        bad.code(),
+        ErrorCode::InvalidInput,
+        "detector-specific options stay rejected for auto"
+    );
 }

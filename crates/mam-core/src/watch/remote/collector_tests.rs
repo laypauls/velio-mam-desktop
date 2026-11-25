@@ -10,17 +10,22 @@ use std::sync::mpsc::{Receiver, channel};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use super::{Attached, BatchCommitter, CommitError, CommitOutcome, Collector, Deps, FeedItem, Folders, Timings};
+use super::{
+    Attached, BatchCommitter, Collector, CommitError, CommitOutcome, Deps, FeedItem, Folders,
+    Timings,
+};
+use crate::SharedClock;
+use crate::secret::Secret;
+use crate::volume::VolumeKind;
+use crate::watch::detector::{
+    ChangeDetector, DetectError, DetectorOptions, ProbeResult, WatchHandle, WatchTarget,
+};
 use crate::watch::remote::fake::{FakeConnector, FakeDdp, FakeSecretBox, line};
 use crate::watch::remote::mapper::Mapping;
 use crate::watch::remote::runner::RunError;
 use crate::watch::remote::stats::Counts;
 use crate::watch::remote::tail::MAX_FETCH;
 use crate::watch::remote::{Auth, RemoteSource, SourceKind};
-use crate::SharedClock;
-use crate::secret::Secret;
-use crate::volume::VolumeKind;
-use crate::watch::detector::{ChangeDetector, DetectError, DetectorOptions, ProbeResult, WatchHandle, WatchTarget};
 use crate::watch::{ChangeSink, DetectorRegistry, SourceHealth, WatchManager, WatchMsg};
 
 const T0: i64 = 1_700_000_000_000;
@@ -48,7 +53,12 @@ impl ChangeDetector for Parking {
     fn probe(&self, _t: &WatchTarget) -> ProbeResult {
         ProbeResult::Available
     }
-    fn start(&self, t: &WatchTarget, _o: &DetectorOptions, sink: ChangeSink) -> Result<Box<dyn WatchHandle>, DetectError> {
+    fn start(
+        &self,
+        t: &WatchTarget,
+        _o: &DetectorOptions,
+        sink: ChangeSink,
+    ) -> Result<Box<dyn WatchHandle>, DetectError> {
         self.0.lock().unwrap().insert(t.folder_id, sink);
         Ok(Box::new(Handle))
     }
@@ -66,13 +76,28 @@ struct FakeCommitter {
 }
 
 impl BatchCommitter for FakeCommitter {
-    fn commit_feed(&self, _source_id: i64, items: &[FeedItem], cursor: &str, _origin: &'static str) -> Result<CommitOutcome, CommitError> {
+    fn commit_feed(
+        &self,
+        _source_id: i64,
+        items: &[FeedItem],
+        cursor: &str,
+        _origin: &'static str,
+    ) -> Result<CommitOutcome, CommitError> {
         if self.fail.load(Ordering::SeqCst) {
             return Err(CommitError("injected".into()));
         }
-        self.commits.lock().unwrap().push((items.iter().map(|i| (i.folder_id, i.path.clone())).collect(), cursor.to_string()));
+        self.commits.lock().unwrap().push((
+            items
+                .iter()
+                .map(|i| (i.folder_id, i.path.clone()))
+                .collect(),
+            cursor.to_string(),
+        ));
         *self.cursor.lock().unwrap() = Some(cursor.to_string());
-        Ok(CommitOutcome { overflowed: std::mem::take(&mut *self.overflow.lock().unwrap()), dropped: 0 })
+        Ok(CommitOutcome {
+            overflowed: std::mem::take(&mut *self.overflow.lock().unwrap()),
+            dropped: 0,
+        })
     }
 
     fn load_cursor(&self, _source_id: i64) -> Option<String> {
@@ -105,7 +130,13 @@ fn source(host_key: Option<&str>, rules: &[(&str, &str)]) -> RemoteSource {
         log_dir: Some("/tmp/audit".into()),
         db_path: None,
         poll_sec: 3,
-        path_map: rules.iter().map(|(f, t)| Mapping { from: (*f).into(), to: (*t).into() }).collect(),
+        path_map: rules
+            .iter()
+            .map(|(f, t)| Mapping {
+                from: (*f).into(),
+                to: (*t).into(),
+            })
+            .collect(),
     }
 }
 
@@ -114,7 +145,12 @@ fn timings() -> Timings {
 }
 
 /// `roots` = (폴더 ID, 루트 경로), `rules` = 경로 변환. 로그 파일 `audit-log.0` 은 비어 있게 시작한다.
-fn harness(roots: &[(i64, &str)], rules: &[(&str, &str)], host_key: Option<&str>, resumed: Option<String>) -> H {
+fn harness(
+    roots: &[(i64, &str)],
+    rules: &[(&str, &str)],
+    host_key: Option<&str>,
+    resumed: Option<String>,
+) -> H {
     let clock = Arc::new(Clock(AtomicI64::new(T0)));
     let shared: SharedClock = clock.clone();
     let ddp = FakeDdp::new("/tmp/audit");
@@ -125,7 +161,11 @@ fn harness(roots: &[(i64, &str)], rules: &[(&str, &str)], host_key: Option<&str>
     let sinks = Arc::new(Mutex::new(HashMap::new()));
     let (tx, rx) = channel();
     let all: Vec<Arc<dyn ChangeDetector>> = vec![Arc::new(Parking(Arc::clone(&sinks)))];
-    let m = WatchManager::with_clock(tx, Arc::new(DetectorRegistry::new(all, &["parking"])), Arc::clone(&shared));
+    let m = WatchManager::with_clock(
+        tx,
+        Arc::new(DetectorRegistry::new(all, &["parking"])),
+        Arc::clone(&shared),
+    );
     let folders: Folders = Arc::new(Mutex::new(Vec::new()));
     let mut h = H {
         c: Collector::new(
@@ -156,10 +196,19 @@ fn harness(roots: &[(i64, &str)], rules: &[(&str, &str)], host_key: Option<&str>
 
 impl H {
     fn attach(&mut self, id: i64, root: &str, late: bool) {
-        let t = WatchTarget { folder_id: id, root: PathBuf::from(root), volume_kind: VolumeKind::Fixed };
+        let t = WatchTarget {
+            folder_id: id,
+            root: PathBuf::from(root),
+            volume_kind: VolumeKind::Fixed,
+        };
         self.m.start(&t, None, None);
         let sink = self.sinks.lock().unwrap().get(&id).cloned().expect("sink");
-        self.folders.lock().unwrap().push(Attached { folder_id: id, root: root.into(), sink, needs_rescan: late });
+        self.folders.lock().unwrap().push(Attached {
+            folder_id: id,
+            root: root.into(),
+            sink,
+            needs_rescan: late,
+        });
     }
 
     fn advance(&self, ms: i64) {
@@ -168,7 +217,11 @@ impl H {
 
     /// 지금까지 도착한 재스캔 요청의 폴더 ID (정렬)
     fn rescans(&self) -> Vec<i64> {
-        let mut v: Vec<i64> = self.rx.try_iter().filter_map(|m| matches!(m, WatchMsg::Rescan { .. }).then(|| m.folder_id())).collect();
+        let mut v: Vec<i64> = self
+            .rx
+            .try_iter()
+            .filter_map(|m| matches!(m, WatchMsg::Rescan { .. }).then(|| m.folder_id()))
+            .collect();
         v.sort_unstable();
         v
     }
@@ -182,7 +235,13 @@ impl H {
     }
 
     fn last_items(&self) -> Vec<(i64, PathBuf)> {
-        self.commit.commits.lock().unwrap().last().map(|c| c.0.clone()).unwrap_or_default()
+        self.commit
+            .commits
+            .lock()
+            .unwrap()
+            .last()
+            .map(|c| c.0.clone())
+            .unwrap_or_default()
     }
 
     fn n_commits(&self) -> usize {
@@ -195,23 +254,55 @@ fn uhd() -> H {
 }
 
 #[test]
-fn t_remote_col_01_the_first_step_sets_a_baseline_stores_the_cursor_and_asks_each_folder_for_one_rescan() {
-    let mut h = harness(&[(1, r"F:\UHD"), (2, r"F:\UHD\1TV")], &[("/", r"F:\UHD")], Some(FP), None);
+fn t_remote_col_01_the_first_step_sets_a_baseline_stores_the_cursor_and_asks_each_folder_for_one_rescan()
+ {
+    let mut h = harness(
+        &[(1, r"F:\UHD"), (2, r"F:\UHD\1TV")],
+        &[("/", r"F:\UHD")],
+        Some(FP),
+        None,
+    );
     h.ddp.write("audit-log.0", &line("CREATE", "/old.mxf")); // 과거 줄은 읽지 않는다
     let wait = h.c.step();
     assert_eq!(wait, Duration::from_secs(3));
     assert_eq!(h.n_commits(), 1);
     assert!(h.last_items().is_empty(), "history is not replayed");
-    assert!(h.commit.cursor.lock().unwrap().as_deref().unwrap().contains("audit-log.0"));
-    assert_eq!(h.rescans(), vec![1, 2], "the unknown gap before the baseline is covered by one rescan per folder");
+    assert!(
+        h.commit
+            .cursor
+            .lock()
+            .unwrap()
+            .as_deref()
+            .unwrap()
+            .contains("audit-log.0")
+    );
+    assert_eq!(
+        h.rescans(),
+        vec![1, 2],
+        "the unknown gap before the baseline is covered by one rescan per folder"
+    );
     assert!(matches!(h.m.health(1), Some(SourceHealth::Ok { .. })));
 }
 
 #[test]
 fn t_remote_col_02_a_change_is_reported_only_to_folders_whose_root_contains_the_mapped_path() {
-    let mut h = harness(&[(1, r"F:\UHD"), (2, r"F:\UHD\1TV"), (3, r"G:\Other")], &[("/", r"F:\UHD")], Some(FP), None).primed();
-    h.ddp.write("audit-log.0", &(line("CREATE", "/1TV/a.mxf") + &line("WRITE", "/2TV/b.mxf") + &line("RENAME", "/tmp/c.mxf")));
-    h.ddp.write("audit-log.0", "2026-10-23 09:30:00.1  RENAME  iqn.kbs-01  |/tmp/d.mxf|/1TV/d.mxf\n");
+    let mut h = harness(
+        &[(1, r"F:\UHD"), (2, r"F:\UHD\1TV"), (3, r"G:\Other")],
+        &[("/", r"F:\UHD")],
+        Some(FP),
+        None,
+    )
+    .primed();
+    h.ddp.write(
+        "audit-log.0",
+        &(line("CREATE", "/1TV/a.mxf")
+            + &line("WRITE", "/2TV/b.mxf")
+            + &line("RENAME", "/tmp/c.mxf")),
+    );
+    h.ddp.write(
+        "audit-log.0",
+        "2026-10-23 09:30:00.1  RENAME  iqn.kbs-01  |/tmp/d.mxf|/1TV/d.mxf\n",
+    );
     h.c.step();
     let mut items = h.last_items();
     items.sort();
@@ -229,20 +320,43 @@ fn t_remote_col_02_a_change_is_reported_only_to_folders_whose_root_contains_the_
         ],
         "folder 3 (G:\\Other) never receives them"
     );
-    assert!(matches!(h.m.health(1), Some(SourceHealth::Ok { last_signal_at: Some(t) }) if t == T0 + 10_000));
-    assert!(matches!(h.m.health(3), Some(SourceHealth::Ok { last_signal_at: None })));
+    assert!(
+        matches!(h.m.health(1), Some(SourceHealth::Ok { last_signal_at: Some(t) }) if t == T0 + 10_000)
+    );
+    assert!(matches!(
+        h.m.health(3),
+        Some(SourceHealth::Ok {
+            last_signal_at: None
+        })
+    ));
 }
 
 #[test]
-fn t_remote_col_03_unmapped_and_outside_paths_are_dropped_and_counted_but_the_cursor_still_advances() {
-    let mut h = harness(&[(1, r"F:\UHD\1TV")], &[("/1TV", r"F:\UHD\1TV"), ("/other", r"F:\UHD\other")], Some(FP), None).primed();
+fn t_remote_col_03_unmapped_and_outside_paths_are_dropped_and_counted_but_the_cursor_still_advances()
+ {
+    let mut h = harness(
+        &[(1, r"F:\UHD\1TV")],
+        &[("/1TV", r"F:\UHD\1TV"), ("/other", r"F:\UHD\other")],
+        Some(FP),
+        None,
+    )
+    .primed();
     let before = h.n_commits();
-    h.ddp.write("audit-log.0", &(line("CREATE", "/2TV/x.mxf") + &line("CREATE", "/other/y.mxf") + &line("READ", "/1TV/z.mxf") + "garbage line\n"));
+    h.ddp.write(
+        "audit-log.0",
+        &(line("CREATE", "/2TV/x.mxf")
+            + &line("CREATE", "/other/y.mxf")
+            + &line("READ", "/1TV/z.mxf")
+            + "garbage line\n"),
+    );
     h.c.step();
     assert_eq!(h.n_commits(), before + 1, "cursor moved, so it is recorded");
     assert!(h.last_items().is_empty());
     let (win, _): (Counts, Counts) = h.c.counts();
-    assert_eq!((win.unmapped, win.outside, win.reported, win.bad), (1, 1, 0, 1));
+    assert_eq!(
+        (win.unmapped, win.outside, win.reported, win.bad),
+        (1, 1, 0, 1)
+    );
 }
 
 #[test]
@@ -252,7 +366,13 @@ fn t_remote_col_04_a_lost_connection_degrades_with_backoff_then_recovers_with_ex
     h.conn.fail_connects(2, RunError::Connect("down".into()));
     // 살아 있던 접속이 끊겼다: 바로 한 번 다시 붙어 보고(실패) -> Degraded, 15초 뒤 재시도
     assert_eq!(h.c.step(), Duration::from_secs(15));
-    assert_eq!(h.m.health(1), Some(SourceHealth::Degraded { since: T0 + 10_000, reason_key: "watch.health.remote_connect" }));
+    assert_eq!(
+        h.m.health(1),
+        Some(SourceHealth::Degraded {
+            since: T0 + 10_000,
+            reason_key: "watch.health.remote_connect"
+        })
+    );
     assert!(h.rescans().is_empty(), "no rescan while still down");
     assert_eq!(h.c.step(), Duration::from_secs(30), "backoff doubles");
     // 서버가 돌아왔다
@@ -267,14 +387,19 @@ fn t_remote_col_04_a_lost_connection_degrades_with_backoff_then_recovers_with_ex
 }
 
 #[test]
-fn t_remote_col_05_rescans_are_gated_to_one_per_folder_per_5s_and_the_blocked_one_is_deferred_not_lost() {
+fn t_remote_col_05_rescans_are_gated_to_one_per_folder_per_5s_and_the_blocked_one_is_deferred_not_lost()
+ {
     let mut h = uhd().primed(); // 마지막 재스캔: T0 (기준선), 지금 T0+10s
     // 로그가 갈아치워져(줄어듦) 공백 재스캔이 필요하다
     h.ddp.write("audit-log.0", &line("CREATE", "/a.mxf"));
     h.c.step();
     h.ddp.set("audit-log.0", "");
     h.c.step();
-    assert_eq!(h.rescans(), vec![1], "first shrink: the gate is open (10s since the baseline rescan)");
+    assert_eq!(
+        h.rescans(),
+        vec![1],
+        "first shrink: the gate is open (10s since the baseline rescan)"
+    );
     h.ddp.write("audit-log.0", &line("CREATE", "/b.mxf"));
     h.c.step();
     h.advance(1_000);
@@ -283,25 +408,41 @@ fn t_remote_col_05_rescans_are_gated_to_one_per_folder_per_5s_and_the_blocked_on
     assert!(h.rescans().is_empty(), "second shrink 1s later: held back");
     h.advance(4_000); // 첫 재스캔으로부터 정확히 5초 — 경계는 통과
     h.c.step();
-    assert_eq!(h.rescans(), vec![1], "the deferred request goes out once the gate opens");
+    assert_eq!(
+        h.rescans(),
+        vec![1],
+        "the deferred request goes out once the gate opens"
+    );
     h.c.step();
     assert!(h.rescans().is_empty());
 }
 
 #[test]
-fn t_remote_col_06_a_failed_record_keeps_the_cursor_and_the_same_lines_are_reported_after_the_next_success() {
+fn t_remote_col_06_a_failed_record_keeps_the_cursor_and_the_same_lines_are_reported_after_the_next_success()
+ {
     let mut h = uhd().primed();
     let saved = h.commit.cursor.lock().unwrap().clone();
     h.ddp.write("audit-log.0", &line("CREATE", "/a.mxf"));
     h.commit.fail.store(true, Ordering::SeqCst);
     h.c.step();
-    assert_eq!(*h.commit.cursor.lock().unwrap(), saved, "nothing was stored");
-    assert!(!h.c.is_degraded(), "a record failure is not a connection failure");
+    assert_eq!(
+        *h.commit.cursor.lock().unwrap(),
+        saved,
+        "nothing was stored"
+    );
+    assert!(
+        !h.c.is_degraded(),
+        "a record failure is not a connection failure"
+    );
     h.commit.fail.store(false, Ordering::SeqCst);
     h.c.step();
     assert_eq!(h.last_items(), vec![(1, PathBuf::from(r"F:\UHD\a.mxf"))]);
     h.c.step();
-    assert_eq!(h.n_commits(), 2, "prime + the one successful batch; no duplicate");
+    assert_eq!(
+        h.n_commits(),
+        2,
+        "prime + the one successful batch; no duplicate"
+    );
 }
 
 #[test]
@@ -309,23 +450,42 @@ fn t_remote_col_07_host_key_problems_are_distinct_hard_errors_that_back_off_for_
     // 지문 미확인 (저장된 호스트 키 없음)
     let mut h = harness(&[(1, r"F:\UHD")], &[("/", r"F:\UHD")], None, None);
     assert_eq!(h.c.step(), Duration::from_secs(300));
-    assert_eq!(h.m.health(1), Some(SourceHealth::Degraded { since: T0, reason_key: "watch.health.remote_host_key" }));
+    assert_eq!(
+        h.m.health(1),
+        Some(SourceHealth::Degraded {
+            since: T0,
+            reason_key: "watch.health.remote_host_key"
+        })
+    );
     assert_eq!(h.n_commits(), 0, "nothing is read from an unverified host");
     // 지문 불일치
     let mut h = harness(&[(1, r"F:\UHD")], &[("/", r"F:\UHD")], Some(OTHER_FP), None);
     assert_eq!(h.c.step(), Duration::from_secs(300));
-    assert_eq!(h.ddp.calls(), 0, "no command reaches a server whose key does not match");
+    assert_eq!(
+        h.ddp.calls(),
+        0,
+        "no command reaches a server whose key does not match"
+    );
     // 인증 실패도 계정 잠금을 피하려고 길게 쉰다
     let mut h = uhd();
     h.conn.fail_connects(1, RunError::Auth);
     assert_eq!(h.c.step(), Duration::from_secs(300));
-    assert_eq!(h.m.health(1), Some(SourceHealth::Degraded { since: T0, reason_key: "watch.health.remote_auth" }));
+    assert_eq!(
+        h.m.health(1),
+        Some(SourceHealth::Degraded {
+            since: T0,
+            reason_key: "watch.health.remote_auth"
+        })
+    );
 }
 
 #[test]
 fn t_remote_col_08_a_path_that_is_the_folder_root_itself_becomes_a_rescan_not_a_whole_tree_item() {
     let mut h = uhd().primed();
-    h.ddp.write("audit-log.0", &line("CREATE", "/UHD") /* maps to F:\UHD\UHD */ );
+    h.ddp.write(
+        "audit-log.0",
+        &line("CREATE", "/UHD"), /* maps to F:\UHD\UHD */
+    );
     h.c.step();
     assert_eq!(h.last_items().len(), 1);
     let mut h = harness(&[(1, r"F:\UHD")], &[("/media", r"F:\UHD")], Some(FP), None).primed();
@@ -336,7 +496,8 @@ fn t_remote_col_08_a_path_that_is_the_folder_root_itself_becomes_a_rescan_not_a_
 }
 
 #[test]
-fn t_remote_col_09_a_folder_attached_after_the_collector_started_gets_one_rescan_for_what_it_missed() {
+fn t_remote_col_09_a_folder_attached_after_the_collector_started_gets_one_rescan_for_what_it_missed()
+ {
     let mut h = uhd().primed();
     h.attach(2, r"F:\UHD\1TV", true);
     h.c.step();
@@ -360,12 +521,22 @@ fn t_remote_col_11_a_restart_resumes_from_the_stored_cursor_without_a_gap_rescan
     h.ddp.write("audit-log.0", &line("CREATE", "/seen.mxf"));
     h.c.step();
     let saved = h.commit.cursor.lock().unwrap().clone();
-    h.ddp.write("audit-log.0", &line("CREATE", "/while-off.mxf")); // 앱이 꺼져 있던 동안 쌓인 줄
+    h.ddp
+        .write("audit-log.0", &line("CREATE", "/while-off.mxf")); // 앱이 꺼져 있던 동안 쌓인 줄
     let mut h2 = harness(&[(1, r"F:\UHD")], &[("/", r"F:\UHD")], Some(FP), saved);
-    h2.ddp.set("audit-log.0", &(line("CREATE", "/seen.mxf") + &line("CREATE", "/while-off.mxf")));
+    h2.ddp.set(
+        "audit-log.0",
+        &(line("CREATE", "/seen.mxf") + &line("CREATE", "/while-off.mxf")),
+    );
     h2.c.step();
-    assert_eq!(h2.last_items(), vec![(1, PathBuf::from(r"F:\UHD\while-off.mxf"))]);
-    assert!(h2.rescans().is_empty(), "resumed from the cursor: nothing was missed");
+    assert_eq!(
+        h2.last_items(),
+        vec![(1, PathBuf::from(r"F:\UHD\while-off.mxf"))]
+    );
+    assert!(
+        h2.rescans().is_empty(),
+        "resumed from the cursor: nothing was missed"
+    );
 }
 
 #[test]
@@ -380,7 +551,8 @@ fn t_remote_col_12_the_same_path_reported_many_times_in_one_batch_is_one_item() 
 #[test]
 fn t_remote_col_13_more_than_1mib_in_one_poll_skips_to_the_end_and_requests_a_rescan() {
     let mut h = uhd().primed();
-    h.ddp.write("audit-log.0", &("x".repeat(MAX_FETCH as usize + 10) + "\n"));
+    h.ddp
+        .write("audit-log.0", &("x".repeat(MAX_FETCH as usize + 10) + "\n"));
     h.c.step();
     assert_eq!(h.rescans(), vec![1]);
     assert!(h.c.counts().0.skipped_bytes > MAX_FETCH);
@@ -394,8 +566,15 @@ fn t_remote_col_14_reload_applies_the_new_path_map_and_closes_the_connection() {
     h.c.reload(source(Some(FP), &[("/", r"F:\Elsewhere")]));
     h.ddp.write("audit-log.0", &line("CREATE", "/a.mxf"));
     h.c.step();
-    assert_eq!(h.conn.connects(), connects + 1, "reconnected with the new settings");
-    assert!(h.last_items().is_empty(), "F:\\Elsewhere\\a.mxf is outside F:\\UHD");
+    assert_eq!(
+        h.conn.connects(),
+        connects + 1,
+        "reconnected with the new settings"
+    );
+    assert!(
+        h.last_items().is_empty(),
+        "F:\\Elsewhere\\a.mxf is outside F:\\UHD"
+    );
 }
 
 #[test]
@@ -409,15 +588,26 @@ fn t_remote_col_15_secrets_never_reach_logs_or_debug_output_of_the_collector_inp
 }
 
 #[test]
-fn t_remote_col_16_a_missing_log_dir_or_empty_audit_logs_degrade_with_a_log_dir_reason_and_keep_the_connection() {
+fn t_remote_col_16_a_missing_log_dir_or_empty_audit_logs_degrade_with_a_log_dir_reason_and_keep_the_connection()
+ {
     let mut h = uhd().primed();
     h.ddp.set_dir_missing(true);
     h.c.step();
-    assert_eq!(h.m.health(1), Some(SourceHealth::Degraded { since: T0 + 10_000, reason_key: "watch.health.remote_log_dir" }));
+    assert_eq!(
+        h.m.health(1),
+        Some(SourceHealth::Degraded {
+            since: T0 + 10_000,
+            reason_key: "watch.health.remote_log_dir"
+        })
+    );
     let connects = h.conn.connects();
     h.ddp.set_dir_missing(false);
     h.advance(20_000);
     h.c.step();
     assert!(matches!(h.m.health(1), Some(SourceHealth::Ok { .. })));
-    assert_eq!(h.conn.connects(), connects, "a log directory problem does not drop the connection");
+    assert_eq!(
+        h.conn.connects(),
+        connects,
+        "a log directory problem does not drop the connection"
+    );
 }

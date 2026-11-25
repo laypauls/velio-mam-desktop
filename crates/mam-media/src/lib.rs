@@ -22,8 +22,8 @@ pub mod tool;
 pub mod wic;
 
 pub use error::{MediaError, Result};
-pub use gate::SidecarGate;
 pub use format::{Container, Detected, MediaKind, detect};
+pub use gate::SidecarGate;
 pub use image_meta::{ImageMeta, read_image_meta};
 pub use metadata::{MediaMetadata, extract_metadata, parse_iso_ms};
 pub use playback::{Playback, PlaybackVerdict, image_in_webview, playback_of, webview_playback};

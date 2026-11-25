@@ -42,7 +42,11 @@ pub fn hash_pixels(data: &[u8], stride: usize, w: u32, h: u32) -> u64 {
 
 impl FrameCache {
     pub fn new(cap: usize) -> Self {
-        Self { cap: cap.max(1), frames: VecDeque::new(), hits: 0 }
+        Self {
+            cap: cap.max(1),
+            frames: VecDeque::new(),
+            hits: 0,
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -65,7 +69,11 @@ impl FrameCache {
 
     /// 새로 렌더된 프레임을 맨 뒤(현재 화면)에 넣는다. 직전과 같은 내용이면(redraw) false. 크기가 바뀌면 이전 것을 버린다
     pub fn push(&mut self, hash: u64, w: u32, h: u32, stride: usize, data: &[u8]) -> bool {
-        if self.frames.back().is_some_and(|e| e.hash == hash && e.w == w && e.h == h) {
+        if self
+            .frames
+            .back()
+            .is_some_and(|e| e.hash == hash && e.w == w && e.h == h)
+        {
             return false;
         }
         if self.frames.back().is_some_and(|e| e.w != w || e.h != h) {
@@ -74,7 +82,13 @@ impl FrameCache {
         if self.frames.len() == self.cap {
             self.frames.pop_front();
         }
-        self.frames.push_back(Entry { hash, w, h, stride, data: data.to_vec() });
+        self.frames.push_back(Entry {
+            hash,
+            w,
+            h,
+            stride,
+            data: data.to_vec(),
+        });
         true
     }
 
@@ -132,7 +146,11 @@ mod tests {
         assert_eq!(c.len(), 3);
         c.step_back();
         c.step_back();
-        assert_eq!(c.step_back().map(|e| e.data[0]), None, "가장 오래된 두 장(0,1)은 밀려났다");
+        assert_eq!(
+            c.step_back().map(|e| e.data[0]),
+            None,
+            "가장 오래된 두 장(0,1)은 밀려났다"
+        );
     }
 
     #[test]

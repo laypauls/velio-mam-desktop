@@ -14,7 +14,11 @@ const P: &str = "com.example.scanyield";
 
 fn world() -> (Env, i64) {
     let env = Env::new();
-    env.install(Plugin::new(P, "scripted").provider("meta.run", ProviderKind::Metadata, &[AssetKind::Image]));
+    env.install(Plugin::new(P, "scripted").provider(
+        "meta.run",
+        ProviderKind::Metadata,
+        &[AssetKind::Image],
+    ));
     let asset = env.add_asset("image", "a.jpg");
     (env, asset)
 }
@@ -25,7 +29,12 @@ fn scan_job(env: &Env, asset: i64, kind: &str, status: &str) {
 
 #[test]
 fn t_pjob_28_feed_waits_while_a_scan_family_job_is_pending_or_running_and_resumes_after() {
-    for (kind, status) in [("scan", "pending"), ("meta", "running"), ("thumb", "pending"), ("hash", "running")] {
+    for (kind, status) in [
+        ("scan", "pending"),
+        ("meta", "running"),
+        ("thumb", "pending"),
+        ("hash", "running"),
+    ] {
         // Arrange
         let (env, asset) = world();
         let cursor = env.cursor(P);
@@ -37,7 +46,11 @@ fn t_pjob_28_feed_waits_while_a_scan_family_job_is_pending_or_running_and_resume
 
         // Assert: 커서·작업 모두 그대로
         assert!(!more, "{kind}/{status}");
-        assert_eq!(env.cursor(P), cursor, "{kind}/{status}: cursor must not move");
+        assert_eq!(
+            env.cursor(P),
+            cursor,
+            "{kind}/{status}: cursor must not move"
+        );
         assert_eq!(env.task_rows(P), 0, "{kind}/{status}: no write tx");
 
         // Act: 스캔 작업이 끝나면

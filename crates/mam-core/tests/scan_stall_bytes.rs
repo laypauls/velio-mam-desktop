@@ -24,7 +24,11 @@ fn stalled(env: &Env, id: i64) -> bool {
 
 fn scanning_one_file(env: &Env) -> i64 {
     env.write("lib/big.mov", 1);
-    let id = env.ingest.add_folder(env.path("lib").to_str().unwrap()).unwrap().folder_id;
+    let id = env
+        .ingest
+        .add_folder(env.path("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id;
     let p = env.ingest.env();
     p.progress.start(id, r"X:\lib".into(), 0, env.clock_now());
     p.progress.hold(id, r"X:\lib\big.mov", env.clock_now());
@@ -62,7 +66,10 @@ fn t_stall_10_no_bytes_for_three_minutes_is_a_stall_and_a_new_byte_recovers_it()
 
     // Assert: 붙든 경로 그대로 멈춤 표시, 시작 시각은 마지막 진행 시각
     let s = env.ingest.scan_stalls().remove(&id).expect("stalled");
-    assert_eq!((s.at_path.as_str(), s.since), (r"X:\lib\big.mov", held_since));
+    assert_eq!(
+        (s.at_path.as_str(), s.since),
+        (r"X:\lib\big.mov", held_since)
+    );
     // 바이트가 다시 읽히면 풀린다 (처리 건수는 늘지 않았다)
     env.ingest.env().progress.bytes_read(id, env.clock_now());
     assert!(!stalled(&env, id));
@@ -119,13 +126,21 @@ fn scan_a_touched_file(report: bool) -> Arc<SlowHasher> {
         stalled_during: AtomicBool::new(false),
         stalled_at_end: AtomicBool::new(false),
     });
-    let env = Env::with_deps(|_, _| {}, Arc::new(mam_core::WindowsFileIdentity), hasher.clone());
+    let env = Env::with_deps(
+        |_, _| {},
+        Arc::new(mam_core::WindowsFileIdentity),
+        hasher.clone(),
+    );
     *hasher.attached.lock().unwrap() = Some((Arc::clone(&env.clock), Arc::clone(env.ingest.env())));
     let p = env.path("lib/a.mov");
     std::fs::create_dir_all(p.parent().unwrap()).unwrap();
     let content = vec![5u8; 20_000];
     std::fs::write(&p, &content).unwrap();
-    let id = env.ingest.add_folder(env.path("lib").to_str().unwrap()).unwrap().folder_id;
+    let id = env
+        .ingest
+        .add_folder(env.path("lib").to_str().unwrap())
+        .unwrap()
+        .folder_id;
     scan_folder(env.ingest.env(), id, &|| false, &AtomicBool::new(false)).unwrap();
     let hash = blake3::hash(&content).as_bytes().to_vec();
     env.pool
@@ -134,7 +149,8 @@ fn scan_a_touched_file(report: bool) -> Arc<SlowHasher> {
         })
         .unwrap();
     let f = std::fs::OpenOptions::new().write(true).open(&p).unwrap();
-    f.set_modified(std::time::SystemTime::now() + std::time::Duration::from_secs(60)).unwrap();
+    f.set_modified(std::time::SystemTime::now() + std::time::Duration::from_secs(60))
+        .unwrap();
     drop(f);
     env.clock.advance(1_000);
     scan_folder(env.ingest.env(), id, &|| false, &AtomicBool::new(false)).unwrap();
@@ -147,9 +163,15 @@ fn t_stall_11_the_real_hash_path_reports_bytes_so_a_four_minute_hash_is_not_a_st
     let hasher = scan_a_touched_file(true);
 
     // Assert: 진행을 알렸고, 4분이 지나도 멈춤으로 판정되지 않았다
-    assert!(hasher.reports.load(Ordering::SeqCst) >= 8, "the hash path must report progress");
+    assert!(
+        hasher.reports.load(Ordering::SeqCst) >= 8,
+        "the hash path must report progress"
+    );
     assert!(!hasher.stalled_during.load(Ordering::SeqCst));
-    assert!(!hasher.stalled_at_end.load(Ordering::SeqCst), "4 min with steady bytes is not a stall");
+    assert!(
+        !hasher.stalled_at_end.load(Ordering::SeqCst),
+        "4 min with steady bytes is not a stall"
+    );
 }
 
 #[test]
@@ -159,6 +181,9 @@ fn t_stall_12_a_hash_that_reports_no_bytes_is_a_stall_at_three_minutes_on_the_sa
 
     // Assert: 3분 경계를 넘긴 뒤에는 멈춤 (도중에 이미 판정됐다)
     assert_eq!(hasher.reports.load(Ordering::SeqCst), 0);
-    assert!(hasher.stalled_during.load(Ordering::SeqCst), "must be stalled once 3 minutes pass without bytes");
+    assert!(
+        hasher.stalled_during.load(Ordering::SeqCst),
+        "must be stalled once 3 minutes pass without bytes"
+    );
     assert!(hasher.stalled_at_end.load(Ordering::SeqCst));
 }

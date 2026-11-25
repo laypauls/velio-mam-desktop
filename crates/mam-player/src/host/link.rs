@@ -12,7 +12,9 @@ use std::time::Instant;
 use super::proc::{WorkerConn, WorkerProcess};
 use super::surface::FrameSurface;
 use crate::protocol::wire::MAX_LINE_BYTES;
-use crate::protocol::{Command, FrameMsgOut, Message, Request, SlotRef, decode_line, encode_line, read_bounded_line};
+use crate::protocol::{
+    Command, FrameMsgOut, Message, Request, SlotRef, decode_line, encode_line, read_bounded_line,
+};
 
 /// 쓰기 큐 길이 — 가득 차면 워커가 멈춘 것이다 (감독자의 침묵 감시가 처리한다)
 const WRITE_QUEUE: usize = 256;
@@ -21,7 +23,10 @@ const WRITE_QUEUE: usize = 256;
 pub(crate) enum Inbox {
     Req(super::core::Req),
     /// `msg == None` = 이벤트 파이프 종료(워커 종료·크래시)
-    Worker { inc: u64, msg: Option<Message> },
+    Worker {
+        inc: u64,
+        msg: Option<Message>,
+    },
     /// 기다리던 프레임이 도착했다 (`want_frame` 가 켜져 있을 때 한 번)
     FrameSeen,
 }
@@ -60,12 +65,15 @@ impl Shared {
     }
 
     pub fn touch(&self) {
-        self.last_msg_ms.store(self.base.elapsed().as_millis() as u64, Ordering::Relaxed);
+        self.last_msg_ms
+            .store(self.base.elapsed().as_millis() as u64, Ordering::Relaxed);
     }
 
     pub fn silence(&self) -> std::time::Duration {
         let now = self.base.elapsed().as_millis() as u64;
-        std::time::Duration::from_millis(now.saturating_sub(self.last_msg_ms.load(Ordering::Relaxed)))
+        std::time::Duration::from_millis(
+            now.saturating_sub(self.last_msg_ms.load(Ordering::Relaxed)),
+        )
     }
 
     fn writer_lock(&self) -> std::sync::MutexGuard<'_, Option<SyncSender<String>>> {
@@ -81,8 +89,19 @@ impl Shared {
         if epoch == 0 || epoch != self.epoch.load(Ordering::Acquire) || slots.is_empty() {
             return;
         }
-        let cmd = Command::Release { epoch, slots: slots.iter().map(|&(slot, seq)| SlotRef { slot, seq }).collect() };
-        let Ok(line) = encode_line(&Request { id: 0, command: cmd }) else { return };
+        let cmd = Command::Release {
+            epoch,
+            slots: slots
+                .iter()
+                .map(|&(slot, seq)| SlotRef { slot, seq })
+                .collect(),
+        };
+        let Ok(line) = encode_line(&Request {
+            id: 0,
+            command: cmd,
+        }) else {
+            return;
+        };
         let guard = self.writer_lock();
         if let Some(tx) = guard.as_ref()
             && let Err(TrySendError::Full(_) | TrySendError::Disconnected(_)) = tx.try_send(line)
@@ -143,7 +162,11 @@ pub(crate) fn start(
     let mut cmd = cmd;
     let writer = std::thread::spawn(move || {
         for line in wrx {
-            if cmd.write_all(line.as_bytes()).and_then(|_| cmd.flush()).is_err() {
+            if cmd
+                .write_all(line.as_bytes())
+                .and_then(|_| cmd.flush())
+                .is_err()
+            {
                 break;
             }
         }
@@ -160,7 +183,9 @@ pub(crate) fn start(
                 Ok(0) | Err(_) => break,
                 Ok(_) => {}
             }
-            let Ok(msg) = decode_line::<Message>(&line) else { continue };
+            let Ok(msg) = decode_line::<Message>(&line) else {
+                continue;
+            };
             if inc_is_current(&sh, id) {
                 sh.touch();
             }
@@ -172,10 +197,28 @@ pub(crate) fn start(
                 continue;
             }
             match msg {
-                Message::FrameReady { epoch, slot, seq, w, h, stride, render_done_ms } => {
+                Message::FrameReady {
+                    epoch,
+                    slot,
+                    seq,
+                    w,
+                    h,
+                    stride,
+                    render_done_ms,
+                } => {
                     // 빠른 경로: 현재 세대·epoch 의 프레임만 UI 로 보낸다 (오래된 세대·epoch 는 버린다 — JS 가 받지 않았으니 슬롯은 워커가 Attach 로 정리)
-                    if sh.inc.load(Ordering::Acquire) == id && sh.epoch.load(Ordering::Acquire) == epoch {
-                        sf.post_frame(&FrameMsgOut::new(epoch, slot, seq, w, h, stride, render_done_ms));
+                    if sh.inc.load(Ordering::Acquire) == id
+                        && sh.epoch.load(Ordering::Acquire) == epoch
+                    {
+                        sf.post_frame(&FrameMsgOut::new(
+                            epoch,
+                            slot,
+                            seq,
+                            w,
+                            h,
+                            stride,
+                            render_done_ms,
+                        ));
                         sh.frames.fetch_add(1, Ordering::AcqRel);
                         if sh.want_frame.swap(false, Ordering::AcqRel) {
                             let _ = inbox.send(Inbox::FrameSeen);
@@ -185,7 +228,13 @@ pub(crate) fn start(
                 // 하트비트는 침묵 감시용 touch 로 충분하다
                 Message::Stats { .. } => {}
                 m => {
-                    if inbox.send(Inbox::Worker { inc: id, msg: Some(m) }).is_err() {
+                    if inbox
+                        .send(Inbox::Worker {
+                            inc: id,
+                            msg: Some(m),
+                        })
+                        .is_err()
+                    {
                         return;
                     }
                 }
@@ -199,7 +248,16 @@ pub(crate) fn start(
         }
     });
 
-    (Inc { id, process, tx, next_cmd: 0, threads: vec![writer, reader] }, ready_rx)
+    (
+        Inc {
+            id,
+            process,
+            tx,
+            next_cmd: 0,
+            threads: vec![writer, reader],
+        },
+        ready_rx,
+    )
 }
 
 /// 읽기 스레드는 자기 세대가 현재일 때만 침묵 시계를 갱신한다 (이전 세대의 늦은 메시지가 새 워커의 침묵을 가리지 않게). 호출자가 `start` 전에 `shared.inc` 를 세대로 맞춘다

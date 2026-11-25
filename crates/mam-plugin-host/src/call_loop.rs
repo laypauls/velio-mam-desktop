@@ -24,7 +24,10 @@ pub(crate) struct CallCtx<'a> {
 
 impl CallCtx<'_> {
     fn cx(&self) -> CallCx<'_> {
-        CallCx { plugin: self.plugin, scope: self.scope }
+        CallCx {
+            plugin: self.plugin,
+            scope: self.scope,
+        }
     }
 }
 
@@ -44,8 +47,21 @@ fn host_reply(c: &CallCtx<'_>, id: u64, method: &str, params: Value) -> HostMsg 
     let out = catch_unwind(AssertUnwindSafe(|| c.api.call(&c.cx(), method, params)))
         .unwrap_or_else(|_| Err(HostError::new(codes::HOST_PANIC, "host function failed")));
     match out {
-        Ok(v) => HostMsg::HostResult { id, ok: true, value: Some(v), error: None },
-        Err(e) => HostMsg::HostResult { id, ok: false, value: None, error: Some(ErrorBody { code: e.code, message: e.message }) },
+        Ok(v) => HostMsg::HostResult {
+            id,
+            ok: true,
+            value: Some(v),
+            error: None,
+        },
+        Err(e) => HostMsg::HostResult {
+            id,
+            ok: false,
+            value: None,
+            error: Some(ErrorBody {
+                code: e.code,
+                message: e.message,
+            }),
+        },
     }
 }
 
@@ -53,13 +69,20 @@ fn map_error(e: Option<ErrorBody>) -> InvokeError {
     match e {
         Some(b) if b.code == CODE_LIMIT => InvokeError::Limit(b.message),
         Some(b) if b.code == CODE_SCRIPT => InvokeError::Script(b.message),
-        Some(b) => InvokeError::Plugin { code: b.code, message: b.message },
+        Some(b) => InvokeError::Plugin {
+            code: b.code,
+            message: b.message,
+        },
         None => InvokeError::Protocol("failed result without error body".into()),
     }
 }
 
 /// `call_id` 에 대한 `result` 가 올 때까지 처리한다. 호출자는 오류가 결함이면 워커를 종료한다
-pub(crate) fn run_call(w: &mut WorkerProc, c: &CallCtx<'_>, call_id: u64) -> Result<Value, InvokeError> {
+pub(crate) fn run_call(
+    w: &mut WorkerProc,
+    c: &CallCtx<'_>,
+    call_id: u64,
+) -> Result<Value, InvokeError> {
     let deadline = c.scope.deadline;
     let mut seen = 0usize;
     loop {
@@ -82,12 +105,27 @@ pub(crate) fn run_call(w: &mut WorkerProc, c: &CallCtx<'_>, call_id: u64) -> Res
                 let reply = host_reply(c, id, &method, params);
                 w.send(&reply).map_err(|_| InvokeError::Crashed)?;
             }
-            WorkerMsg::Log { level, message } => c.api.log(&c.cx(), level, truncate(&message, MAX_LOG_BYTES)),
-            WorkerMsg::Result { id, ok, value, error } if id == call_id => {
-                return if ok { Ok(value.unwrap_or(Value::Null)) } else { Err(map_error(error)) };
+            WorkerMsg::Log { level, message } => {
+                c.api.log(&c.cx(), level, truncate(&message, MAX_LOG_BYTES))
             }
-            WorkerMsg::Result { .. } => return Err(InvokeError::Protocol("result for a different call".into())),
-            WorkerMsg::Ready { .. } | WorkerMsg::InitError { .. } => return Err(InvokeError::Protocol("unexpected handshake message".into())),
+            WorkerMsg::Result {
+                id,
+                ok,
+                value,
+                error,
+            } if id == call_id => {
+                return if ok {
+                    Ok(value.unwrap_or(Value::Null))
+                } else {
+                    Err(map_error(error))
+                };
+            }
+            WorkerMsg::Result { .. } => {
+                return Err(InvokeError::Protocol("result for a different call".into()));
+            }
+            WorkerMsg::Ready { .. } | WorkerMsg::InitError { .. } => {
+                return Err(InvokeError::Protocol("unexpected handshake message".into()));
+            }
         }
     }
 }

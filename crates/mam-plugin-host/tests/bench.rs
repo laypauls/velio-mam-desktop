@@ -14,7 +14,14 @@ fn pct(sorted: &[Duration], p: f64) -> f64 {
 
 fn report(label: &str, mut v: Vec<Duration>) {
     v.sort();
-    eprintln!("BENCH {label}: n={} P50={:.3}ms P95={:.3}ms P99={:.3}ms max={:.3}ms", v.len(), pct(&v, 0.50), pct(&v, 0.95), pct(&v, 0.99), v.last().map_or(0.0, |d| d.as_secs_f64() * 1000.0));
+    eprintln!(
+        "BENCH {label}: n={} P50={:.3}ms P95={:.3}ms P99={:.3}ms max={:.3}ms",
+        v.len(),
+        pct(&v, 0.50),
+        pct(&v, 0.95),
+        pct(&v, 0.99),
+        v.last().map_or(0.0, |d| d.as_secs_f64() * 1000.0)
+    );
 }
 
 #[test]
@@ -31,7 +38,10 @@ fn t_phost_bench_01_cold_start_and_round_trip_latency() {
     }
     report("cold start (first call incl. spawn)", cold);
     // 왕복: 워밍업 200 + 측정 2000 을 3 회. echo(호스트 호출 없음) 와 hostcall(호스트 호출 1회, F5 와 같은 형태)
-    for (label, cmd) in [("round trip echo (no host call)", "echo"), ("round trip hostcall (1 host call)", "hostcall")] {
+    for (label, cmd) in [
+        ("round trip echo (no host call)", "echo"),
+        ("round trip hostcall (1 host call)", "hostcall"),
+    ] {
         for rep in 1..=3 {
             let (host, _, _) = new_host(PLUGIN, |_| {});
             for _ in 0..200 {

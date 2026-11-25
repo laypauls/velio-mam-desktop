@@ -37,7 +37,10 @@ fn t_phost_sbx_01_file_network_and_process_access_are_impossible_verified_by_hos
     let dir = tempfile::tempdir().unwrap();
     let secret = dir.path().join("secret.txt");
     std::fs::write(&secret, "TOPSECRET-d41d8cd9").unwrap();
-    let (write_path, marker) = (dir.path().join("written.txt"), dir.path().join("marker.txt"));
+    let (write_path, marker) = (
+        dir.path().join("written.txt"),
+        dir.path().join("marker.txt"),
+    );
     let module = dir.path().join("evil.js");
     std::fs::write(&module, "globalThis.__evil = 'loaded';").unwrap();
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -53,17 +56,52 @@ fn t_phost_sbx_01_file_network_and_process_access_are_impossible_verified_by_hos
     let after = run(&host, "after", json!(null)).unwrap();
 
     // Assert (호스트 직접 확인): 유출 없음 / 파일·표식 미생성 / 접속 없음
-    assert!(!report.to_string().contains("TOPSECRET"), "비밀 파일 내용이 보고에 나타남: {report}");
+    assert!(
+        !report.to_string().contains("TOPSECRET"),
+        "비밀 파일 내용이 보고에 나타남: {report}"
+    );
     assert!(!write_path.exists(), "쓰기 성공");
     assert!(!marker.exists(), "자식 프로세스 실행됨");
-    assert!(matches!(listener.accept(), Err(e) if e.kind() == std::io::ErrorKind::WouldBlock), "호스트 리스너에 접속됨");
-    assert_eq!(std::fs::read_to_string(&secret).unwrap(), "TOPSECRET-d41d8cd9", "원본 불변");
+    assert!(
+        matches!(listener.accept(), Err(e) if e.kind() == std::io::ErrorKind::WouldBlock),
+        "호스트 리스너에 접속됨"
+    );
+    assert_eq!(
+        std::fs::read_to_string(&secret).unwrap(),
+        "TOPSECRET-d41d8cd9",
+        "원본 불변"
+    );
     // Assert (보조): 모듈 import 는 거부, 위험 전역은 없음, 모든 시도가 실패
     assert_eq!(after, json!({"imp": "rejected", "evil": "undefined"}));
-    for name in ["require", "std", "os", "fetch", "XMLHttpRequest", "WebSocket", "process", "Deno", "Bun", "scriptArgs", "module", "Worker", "WebAssembly", "console"] {
+    for name in [
+        "require",
+        "std",
+        "os",
+        "fetch",
+        "XMLHttpRequest",
+        "WebSocket",
+        "process",
+        "Deno",
+        "Bun",
+        "scriptArgs",
+        "module",
+        "Worker",
+        "WebAssembly",
+        "console",
+    ] {
         assert_eq!(report["types"][name], "undefined", "전역 {name} 이 존재함");
     }
-    for k in ["read_node", "read_std", "write_node", "write_std", "net_node", "fetch", "spawn_node", "spawn_os", "mam_mutation"] {
+    for k in [
+        "read_node",
+        "read_std",
+        "write_node",
+        "write_std",
+        "net_node",
+        "fetch",
+        "spawn_node",
+        "spawn_os",
+        "mam_mutation",
+    ] {
         assert_eq!(report[k]["ok"], Value::Bool(false), "{k}: {}", report[k]);
     }
 }
@@ -80,7 +118,10 @@ fn t_phost_sbx_02_control_group_proves_the_attack_code_is_valid() {
     let accepted = listener.accept().ok();
     assert!(accepted.is_some());
     let f = dir.path().join("m.txt");
-    std::process::Command::new("cmd.exe").args(["/c", &format!("echo x> {}", f.display())]).status().unwrap();
+    std::process::Command::new("cmd.exe")
+        .args(["/c", &format!("echo x> {}", f.display())])
+        .status()
+        .unwrap();
     assert!(f.exists(), "표식 검사 수단이 파일 생성을 감지한다");
 }
 

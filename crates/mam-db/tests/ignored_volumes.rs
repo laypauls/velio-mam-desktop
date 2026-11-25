@@ -70,7 +70,10 @@ fn t_ignvol_db_03_corrupt_json_falls_back_to_empty_and_add_recovers() {
         db.conn.execute("DELETE FROM settings", []).unwrap();
         put_raw(&db.conn, raw);
 
-        assert!(load_ignored_volumes(&db.conn).unwrap().is_empty(), "raw = {raw}");
+        assert!(
+            load_ignored_volumes(&db.conn).unwrap().is_empty(),
+            "raw = {raw}"
+        );
     }
     // 깨진 값 위에 추가하면 정상 목록으로 복구된다
     add_ignored_volume(&db.conn, &vol("k", None, None, 1)).unwrap();
@@ -123,7 +126,10 @@ fn t_ignvol_db_06_remove_and_update_of_unknown_key_are_no_ops() {
     assert_eq!(load_ignored_volumes(&db.conn).unwrap().len(), 1);
     assert!(remove_ignored_volume(&db.conn, "k1").unwrap());
     assert!(load_ignored_volumes(&db.conn).unwrap().is_empty());
-    assert!(!remove_ignored_volume(&db.conn, "k1").unwrap(), "second remove");
+    assert!(
+        !remove_ignored_volume(&db.conn, "k1").unwrap(),
+        "second remove"
+    );
 }
 
 #[test]
@@ -144,7 +150,11 @@ fn t_ignvol_db_07_key_is_invisible_to_settings_load_and_patch() {
             Err(settings::SettingsError::Unknown(_))
         ));
     }
-    assert_eq!(load_ignored_volumes(&db.conn).unwrap().len(), 1, "state untouched");
+    assert_eq!(
+        load_ignored_volumes(&db.conn).unwrap().len(),
+        1,
+        "state untouched"
+    );
 }
 
 #[test]

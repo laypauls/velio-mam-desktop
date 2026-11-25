@@ -74,7 +74,10 @@ fn t_hide_core_02_hiding_does_not_stop_scanning_and_never_touches_originals() {
     let outcome = scan_folder(env.ingest.env(), lib, &|| false, &AtomicBool::new(false)).unwrap();
 
     // Assert
-    assert!(matches!(outcome, ScanOutcome::Completed { .. }), "{outcome:?}");
+    assert!(
+        matches!(outcome, ScanOutcome::Completed { .. }),
+        "{outcome:?}"
+    );
     assert_eq!(env.count("SELECT COUNT(*) FROM media_assets"), 2);
     assert_eq!(
         env.count("SELECT COUNT(*) FROM search_outbox WHERE event_type = 'upsert'"),
@@ -92,19 +95,37 @@ fn t_hide_core_03_unknown_and_removed_folders_are_not_found() {
     let lib = add(&env, "lib");
 
     // Act + Assert: 없는 폴더
-    assert!(matches!(env.ingest.set_folder_hidden(9999, true), Err(IngestError::NotFound)));
-    assert!(matches!(env.ingest.set_folder_hidden(-1, false), Err(IngestError::NotFound)));
+    assert!(matches!(
+        env.ingest.set_folder_hidden(9999, true),
+        Err(IngestError::NotFound)
+    ));
+    assert!(matches!(
+        env.ingest.set_folder_hidden(-1, false),
+        Err(IngestError::NotFound)
+    ));
 
     // 등록 해제 중(enabled = 0)
-    exec(&env, &format!("UPDATE managed_folders SET enabled = 0 WHERE folder_id = {lib}"));
-    assert!(matches!(env.ingest.set_folder_hidden(lib, true), Err(IngestError::NotFound)));
-    exec(&env, &format!("UPDATE managed_folders SET enabled = 1 WHERE folder_id = {lib}"));
+    exec(
+        &env,
+        &format!("UPDATE managed_folders SET enabled = 0 WHERE folder_id = {lib}"),
+    );
+    assert!(matches!(
+        env.ingest.set_folder_hidden(lib, true),
+        Err(IngestError::NotFound)
+    ));
+    exec(
+        &env,
+        &format!("UPDATE managed_folders SET enabled = 1 WHERE folder_id = {lib}"),
+    );
     assert!(!hidden_of(&env, lib), "거부된 호출은 값을 바꾸지 않는다");
 
     // 제거 완료 후
     env.ingest.remove_folder(lib).unwrap();
     env.ingest.wait_removals();
-    assert!(matches!(env.ingest.set_folder_hidden(lib, true), Err(IngestError::NotFound)));
+    assert!(matches!(
+        env.ingest.set_folder_hidden(lib, true),
+        Err(IngestError::NotFound)
+    ));
 }
 
 #[test]
@@ -132,15 +153,16 @@ fn t_hide_core_05_hidden_folder_ids_keeps_a_folder_that_is_being_removed() {
     env.write("b/y.jpg", 2);
     env.write("c/z.jpg", 3);
     let (a, b, c) = (add(&env, "a"), add(&env, "b"), add(&env, "c"));
-    let ids = || {
-        env.read(|conn| mam_core::scan::hidden_folder_ids(conn).unwrap())
-    };
+    let ids = || env.read(|conn| mam_core::scan::hidden_folder_ids(conn).unwrap());
     assert!(ids().is_empty());
 
     // Act
     env.ingest.set_folder_hidden(a, true).unwrap();
     env.ingest.set_folder_hidden(c, true).unwrap();
-    exec(&env, &format!("UPDATE managed_folders SET enabled = 0 WHERE folder_id = {c}"));
+    exec(
+        &env,
+        &format!("UPDATE managed_folders SET enabled = 0 WHERE folder_id = {c}"),
+    );
 
     // Assert: 등록 해제 중인 c 도 제외 목록에 남는다 (detach 도중 색인 문서가 다시 보이면 안 된다). 숨기지 않은 b 는 없다
     assert_eq!(ids(), [a as u64, c as u64]);
@@ -156,7 +178,11 @@ fn scanned_two_folders(env: &Env) -> (i64, i64, [i64; 3]) {
     for f in [lib, other] {
         scan_folder(env.ingest.env(), f, &|| false, &AtomicBool::new(false)).unwrap();
     }
-    let id = |n: &str| env.count(&format!("SELECT asset_id FROM file_locations WHERE rel_path LIKE '%{n}'"));
+    let id = |n: &str| {
+        env.count(&format!(
+            "SELECT asset_id FROM file_locations WHERE rel_path LIKE '%{n}'"
+        ))
+    };
     (lib, other, [id("a.jpg"), id("b.jpg"), id("c.jpg")])
 }
 
@@ -185,7 +211,11 @@ fn t_hide_core_07_rating_counts_exclude_hidden_folder_assets_including_unrated()
 
     // Act + Assert
     env.ingest.set_folder_hidden(lib, true).unwrap();
-    assert_eq!(ud.rating_counts().unwrap(), [0, 0, 0, 0, 0, 1], "a(5점)·b(미평가) 가 빠진다");
+    assert_eq!(
+        ud.rating_counts().unwrap(),
+        [0, 0, 0, 0, 0, 1],
+        "a(5점)·b(미평가) 가 빠진다"
+    );
     env.ingest.set_folder_hidden(lib, false).unwrap();
     assert_eq!(ud.rating_counts().unwrap(), [1, 0, 0, 0, 0, 2]);
 }
@@ -196,8 +226,12 @@ fn t_hide_core_08_tag_counts_exclude_hidden_folder_assets() {
     let env = Env::new();
     let (lib, _other, [a, _b, c]) = scanned_two_folders(&env);
     let ud = UserData::new(Arc::clone(&env.pool), env.clock.clone());
-    ud.update_asset_tags(UpdateTagsInput { asset_ids: vec![a, c], add: vec!["trip".into()], remove: vec![] })
-        .unwrap();
+    ud.update_asset_tags(UpdateTagsInput {
+        asset_ids: vec![a, c],
+        add: vec!["trip".into()],
+        remove: vec![],
+    })
+    .unwrap();
     let count = || ud.list_tags().unwrap()[0].asset_count;
     assert_eq!(count(), 2);
 
@@ -218,7 +252,10 @@ fn t_hide_core_09_counts_still_exclude_a_hidden_folder_that_is_being_removed() {
     env.ingest.set_folder_hidden(lib, true).unwrap();
 
     // Act
-    exec(&env, &format!("UPDATE managed_folders SET enabled = 0 WHERE folder_id = {lib}"));
+    exec(
+        &env,
+        &format!("UPDATE managed_folders SET enabled = 0 WHERE folder_id = {lib}"),
+    );
 
     // Assert
     assert_eq!(ud.rating_counts().unwrap(), [0, 0, 0, 0, 0, 1]);

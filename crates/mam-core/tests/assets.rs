@@ -14,7 +14,9 @@ use rusqlite::Connection;
 fn env_with_volume() -> Env {
     let env = Env::new();
     std::fs::create_dir_all(env.path("lib")).unwrap();
-    env.ingest.add_folder(env.path("lib").to_str().unwrap()).unwrap();
+    env.ingest
+        .add_folder(env.path("lib").to_str().unwrap())
+        .unwrap();
     env
 }
 
@@ -27,7 +29,9 @@ fn set_hash(env: &Env, ids: &[i64], hash_byte: u8) {
     let hex = format!("{hash_byte:02x}").repeat(32);
     exec(
         env,
-        &format!("UPDATE media_assets SET hash_state = 'done', hash_algo = 'blake3', content_hash = X'{hex}' WHERE asset_id IN ({list})"),
+        &format!(
+            "UPDATE media_assets SET hash_state = 'done', hash_algo = 'blake3', content_hash = X'{hex}' WHERE asset_id IN ({list})"
+        ),
     );
 }
 
@@ -36,11 +40,20 @@ fn t_asset_01_exists_is_true_for_any_status_and_false_for_unknown_ids() {
     // Arrange
     let env = env_with_volume();
     let ids = insert_assets(&env, "vol-a", "lib", 2, "image");
-    exec(&env, &format!("UPDATE media_assets SET status = 'deleted' WHERE asset_id = {}", ids[1]));
+    exec(
+        &env,
+        &format!(
+            "UPDATE media_assets SET status = 'deleted' WHERE asset_id = {}",
+            ids[1]
+        ),
+    );
 
     // Act / Assert
     assert!(one(&env, |c| exists(c, ids[0]).unwrap()));
-    assert!(one(&env, |c| exists(c, ids[1]).unwrap()), "deleted rows still exist");
+    assert!(
+        one(&env, |c| exists(c, ids[1]).unwrap()),
+        "deleted rows still exist"
+    );
     assert!(!one(&env, |c| exists(c, 987_654).unwrap()));
     assert!(!one(&env, |c| exists(c, -1).unwrap()));
 }
@@ -50,16 +63,34 @@ fn t_asset_02_brief_returns_the_file_name_only_and_metadata_when_present() {
     // Arrange
     let env = env_with_volume();
     let ids = insert_assets(&env, "vol-a", "lib/sub", 1, "video");
-    exec(&env, &format!("INSERT INTO media_metadata (asset_id, width, height, duration_ms, captured_at) VALUES ({}, 1, 1, 5000, 1700000000000) ON CONFLICT(asset_id) DO UPDATE SET duration_ms = 5000, captured_at = 1700000000000", ids[0]));
+    exec(
+        &env,
+        &format!(
+            "INSERT INTO media_metadata (asset_id, width, height, duration_ms, captured_at) VALUES ({}, 1, 1, 5000, 1700000000000) ON CONFLICT(asset_id) DO UPDATE SET duration_ms = 5000, captured_at = 1700000000000",
+            ids[0]
+        ),
+    );
 
     // Act
     let b = one(&env, |c| brief(c, ids[0]).unwrap()).unwrap();
 
     // Assert: 디렉터리는 나가지 않는다
-    assert_eq!((b.media_type.as_str(), b.status.as_str()), ("video", "active"));
-    assert_eq!(b.file_name.as_deref(), Some(format!("f{}_0.jpg", ids[0]).as_str()));
-    assert_eq!((b.captured_at, b.duration_ms), (Some(1_700_000_000_000), Some(5000)));
-    assert!(!format!("{b:?}").contains("lib"), "no directory part: {b:?}");
+    assert_eq!(
+        (b.media_type.as_str(), b.status.as_str()),
+        ("video", "active")
+    );
+    assert_eq!(
+        b.file_name.as_deref(),
+        Some(format!("f{}_0.jpg", ids[0]).as_str())
+    );
+    assert_eq!(
+        (b.captured_at, b.duration_ms),
+        (Some(1_700_000_000_000), Some(5000))
+    );
+    assert!(
+        !format!("{b:?}").contains("lib"),
+        "no directory part: {b:?}"
+    );
 }
 
 #[test]
@@ -67,9 +98,24 @@ fn t_asset_03_brief_handles_missing_asset_missing_location_missing_metadata_and_
     // Arrange
     let env = env_with_volume();
     let ids = insert_assets(&env, "vol-a", "lib", 3, "image");
-    exec(&env, &format!("DELETE FROM media_metadata WHERE asset_id = {}", ids[0]));
-    exec(&env, &format!("UPDATE file_locations SET detached_at = 5 WHERE asset_id = {}", ids[1]));
-    exec(&env, &format!("UPDATE file_locations SET rel_path = 'a\\b\\c.jpg' WHERE asset_id = {}", ids[2]));
+    exec(
+        &env,
+        &format!("DELETE FROM media_metadata WHERE asset_id = {}", ids[0]),
+    );
+    exec(
+        &env,
+        &format!(
+            "UPDATE file_locations SET detached_at = 5 WHERE asset_id = {}",
+            ids[1]
+        ),
+    );
+    exec(
+        &env,
+        &format!(
+            "UPDATE file_locations SET rel_path = 'a\\b\\c.jpg' WHERE asset_id = {}",
+            ids[2]
+        ),
+    );
 
     // Act / Assert
     assert_eq!(one(&env, |c| brief(c, 987_654).unwrap()), None);
@@ -77,7 +123,10 @@ fn t_asset_03_brief_handles_missing_asset_missing_location_missing_metadata_and_
     assert_eq!((no_meta.captured_at, no_meta.duration_ms), (None, None));
     assert!(no_meta.file_name.is_some());
     let detached = one(&env, |c| brief(c, ids[1]).unwrap()).unwrap();
-    assert_eq!(detached.file_name, None, "detached location is not an active location");
+    assert_eq!(
+        detached.file_name, None,
+        "detached location is not an active location"
+    );
     let backslash = one(&env, |c| brief(c, ids[2]).unwrap()).unwrap();
     assert_eq!(backslash.file_name.as_deref(), Some("c.jpg"));
 }
@@ -87,13 +136,22 @@ fn t_asset_04_brief_reports_inactive_status_instead_of_hiding_the_asset() {
     // Arrange
     let env = env_with_volume();
     let ids = insert_assets(&env, "vol-a", "lib", 1, "audio");
-    exec(&env, &format!("UPDATE media_assets SET status = 'deleted' WHERE asset_id = {}", ids[0]));
+    exec(
+        &env,
+        &format!(
+            "UPDATE media_assets SET status = 'deleted' WHERE asset_id = {}",
+            ids[0]
+        ),
+    );
 
     // Act
     let b = one(&env, |c| brief(c, ids[0]).unwrap()).unwrap();
 
     // Assert
-    assert_eq!((b.status.as_str(), b.media_type.as_str()), ("deleted", "audio"));
+    assert_eq!(
+        (b.status.as_str(), b.media_type.as_str()),
+        ("deleted", "audio")
+    );
 }
 
 #[test]
@@ -101,12 +159,26 @@ fn t_asset_05_same_content_is_none_for_inactive_or_unknown_and_self_only_without
     // Arrange
     let env = env_with_volume();
     let ids = insert_assets(&env, "vol-a", "lib", 2, "image");
-    exec(&env, &format!("UPDATE media_assets SET status = 'deleted' WHERE asset_id = {}", ids[1]));
+    exec(
+        &env,
+        &format!(
+            "UPDATE media_assets SET status = 'deleted' WHERE asset_id = {}",
+            ids[1]
+        ),
+    );
 
     // Act / Assert
     assert_eq!(one(&env, |c| same_content(c, 987_654).unwrap()), None);
-    assert_eq!(one(&env, |c| same_content(c, ids[1]).unwrap()), None, "inactive");
-    assert_eq!(one(&env, |c| same_content(c, ids[0]).unwrap()), Some(vec![ids[0]]), "no hash yet");
+    assert_eq!(
+        one(&env, |c| same_content(c, ids[1]).unwrap()),
+        None,
+        "inactive"
+    );
+    assert_eq!(
+        one(&env, |c| same_content(c, ids[0]).unwrap()),
+        Some(vec![ids[0]]),
+        "no hash yet"
+    );
 }
 
 #[test]
@@ -143,10 +215,12 @@ fn t_asset_07_same_content_copy_lookup_uses_the_hash_index() {
                  WHERE hash_algo = ?1 AND content_hash = ?2 AND asset_id <> ?3 LIMIT ?4",
             )
             .unwrap();
-        stmt.query_map(rusqlite::params!["blake3", vec![1u8], 1i64, 10i64], |r| r.get::<_, String>(3))
-            .unwrap()
-            .map(Result::unwrap)
-            .collect()
+        stmt.query_map(rusqlite::params!["blake3", vec![1u8], 1i64, 10i64], |r| {
+            r.get::<_, String>(3)
+        })
+        .unwrap()
+        .map(Result::unwrap)
+        .collect()
     });
 
     // Assert

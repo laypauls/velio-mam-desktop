@@ -6,7 +6,9 @@
 //! - 프레임 격자는 `start + k/fps`. seek 는 이 격자에 맞춰 `absolute+exact` 로 보낸다
 //! - EDL(구간)이면 mpv 의 시각은 EDL 타임라인(0 에서 시작)이고, `EdlMap` 이 소스 상대 시각과 오간다
 
-use mam_player::protocol::{EdlMap, LastFrameGuard, Landing, RangeMs, ms_from_secs, snap_to_frame_start};
+use mam_player::protocol::{
+    EdlMap, Landing, LastFrameGuard, RangeMs, ms_from_secs, snap_to_frame_start,
+};
 use std::time::Instant;
 
 /// 비동기로 이어지는 전환 (이벤트 스레드가 다음 단계를 진행한다)
@@ -17,7 +19,13 @@ pub enum Pending {
     /// 구간 열기의 2단계: EDL 로 다시 열었고 첫 재시작을 기다린다
     EdlLoad,
     /// 열린 채 구간 교체(재열기) — 로드되면 목표로 seek, 도달하면 재생 상태를 되돌린다
-    Reload { target_s: f64, resume_play: bool, seeked: bool, past_end: bool, deadline: Instant },
+    Reload {
+        target_s: f64,
+        resume_play: bool,
+        seeked: bool,
+        past_end: bool,
+        deadline: Instant,
+    },
 }
 
 #[derive(Debug, Default)]
@@ -70,8 +78,22 @@ pub struct SeekTarget {
 
 impl Session {
     /// 새 파일 열기 — 이전 상태를 모두 버린다
-    pub fn begin(path: String, edl: Option<EdlMap>, duration_hint_ms: Option<i64>, paused_after: bool) -> Self {
-        Self { open: true, path, edl, source_duration_ms: duration_hint_ms, opening: true, paused: paused_after, autoplay_after_open: !paused_after, ..Self::default() }
+    pub fn begin(
+        path: String,
+        edl: Option<EdlMap>,
+        duration_hint_ms: Option<i64>,
+        paused_after: bool,
+    ) -> Self {
+        Self {
+            open: true,
+            path,
+            edl,
+            source_duration_ms: duration_hint_ms,
+            opening: true,
+            paused: paused_after,
+            autoplay_after_open: !paused_after,
+            ..Self::default()
+        }
     }
 
     /// mpv `time-pos`(현재 타임라인 초) → 보정된 소스 시각 (ms, 첫 프레임 = 0). `eof` 면 마지막 프레임 시각
@@ -80,12 +102,20 @@ impl Session {
         let ms = match &self.edl {
             Some(edl) => {
                 let total_s = edl.total_ms() as f64 / 1000.0;
-                let c = if eof { self.guard.eof_time(Some(total_s), fps) } else { self.guard.correct(pos_s, Some(total_s), fps) };
+                let c = if eof {
+                    self.guard.eof_time(Some(total_s), fps)
+                } else {
+                    self.guard.correct(pos_s, Some(total_s), fps)
+                };
                 edl.edl_to_source(c * 1000.0)
             }
             None => {
                 let rel = (pos_s - self.start_s).max(0.0);
-                let c = if eof { self.guard.eof_time(self.duration_s, fps) } else { self.guard.correct(rel, self.duration_s, fps) };
+                let c = if eof {
+                    self.guard.eof_time(self.duration_s, fps)
+                } else {
+                    self.guard.correct(rel, self.duration_s, fps)
+                };
                 c * 1000.0
             }
         };
@@ -96,23 +126,34 @@ impl Session {
     pub fn seek_target(&self, ms: i64) -> SeekTarget {
         let want_rel = (ms.max(0)) as f64 / 1000.0;
         // 격자는 파일 pts 영역(start 기준)에서 맞추고, 상대 시각으로 되돌린다
-        let snapped_rel = snap_to_frame_start(self.start_s + want_rel, self.fps, self.start_s) - self.start_s;
+        let snapped_rel =
+            snap_to_frame_start(self.start_s + want_rel, self.fps, self.start_s) - self.start_s;
         match &self.edl {
             Some(edl) => {
                 let (edl_ms, landing) = edl.source_to_edl(snapped_rel * 1000.0);
-                SeekTarget { mpv_s: edl_ms / 1000.0, landing }
+                SeekTarget {
+                    mpv_s: edl_ms / 1000.0,
+                    landing,
+                }
             }
             None => {
                 let limit = self.duration_s.map(|d| d.max(0.0));
                 let rel = limit.map_or(snapped_rel, |l| snapped_rel.min(l));
-                SeekTarget { mpv_s: self.start_s + rel, landing: Landing::Inside }
+                SeekTarget {
+                    mpv_s: self.start_s + rel,
+                    landing: Landing::Inside,
+                }
             }
         }
     }
 
     /// 처음(첫 구간 시작 또는 파일 시작)으로 가는 seek 목표 — 끝난 뒤 다시 재생할 때
     pub fn rewind_target(&self) -> f64 {
-        if self.edl.is_some() { 0.0 } else { self.start_s }
+        if self.edl.is_some() {
+            0.0
+        } else {
+            self.start_s
+        }
     }
 
     /// 구간을 바꾼다 (재열기 전). 보정 기록을 버린다
@@ -168,7 +209,10 @@ mod tests {
     fn t_player_time_12_seek_without_fps_is_not_snapped_and_clamped_to_the_length() {
         let s = plain(0.5, None, 10.0);
         assert!((s.seek_target(1234).mpv_s - 1.734).abs() < 1e-9);
-        assert!((s.seek_target(99_000).mpv_s - 10.5).abs() < 1e-9, "길이를 넘지 않는다");
+        assert!(
+            (s.seek_target(99_000).mpv_s - 10.5).abs() < 1e-9,
+            "길이를 넘지 않는다"
+        );
         assert!((s.seek_target(-5).mpv_s - 0.5).abs() < 1e-12, "음수는 0");
     }
 
@@ -188,7 +232,12 @@ mod tests {
     #[test]
     fn t_player_time_14_edl_maps_between_the_edl_and_the_source_timeline() {
         // Arrange: 구간 [1s,2s) [5s,6s), 30fps, start 0.105 — EDL 시각은 0 에서 시작
-        let mut s = Session::begin("a.mp4".into(), EdlMap::new(&[(1000, 2000), (5000, 6000)]), Some(30_000), true);
+        let mut s = Session::begin(
+            "a.mp4".into(),
+            EdlMap::new(&[(1000, 2000), (5000, 6000)]),
+            Some(30_000),
+            true,
+        );
         s.start_s = 0.105;
         s.start_known = true;
         s.fps = Some(30.0);
@@ -215,7 +264,9 @@ mod tests {
         old.eof = true;
         old.shown_ms = 4000;
         let fresh = Session::begin("b.mp4".into(), None, Some(1000), false);
-        assert!(fresh.open && fresh.opening && !fresh.start_known && !fresh.eof && fresh.shown_ms == 0);
+        assert!(
+            fresh.open && fresh.opening && !fresh.start_known && !fresh.eof && fresh.shown_ms == 0
+        );
         assert!(fresh.autoplay_after_open && !fresh.paused);
         assert_eq!(plain(0.3, None, 1.0).rewind_target(), 0.3);
     }

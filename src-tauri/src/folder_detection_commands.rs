@@ -19,7 +19,10 @@ pub async fn list_change_detectors(
     ingest: State<'_, Arc<Ingest>>,
     folder_id: i64,
 ) -> Result<Vec<ChangeDetectorInfo>, CommandError> {
-    run_blocking(Arc::clone(&ingest), move |i| i.list_change_detectors(folder_id)).await
+    run_blocking(Arc::clone(&ingest), move |i| {
+        i.list_change_detectors(folder_id)
+    })
+    .await
 }
 
 /// 변경 감지 방식 저장 + 감시 재설정. `mode` null = 자동. 등록되지 않은 방식·잘못된 옵션은 `invalid_input`.
@@ -30,7 +33,10 @@ pub async fn set_folder_watch_mode(
     mode: Option<String>,
     options: Option<Value>,
 ) -> Result<ManagedFolderView, CommandError> {
-    run_blocking(Arc::clone(&ingest), move |i| i.set_folder_watch_mode(folder_id, mode, options)).await
+    run_blocking(Arc::clone(&ingest), move |i| {
+        i.set_folder_watch_mode(folder_id, mode, options)
+    })
+    .await
 }
 
 /// 재스캔 정책 저장. `policy` null = 전역 기본. 잘못된 정책은 `invalid_input` (메시지에 필드 경로).
@@ -40,7 +46,10 @@ pub async fn set_folder_rescan_policy(
     folder_id: i64,
     policy: Option<Value>,
 ) -> Result<ManagedFolderView, CommandError> {
-    run_blocking(Arc::clone(&ingest), move |i| i.set_folder_rescan_policy(folder_id, policy)).await
+    run_blocking(Arc::clone(&ingest), move |i| {
+        i.set_folder_rescan_policy(folder_id, policy)
+    })
+    .await
 }
 
 #[cfg(test)]

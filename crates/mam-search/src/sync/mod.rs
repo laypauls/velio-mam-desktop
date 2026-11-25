@@ -17,9 +17,9 @@
 //! 생기는 단계(P2-7, P3)에서 [`load`] 에 추가한다.
 
 pub mod load;
-pub mod user_values;
 mod outbox;
 mod rebuild;
+pub mod user_values;
 mod worker;
 
 pub use outbox::SELECT_PENDING_SQL;
