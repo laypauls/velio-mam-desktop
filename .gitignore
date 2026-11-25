@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+!crates/mam-plugin-runtime/tests/fixtures/plugins/**/dist/
 *.local
 
 # Editor directories and files
