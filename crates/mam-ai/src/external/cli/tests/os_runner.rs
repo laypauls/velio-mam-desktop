@@ -36,7 +36,8 @@ fn is_gone(pid: u32) -> bool {
         if h.is_null() {
             return true;
         }
-        let r = WaitForSingleObject(h, 0);
+        // 종료는 비동기 — 느린 러너를 위해 최대 3초 유예 (살아 있으면 WAIT_TIMEOUT 이라 false).
+        let r = WaitForSingleObject(h, 3000);
         CloseHandle(h);
         r == 0
     }

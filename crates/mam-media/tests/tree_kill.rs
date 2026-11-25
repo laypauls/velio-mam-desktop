@@ -14,16 +14,17 @@ use std::time::{Duration, Instant};
 
 use mam_media::MediaError;
 use mam_media::tool::{CancellableProcessRunner, CommandRunner, ProcessRunner, RunOptions, Tool};
-use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
+use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE, WAIT_TIMEOUT};
 use windows_sys::Win32::System::Diagnostics::ToolHelp::{
     CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW, TH32CS_SNAPPROCESS,
 };
 use windows_sys::Win32::System::Threading::{
-    GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+    OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SYNCHRONIZE, WaitForSingleObject,
 };
 
 static SERIAL: Mutex<()> = Mutex::new(());
-const STILL_ACTIVE: u32 = 259;
+/// 종료 요청 뒤 프로세스가 실제로 사라질 때까지 기다려 주는 총 유예 시간 (종료는 비동기라 느린 러너에서 지연된다).
+const EXIT_GRACE: Duration = Duration::from_secs(3);
 
 fn shim_args() -> Vec<OsString> {
     ["/c", "ping -n 60 127.0.0.1"].map(OsString::from).to_vec()
@@ -60,17 +61,24 @@ fn descendants() -> Vec<u32> {
     found
 }
 
-fn is_alive(pid: u32) -> bool {
-    // SAFETY: 조회 전용 핸들을 열고 닫는다.
+/// `deadline` 까지 종료를 기다린 뒤에도 살아 있으면 true (= 진짜 누수). 핸들을 못 열면 이미 사라진 것.
+fn is_alive_after(pid: u32, deadline: Instant) -> bool {
+    let wait_ms = deadline
+        .saturating_duration_since(Instant::now())
+        .as_millis() as u32;
+    // SAFETY: 동기화 핸들을 열어 종료 신호를 기다리고 닫는다.
     unsafe {
-        let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        let h = OpenProcess(
+            PROCESS_SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION,
+            0,
+            pid,
+        );
         if h.is_null() {
             return false;
         }
-        let mut code = 0u32;
-        let ok = GetExitCodeProcess(h, &mut code);
+        let r = WaitForSingleObject(h, wait_ms);
         CloseHandle(h);
-        ok != 0 && code == STILL_ACTIVE
+        r == WAIT_TIMEOUT
     }
 }
 
@@ -86,9 +94,14 @@ fn wait_for_tree() -> Vec<u32> {
     descendants()
 }
 
-/// 남은 프로세스를 PID 로만 정리한다 (실패한 단언이 고아를 남기지 않게).
+/// 유예 시간(`EXIT_GRACE`) 안에 끝나지 않은 프로세스를 누수로 돌려주고 PID 로만 정리한다 (실패한 단언이 고아를 남기지 않게).
 fn reap(pids: &[u32]) -> Vec<u32> {
-    let alive: Vec<u32> = pids.iter().copied().filter(|p| is_alive(*p)).collect();
+    let deadline = Instant::now() + EXIT_GRACE;
+    let alive: Vec<u32> = pids
+        .iter()
+        .copied()
+        .filter(|p| is_alive_after(*p, deadline))
+        .collect();
     for p in &alive {
         let _ = std::process::Command::new("taskkill")
             .args(["/PID", &p.to_string(), "/T", "/F"])
