@@ -1,0 +1,68 @@
+{
+  "permissions": ["asset.read.metadata", "asset.read.derived", "kv.read", "kv.write", "tag.write", "export.write"],
+  "errorCodes": ["plugin_invalid", "plugin_incompatible", "plugin_disabled", "plugin_permission_denied", "plugin_timeout", "plugin_error"],
+  "pluginInfo": {
+    "id": "com.example.exif-summary",
+    "version": "1.2.0",
+    "displayName": "EXIF summary",
+    "description": "Summarizes EXIF data",
+    "status": "ok",
+    "enabled": true,
+    "unsigned": true,
+    "permissions": ["asset.read.metadata", "kv.write", "tag.write", "export.write"],
+    "granted": ["asset.read.metadata", "kv.write"],
+    "commands": [{ "id": "summarize", "title": "Summarize" }],
+    "providers": [
+      { "id": "exif", "title": "EXIF", "kind": "metadata", "assetKinds": ["image"], "fileExtension": null },
+      { "id": "csv", "title": "CSV export", "kind": "export", "assetKinds": [], "fileExtension": "csv" }
+    ],
+    "installedAt": 1700000000000,
+    "workerAvailable": true
+  },
+  "pluginInfoBroken": {
+    "id": "com.example.gone",
+    "version": "0.0.0",
+    "displayName": "com.example.gone",
+    "description": null,
+    "status": "broken",
+    "enabled": false,
+    "unsigned": true,
+    "permissions": [],
+    "granted": [],
+    "commands": [],
+    "providers": [],
+    "installedAt": 1700000000000,
+    "workerAvailable": false
+  },
+  "pluginPreview": {
+    "id": "com.example.exif-summary",
+    "version": "1.3.0",
+    "displayName": "EXIF summary",
+    "description": null,
+    "permissions": ["asset.read.metadata", "kv.write", "tag.write"],
+    "commands": [{ "id": "summarize", "title": "Summarize" }],
+    "providers": [{ "id": "exif", "title": "EXIF", "kind": "analysis", "assetKinds": ["image", "video", "audio"], "fileExtension": null }],
+    "unsigned": true,
+    "installed": { "version": "1.2.0", "granted": ["asset.read.metadata", "kv.write"] },
+    "change": "upgrade",
+    "addedPermissions": ["tag.write"],
+    "hasKeptData": false
+  },
+  "pluginContributions": {
+    "menuItems": [
+      { "pluginId": "com.example.exif-summary", "commandId": "summarize", "title": "Summarize", "when": "asset.kind == 'image'" },
+      { "pluginId": "com.example.exif-summary", "commandId": "other", "title": "other", "when": null }
+    ],
+    "exportProviders": [
+      { "pluginId": "com.example.exif-summary", "providerId": "csv", "title": "CSV export", "fileExtension": "csv", "assetKinds": ["image"] }
+    ]
+  },
+  "commandResult": { "message": "done" },
+  "commandResultNull": { "message": null },
+  "runAllResult": { "started": true },
+  "exportResult": { "bytesWritten": 1234 },
+  "taskCounts": [{ "pluginId": "com.example.exif-summary", "pending": 12, "failed": 1 }],
+  "changedEvent": { "pluginId": "com.example.exif-summary", "reason": "autoDisabled" },
+  "changeReasons": ["installed", "upgraded", "uninstalled", "enabled", "disabled", "autoDisabled", "permissionsChanged"],
+  "eventName": "plugin://changed"
+}

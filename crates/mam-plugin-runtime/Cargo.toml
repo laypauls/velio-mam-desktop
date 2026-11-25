@@ -1,0 +1,31 @@
+[package]
+name = "mam-plugin-runtime"
+version = "0.1.0"
+description = "MAM Desktop - plugin runtime (registry, install/uninstall, provider invocation, job queue integration)"
+authors = []
+edition = "2024"
+
+[dependencies]
+mam-plugin-gateway = { path = "../mam-plugin-gateway" }
+mam-plugin-host = { path = "../mam-plugin-host" }
+mam-plugin-manifest = { path = "../mam-plugin-manifest" }
+mam-core = { path = "../mam-core" }
+mam-db = { path = "../mam-db" }
+rusqlite = "0.40"
+semver = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+base64 = "0.22"
+
+[target.'cfg(windows)'.dependencies]
+# 내보내기 임시 파일의 실제 위치(GetFinalPathNameByHandleW) — TOCTOU 재검사
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
+
+[dev-dependencies]
+tempfile = "3"
+rusqlite = { version = "0.40", features = ["bundled"] }
+# examples/jobs_bench.rs (P5 1M-row measurements M1..M3): real ingest pipeline + synthetic JPEG fixtures
+mam-media = { path = "../mam-media" }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }

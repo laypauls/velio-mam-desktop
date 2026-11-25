@@ -1,0 +1,151 @@
+query	kind	notes	author	truth_terms
+부산	fn_ko2	2-syllable Korean filename word	generated	부산
+제주	fn_ko2	2-syllable Korean filename word	generated	제주
+서울	fn_ko2	2-syllable Korean filename word	generated	서울
+강릉	fn_ko2	2-syllable Korean filename word	generated	강릉
+경주	fn_ko2	2-syllable Korean filename word	generated	경주
+전주	fn_ko2	2-syllable Korean filename word	generated	전주
+속초	fn_ko2	2-syllable Korean filename word	generated	속초
+여수	fn_ko2	2-syllable Korean filename word	generated	여수
+대구	fn_ko2	2-syllable Korean filename word	generated	대구
+인천	fn_ko2	2-syllable Korean filename word	generated	인천
+광주	fn_ko2	2-syllable Korean filename word	generated	광주
+대전	fn_ko2	2-syllable Korean filename word	generated	대전
+울산	fn_ko2	2-syllable Korean filename word	generated	울산
+춘천	fn_ko2	2-syllable Korean filename word	generated	춘천
+순천	fn_ko2	2-syllable Korean filename word	generated	순천
+안동	fn_ko2	2-syllable Korean filename word	generated	안동
+목포	fn_ko2	2-syllable Korean filename word	generated	목포
+포항	fn_ko2	2-syllable Korean filename word	generated	포항
+가족	fn_ko2	2-syllable Korean filename word	generated	가족
+친구	fn_ko2	2-syllable Korean filename word	generated	친구
+가족사진	fn_ko_long	3+ syllable word / compound noun	generated	가족사진
+여행사진	fn_ko_long	3+ syllable word / compound noun	generated	여행사진
+졸업사진	fn_ko_long	3+ syllable word / compound noun	generated	졸업사진
+증명사진	fn_ko_long	3+ syllable word / compound noun	generated	증명사진
+결혼사진	fn_ko_long	3+ syllable word / compound noun	generated	결혼사진
+여행영상	fn_ko_long	3+ syllable word / compound noun	generated	여행영상
+프로젝트	fn_ko_long	3+ syllable word / compound noun	generated	프로젝트
+발표자료	fn_ko_long	3+ syllable word / compound noun	generated	발표자료
+동창회	fn_ko_long	3+ syllable word / compound noun	generated	동창회
+회의록	fn_ko_long	3+ syllable word / compound noun	generated	회의록
+사진	fn_ko_inner	inside compounds 여행사진/가족사진 (ko-dic keeps compound as one token)	generated	사진
+행사	fn_ko_inner	inside 여행사진 and the word 행사	generated	행사
+족사진	fn_ko_inner	cross-morpheme inside 가족사진	generated	족사진
+업사	fn_ko_inner	cross-morpheme inside 졸업사진	generated	업사
+명사	fn_ko_inner	cross-morpheme inside 증명사진	generated	명사
+혼사	fn_ko_inner	cross-morpheme inside 결혼사진	generated	혼사
+표자	fn_ko_inner	inside 발표자료	generated	표자
+젝트	fn_ko_inner	inside 프로젝트	generated	젝트
+창회	fn_ko_inner	inside 동창회	generated	창회
+의록	fn_ko_inner	inside 회의록	generated	의록
+trip	fn_en	whole word	generated	trip
+beach	fn_en	whole word	generated	beach
+vacat	fn_en	prefix of vacation	generated	vacat
+ummer	fn_en	inside summer (also camelCase pieces)	generated	ummer
+report	fn_en	whole word	generated	report
+eport	fn_en	inside report	generated	eport
+design	fn_en	whole word	generated	design
+ogo	fn_en	inside logo	generated	ogo
+backup	fn_en	whole word	generated	backup
+draft	fn_en	whole word	generated	draft
+hiking	fn_en	whole word	generated	hiking
+elfie	fn_en	inside selfie	generated	elfie
+memo	fn_en	whole word	generated	memo
+ample	fn_en	inside sample	generated	ample
+ecture	fn_en	inside lecture	generated	ecture
+0815	fn_digits	MMDD inside date names	generated	0815
+1225	fn_digits	MMDD	generated	1225
+0101	fn_digits	MMDD	generated	0101
+0504	fn_digits	MMDD	generated	0504
+0630	fn_digits	MMDD	generated	0630
+0928	fn_digits	MMDD	generated	0928
+1111	fn_digits	repeated digits	generated	1111
+2023	fn_digits	year	generated	2023
+2019	fn_digits	year	generated	2019
+2015	fn_digits	year	generated	2015
+4821	fn_digits	camera counter	generated	4821
+1234	fn_digits	camera counter	generated	1234
+202408	fn_digits	year+month inside date	generated	202408
+20240815	fn_digits	full date	generated	20240815
+143052	fn_digits	time part	generated	143052
+일출	ft_plain	Korean lemma (less popular half)	generated	일출
+갯벌	ft_plain	Korean lemma (less popular half)	generated	갯벌
+비빔밥	ft_plain	Korean lemma (less popular half)	generated	비빔밥
+케이크	ft_plain	Korean lemma (less popular half)	generated	케이크
+아이스크림	ft_plain	Korean lemma (less popular half)	generated	아이스크림
+샌드위치	ft_plain	Korean lemma (less popular half)	generated	샌드위치
+도서관	ft_plain	Korean lemma (less popular half)	generated	도서관
+기차역	ft_plain	Korean lemma (less popular half)	generated	기차역
+경기장	ft_plain	Korean lemma (less popular half)	generated	경기장
+정원	ft_plain	Korean lemma (less popular half)	generated	정원
+졸업식	ft_plain	Korean lemma (less popular half)	generated	졸업식
+등산	ft_plain	Korean lemma (less popular half)	generated	등산
+파티	ft_plain	Korean lemma (less popular half)	generated	파티
+마라톤	ft_plain	Korean lemma (less popular half)	generated	마라톤
+mountain	ft_plain	English lemma	generated	mountain
+portrait	ft_plain	English lemma	generated	portrait
+football	ft_plain	English lemma	generated	football
+bridge	ft_plain	English lemma	generated	bridge
+flower	ft_plain	English lemma	generated	flower
+window	ft_plain	English lemma	generated	window
+구름이	ft_particle	lemma + particle	generated	구름
+폭포를	ft_particle	lemma + particle	generated	폭포
+벚꽃과	ft_particle	lemma + particle	generated	벚꽃
+달빛은	ft_particle	lemma + particle	generated	달빛
+사막에서	ft_particle	lemma + particle	generated	사막
+비빔밥을	ft_particle	lemma + particle	generated	비빔밥
+커피와	ft_particle	lemma + particle	generated	커피
+떡볶이는	ft_particle	lemma + particle	generated	떡볶이
+불고기가	ft_particle	lemma + particle	generated	불고기
+와플도	ft_particle	lemma + particle	generated	와플
+도서관과	ft_particle	lemma + particle	generated	도서관
+공항은	ft_particle	lemma + particle	generated	공항
+미술관이	ft_particle	lemma + particle	generated	미술관
+사무실을	ft_particle	lemma + particle	generated	사무실
+옥상만	ft_particle	lemma + particle	generated	옥상
+졸업식은	ft_particle	lemma + particle	generated	졸업식
+산책이	ft_particle	lemma + particle	generated	산책
+공연을	ft_particle	lemma + particle	generated	공연
+수영과	ft_particle	lemma + particle	generated	수영
+스키의	ft_particle	lemma + particle	generated	스키
+하늘 노을	ft_multi	two words (AND)	generated	하늘|노을
+해변 파도	ft_multi	two words (AND)	generated	해변|파도
+강아지 공원	ft_multi	two words (AND)	generated	강아지|공원
+고양이 거실	ft_multi	two words (AND)	generated	고양이|거실
+커피 카페	ft_multi	two words (AND)	generated	커피|카페
+강아지가 바다	ft_multi	two words (AND)	generated	강아지|바다
+케이크 생일을	ft_multi	two words (AND)	generated	케이크|생일
+등산 단풍	ft_multi	two words (AND)	generated	등산|단풍
+고양이 sunset	ft_multi	two words (AND)	generated	고양이|sunset
+coffee 카페에서	ft_multi	two words (AND)	generated	coffee|카페
+사진	tricky_fn	compound-noun split: inside 여행사진/가족사진; A expected to miss	agent	사진
+여행	tricky_fn	word and compound part (부산여행, 여행사진)	agent	여행
+행사	tricky_fn	cross-morpheme inside 여행사진	agent	행사
+부산여	tricky_fn	crosses the 부산|여행 morpheme boundary	agent	부산여
+제주	tricky_fn	proper noun (place); also prefix of text tag 제주도	agent	제주
+부산trip	tricky_fn	Korean-English adjacency in one piece pair	agent	부산trip
+summervacation	tricky_fn	lowercase joined query vs camelCase SummerVacation filename; ngram/regex are per-piece so expected to miss	agent	summervacation
+SummerVacation	tricky_fn	camelCase typed as in filename; splits into summer+vacation	agent	summervacation
+0815	tricky_fn	digits inside 8-digit date 20240815; A cannot match inside token	agent	0815
+240815	tricky_fn	6-digit tail of a date	agent	240815
+img	tricky_fn	camera prefix, huge truth set	agent	img
+스크린샷	tricky_fn	Korean screenshot prefix	agent	스크린샷
+Screenshot	tricky_fn	capitalised English prefix	agent	screenshot
+jpg	tricky_fn	extension typed as a word	agent	jpg
+4821	tricky_fn	camera counter digits	agent	4821
+녹음	tricky_fn	Korean recording prefix/word	agent	녹음
+가	tricky_fn	single Hangul syllable; 1-char policy: B/C ignore	agent	가
+강아지를	tricky_ft	particle on very popular lemma	agent	강아지
+아이스크림을	tricky_ft	foreign-origin compound noun + particle	agent	아이스크림
+해운대	tricky_ft	proper noun tag; ko-dic may split	agent	해운대
+에버랜드	tricky_ft	proper noun tag (brand); likely OOV	agent	에버랜드
+한라산을	tricky_ft	proper noun + particle	agent	한라산
+sunset 바다	tricky_ft	Korean-English mixed AND	agent	sunset|바다
+Sunset	tricky_ft	case folding	agent	sunset
+떡볶이가	tricky_ft	noun ending in 이 + subject particle	agent	떡볶이
+제주	tricky_any	place in filenames AND prefix of text tag 제주도 (substring truth includes both)	agent	제주
+광주	tricky_any	place name in filenames; text has no 광주	agent	광주
+파티	tricky_any	text lemma; no filename use	agent	파티
+경복궁에서	tricky_any	proper-noun tag + particle	agent	경복궁
+부산 해변	tricky_any	word 1 in filename, word 2 in tags/AI text (cross-field AND)	agent	부산|해변

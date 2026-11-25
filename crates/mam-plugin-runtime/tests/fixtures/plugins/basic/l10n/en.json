@@ -1,0 +1,8 @@
+{
+  "plugin.name": "Basic Plugin",
+  "plugin.desc": "Basic description",
+  "cmd.echo": "Echo",
+  "cmd.assets": "Assets",
+  "prov.meta": "Extract",
+  "prov.exp": "Export CSV"
+}

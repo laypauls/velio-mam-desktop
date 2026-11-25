@@ -1,0 +1,29 @@
+[package]
+name = "mam-player-worker"
+version = "0.1.0"
+description = "MAM Desktop - player worker process (libmpv dynamic load, frames rendered into WebView2 SharedBuffer sections)"
+authors = []
+edition = "2024"
+
+[[bin]]
+name = "mam-player-worker"
+path = "src/main.rs"
+
+[dependencies]
+# 프로토콜·슬롯 상태 기계·EDL·파이프(서버) — 호스트와 같은 정의를 쓴다
+mam-player = { path = "../mam-player" }
+# libmpv 는 빌드 시 링크하지 않고 런타임에 동적 로드한다 (Cargo.lock 의 0.7.4 재사용)
+libloading = "0.7.4"
+windows = { version = "0.62", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Direct3D",
+  "Win32_Graphics_Direct3D11",
+  "Win32_Graphics_Dxgi_Common",
+  "Win32_System_Memory",
+  "Win32_System_SystemInformation",
+] }
+
+[dev-dependencies]
+mam-player = { path = "../mam-player", features = ["test-support"] }
+tempfile = "3"
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_System_Memory", "Win32_Security", "Win32_Storage_FileSystem"] }

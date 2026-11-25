@@ -1,0 +1,295 @@
+/* 클래스 탐색을 src/ 로 한정한다 — 기본(프로젝트 전체)은 Rust crate·문서·픽스처까지 훑어 첫 CSS 컴파일이 수십 초 걸리고 그동안 창이 빈다 */
+@import "tailwindcss" source(".");
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/inter";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-heading: var(--font-sans);
+    --font-sans: 'Inter Variable', sans-serif;
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-media-image: var(--media-image);
+    --color-media-video: var(--media-video);
+    --color-media-audio: var(--media-audio);
+    --color-ai: var(--ai);
+    --color-overlay: var(--overlay);
+    --color-overlay-foreground: var(--overlay-foreground);
+    --color-viewer-stage: var(--viewer-stage);
+    --color-scene-cut-auto: var(--scene-cut-auto);
+    --color-scene-cut-user: var(--scene-cut-user);
+    --color-favorite: var(--favorite);
+    --color-rating: var(--rating);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* .light — 어두운 테마 안에서 라이트 값을 되돌리는 범위 선택자(설정 화면 테마 미리보기용) */
+:root,
+.light {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+    --primary: oklch(0.205 0 0);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --radius: 0.625rem;
+    --media-image: oklch(0.62 0.15 160);
+    --media-video: oklch(0.58 0.2 295);
+    --media-audio: oklch(0.68 0.15 55);
+    --ai: oklch(0.66 0.13 205);
+    --overlay: oklch(0 0 0 / 62%);
+    --overlay-foreground: oklch(1 0 0);
+    --viewer-stage: oklch(0.1 0 0);
+    --scene-cut-auto: oklch(0.6 0.15 65);
+    --scene-cut-user: oklch(0.55 0.2 330);
+    --favorite: oklch(0.68 0.19 12);
+    --rating: oklch(0.8 0.16 85);
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.145 0 0);
+    --sidebar-primary: oklch(0.205 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.97 0 0);
+    --sidebar-accent-foreground: oklch(0.205 0 0);
+    --sidebar-border: oklch(0.922 0 0);
+    --sidebar-ring: oklch(0.708 0 0);
+    color-scheme: light;
+}
+
+/* 라이트 그레이 — 라이트 계열(.dark 없음). 표면·테두리만 낮추고 나머지 토큰은 :root 와 동일 */
+:root[data-theme="gray"],
+.light[data-theme="gray"] {
+    --background: oklch(0.92 0 0);
+    --foreground: oklch(0.145 0 0);
+    --card: oklch(0.935 0 0);
+    --card-foreground: oklch(0.145 0 0);
+    --popover: oklch(0.945 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+    --primary: oklch(0.205 0 0);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.885 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.885 0 0);
+    --muted-foreground: oklch(0.49 0 0);
+    --accent: oklch(0.885 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.84 0 0);
+    --input: oklch(0.84 0 0);
+    --ring: oklch(0.708 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --radius: 0.625rem;
+    --media-image: oklch(0.62 0.15 160);
+    --media-video: oklch(0.58 0.2 295);
+    --media-audio: oklch(0.68 0.15 55);
+    --ai: oklch(0.66 0.13 205);
+    --overlay: oklch(0 0 0 / 62%);
+    --overlay-foreground: oklch(1 0 0);
+    --viewer-stage: oklch(0.1 0 0);
+    --scene-cut-auto: oklch(0.6 0.15 65);
+    --scene-cut-user: oklch(0.55 0.2 330);
+    --favorite: oklch(0.68 0.19 12);
+    --rating: oklch(0.8 0.16 85);
+    --sidebar: oklch(0.9 0 0);
+    --sidebar-foreground: oklch(0.145 0 0);
+    --sidebar-primary: oklch(0.205 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.87 0 0);
+    --sidebar-accent-foreground: oklch(0.205 0 0);
+    --sidebar-border: oklch(0.84 0 0);
+    --sidebar-ring: oklch(0.708 0 0);
+    color-scheme: light;
+}
+
+.dark {
+    color-scheme: dark;
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.225 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.922 0 0);
+    --primary-foreground: oklch(0.205 0 0);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.556 0 0);
+    --media-image: oklch(0.72 0.15 160);
+    --media-video: oklch(0.72 0.17 295);
+    --media-audio: oklch(0.76 0.14 55);
+    --ai: oklch(0.78 0.12 205);
+    --overlay: oklch(0 0 0 / 62%);
+    --overlay-foreground: oklch(1 0 0);
+    --viewer-stage: oklch(0.1 0 0);
+    --scene-cut-auto: oklch(0.82 0.15 85);
+    --scene-cut-user: oklch(0.72 0.2 330);
+    --favorite: oklch(0.72 0.18 12);
+    --rating: oklch(0.82 0.16 85);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --sidebar: oklch(0.175 0 0);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.922 0 0);
+    --sidebar-primary-foreground: oklch(0.205 0 0);
+    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* 딤 — .dark 위에 덮어쓴다(딤도 .dark 를 가져 dark: 변형이 적용된다). 값 출처: temp/mockups/theme-options.html THEMES.dim */
+.dark[data-theme="dim"] {
+    --background: oklch(0.285 0.008 260);
+    --foreground: oklch(0.96 0.004 260);
+    --card: oklch(0.32 0.008 260);
+    --card-foreground: oklch(0.96 0.004 260);
+    --popover: oklch(0.345 0.009 260);
+    --popover-foreground: oklch(0.96 0.004 260);
+    --primary: oklch(0.93 0.004 260);
+    --primary-foreground: oklch(0.26 0.008 260);
+    --secondary: oklch(0.375 0.009 260);
+    --secondary-foreground: oklch(0.96 0.004 260);
+    --muted: oklch(0.355 0.009 260);
+    --muted-foreground: oklch(0.78 0.008 260);
+    --accent: oklch(0.385 0.01 260);
+    --accent-foreground: oklch(0.96 0.004 260);
+    --destructive: oklch(0.74 0.17 22);
+    --border: oklch(1 0 0 / 12%);
+    --input: oklch(1 0 0 / 18%);
+    --ring: oklch(0.68 0.01 260);
+    --media-image: oklch(0.72 0.14 160);
+    --media-video: oklch(0.72 0.16 295);
+    --media-audio: oklch(0.77 0.14 55);
+    --ai: oklch(0.78 0.12 205);
+    --overlay: oklch(0 0 0 / 55%);
+    --overlay-foreground: oklch(1 0 0);
+    --viewer-stage: oklch(0.1 0 0);
+    --scene-cut-auto: oklch(0.82 0.15 85);
+    --scene-cut-user: oklch(0.72 0.2 330);
+    --favorite: oklch(0.74 0.17 12);
+    --rating: oklch(0.84 0.15 85);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --sidebar: oklch(0.255 0.008 260);
+    --sidebar-foreground: oklch(0.96 0.004 260);
+    --sidebar-primary: oklch(0.93 0.004 260);
+    --sidebar-primary-foreground: oklch(0.26 0.008 260);
+    --sidebar-accent: oklch(0.36 0.01 260);
+    --sidebar-accent-foreground: oklch(0.96 0.004 260);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.68 0.01 260);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    user-select: none;
+    }
+  input, textarea, [contenteditable]:not([contenteditable="false"]) {
+    user-select: text;
+    }
+  html {
+    @apply font-sans;
+    }
+}
+/* 가로 스크롤은 유지하고 스크롤바만 숨긴다 (Tailwind arbitrary variant 는 WebView2 에서 무효) */
+@utility scrollbar-hidden {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+/* 플레이어 중앙 상태 표시 (PlayFeedbackOverlay) — 크기 변화는 transform 만 써 합성기에서 처리한다 */
+@theme {
+  --animate-feedback-pop: feedback-pop 600ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  --animate-feedback-fade: feedback-fade 500ms forwards;
+  --animate-feedback-wave: feedback-wave 450ms ease-out;
+  @keyframes feedback-pop {
+    0% { opacity: 0; scale: 0.8; }
+    20% { opacity: 1; scale: 1; }
+    100% { opacity: 0; scale: 1.15; }
+  }
+  @keyframes feedback-fade {
+    0% { opacity: 0; }
+    20% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  @keyframes feedback-wave {
+    0% { opacity: 0.25; }
+    40% { opacity: 1; }
+    100% { opacity: 0.25; }
+  }
+}

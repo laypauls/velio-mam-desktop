@@ -1,0 +1,34 @@
+{
+  "apiVersion": 1,
+  "id": "com.example.basic",
+  "version": "1.0.0",
+  "engines": { "mam": ">=0.1.0" },
+  "main": "dist/main.js",
+  "displayName": "plugin.name",
+  "description": "plugin.desc",
+  "permissions": ["asset.read.metadata", "kv.read", "kv.write", "tag.write", "export.write"],
+  "contributes": {
+    "commands": [
+      { "id": "echo", "title": "cmd.echo" },
+      { "id": "assets", "title": "cmd.assets" },
+      { "id": "asset", "title": "cmd.asset" },
+      { "id": "neighbor", "title": "cmd.neighbor" },
+      { "id": "setkv", "title": "cmd.setkv" },
+      { "id": "throw", "title": "cmd.throw" },
+      { "id": "flood", "title": "cmd.flood" },
+      { "id": "slow", "title": "cmd.slow" }
+    ],
+    "menus": {
+      "assetContext": [
+        { "command": "echo", "when": "selection.count > 0 && asset.kind == 'image'" },
+        { "command": "assets" },
+        { "command": "throw" }
+      ]
+    },
+    "providers": {
+      "metadata": [{ "id": "meta.extract", "title": "prov.meta", "assetKinds": ["image"] }],
+      "analysis": [{ "id": "ana.scan", "title": "prov.ana" }],
+      "export": [{ "id": "exp.csv", "title": "prov.exp", "assetKinds": ["image", "video"], "fileExtension": "csv" }]
+    }
+  }
+}

@@ -1,0 +1,20 @@
+[workspace]
+members = ["src-tauri", "crates/mam-db", "crates/mam-search", "crates/mam-vector", "crates/mam-core", "crates/mam-media", "crates/mam-ai", "crates/mam-player", "crates/mam-player-worker", "crates/mam-plugin-manifest", "crates/mam-plugin-host", "crates/mam-plugin-worker", "crates/mam-plugin-gateway", "crates/mam-plugin-runtime"]
+resolver = "2"
+
+
+# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
+
+# 테스트 바이너리 크기 축소 — 실행 파일마다 onnxruntime 등을 정적 링크해 target/debug 가 수십 GB 로 커졌다.
+# 실패 위치(파일:라인)는 유지하고 변수 디버그 정보만 줄인다.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false

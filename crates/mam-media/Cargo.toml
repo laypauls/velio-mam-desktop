@@ -1,0 +1,25 @@
+[package]
+name = "mam-media"
+version = "0.1.0"
+description = "MAM Desktop - media format detection, FFprobe/FFmpeg sidecar wrappers, metadata, thumbnails, WebView2 playability"
+authors = []
+edition = "2024"
+
+[dependencies]
+# 이미지 디코딩/인코딩 (WebP 인코딩은 무손실만 지원)
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "tiff"] }
+kamadak-exif = "0.6"
+# 손실 WebP 인코딩 (image crate 는 무손실만 지원) - libwebp C 소스를 번들 빌드
+webp = { version = "0.3", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+
+[dev-dependencies]
+tempfile = "3"
+
+[target.'cfg(windows)'.dependencies]
+# HEIC 폴백 디코딩 (WIC). tauri 가 이미 0.61/0.62 계열을 끌어오므로 같은 계열을 쓴다
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Imaging", "Win32_System_Com"] }
+# 사이드카 프로세스 트리 종료 (Job Object) — workspace 의 다른 crate 와 같은 windows-sys 계열
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_System_Diagnostics_ToolHelp"] }

@@ -1,0 +1,32 @@
+[package]
+name = "mam-ai"
+version = "0.1.0"
+description = "MAM Desktop - local AI runtime: model manifest/download, ONNX embeddings (CLIP, e5), whisper.cpp STT sidecar"
+authors = []
+edition = "2024"
+
+
+[dependencies]
+# ONNX Runtime — 빌드 시 pyke 가 미리 빌드한 onnxruntime 을 내려받아 정적 링크한다(기본 download-binaries). 결과는 보고서 참고.
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "download-binaries", "tls-rustls"] }
+tokenizers = { version = "0.22", default-features = false, features = ["unstable_wasm"] }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "tiff"] }
+safetensors = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+thiserror = "2"
+ureq = { version = "3", default-features = false, features = ["rustls"] }
+zeroize = "1"
+base64 = "0.22"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_Security_Cryptography", "Win32_System_Memory", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_System_Diagnostics_ToolHelp"] }
+
+[dev-dependencies]
+tempfile = "3"
+mam-vector = { path = "../mam-vector" }
+mam-db = { path = "../mam-db" }
+
+[target.'cfg(windows)'.dev-dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_ProcessStatus", "Win32_System_Threading"] }

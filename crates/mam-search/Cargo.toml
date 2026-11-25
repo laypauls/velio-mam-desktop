@@ -1,0 +1,22 @@
+[package]
+name = "mam-search"
+version = "0.1.0"
+description = "MAM Desktop - Tantivy full-text index, Korean/filename analyzers, search, Outbox sync worker"
+authors = []
+edition = "2024"
+
+[dependencies]
+tantivy = "0.27"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+lindera = { version = "6.2", features = ["embed-ko-dic"] }
+thiserror = "2"
+unicode-normalization = "0.1"
+# sync 모듈(Outbox 워커) — SQLite 가 원천이다. rusqlite 는 mam-db 와 같은 버전이어야 연결 타입이 일치한다.
+mam-db = { path = "../mam-db" }
+rusqlite = { version = "0.40", features = ["bundled"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[target.'cfg(windows)'.dev-dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_ProcessStatus", "Win32_System_Threading"] }
