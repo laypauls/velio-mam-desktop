@@ -402,7 +402,7 @@ mod tests {
                 "subtitleVisible",
                 "theme",
                 "titleEditEnabled",
-                "videoPlayerVlc",
+                "videoPlayerBuiltIn",
                 "viewerPlacement"
             ]
         );

@@ -113,7 +113,7 @@ fn t_pref_11_empty_db_is_at_v26_with_the_failed_partial_index() {
     let mut db = migrated_db();
 
     // Assert
-    assert_eq!(latest_version(), 26);
+    assert_eq!(latest_version(), 27);
     let sql: String = db.conn.query_row("SELECT sql FROM sqlite_master WHERE name = 'idx_plugin_tasks_failed'", [], |r| r.get(0)).unwrap();
     let sql = norm_sql(&sql);
     assert!(sql.contains("plugin_tasks (plugin_ref, task_id) WHERE status = 'failed'"), "{sql}");
@@ -137,7 +137,7 @@ fn t_pref_11_v25_db_upgrades_to_v26_with_a_backup_and_empty_plugin_tables() {
     let report = migrate(&mut conn, &db.backup_dir, &FixedClock(T0 + 1)).unwrap();
 
     // Assert
-    assert_eq!(report.applied, vec![26]);
+    assert_eq!(report.applied, vec![26, 27]);
     assert!(report.backup.is_some_and(|b| b.is_file()));
     assert_eq!(count(&conn, "SELECT COUNT(*) FROM plugin_tasks") + count(&conn, "SELECT COUNT(*) FROM plugins"), 0);
     assert_eq!(count(&conn, "SELECT COUNT(*) FROM sqlite_master WHERE name = 'idx_plugin_tasks_failed'"), 1);

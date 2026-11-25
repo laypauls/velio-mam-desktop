@@ -180,7 +180,7 @@ export interface Settings {
   /** 기본 true */
   sidebarRatingMenu: boolean
   /** 기본 true */
-  videoPlayerVlc: boolean
+  videoPlayerBuiltIn: boolean
   /** 기본 "Escape", null = 사용 안 함 */
   hideShortcut: string | null
   /** 기본 "Q", null = 사용 안 함 */

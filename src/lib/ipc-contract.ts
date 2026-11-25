@@ -259,8 +259,8 @@ export interface Settings {
   originalActionsEnabled: boolean
   /** 사이드바 별점 메뉴 표시 (기본 true) */
   sidebarRatingMenu: boolean
-  /** 동영상을 내장 플레이어로 재생 (키 이름 `videoPlayerVlc` 는 호환을 위해 유지 — 기본 true — 끄면 WebView 재생 가능 영상은 앱 기본 재생) */
-  videoPlayerVlc: boolean
+  /** 동영상을 내장 플레이어로 재생 (기본 true — 끄면 WebView 재생 가능 영상은 앱 기본 재생) */
+  videoPlayerBuiltIn: boolean
   /** 재생 정지 후 숨기기 단축키 (기본 "Escape", null = 사용 안 함). 형식: [Ctrl+][Alt+][Shift+]키 — 키는 KeyboardEvent.key(한 글자는 대문자) */
   hideShortcut: string | null
   /** 플레이어 패널 닫기 단축키 (기본 "Q", null = 사용 안 함). 형식은 hideShortcut 과 같다 */

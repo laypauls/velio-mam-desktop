@@ -45,7 +45,7 @@ describe("settings > player > page split", () => {
 })
 
 describe("settings > player > video player", () => {
-  it("T-ui-vlcset-12 [Happy] the built-in player switch defaults ON and saves { videoPlayerVlc } OFF then ON", async () => {
+  it("T-ui-vlcset-12 [Happy] the built-in player switch defaults ON and saves { videoPlayerBuiltIn } OFF then ON", async () => {
     // Arrange
     stubLayout()
     const api = createMockApi({ count: 50 })
@@ -57,12 +57,29 @@ describe("settings > player > video player", () => {
     expect(sw).toBeChecked()
     // Act + Assert: OFF
     await user.click(sw)
-    await waitFor(() => expect(update).toHaveBeenLastCalledWith({ videoPlayerVlc: false }))
+    await waitFor(() => expect(update).toHaveBeenLastCalledWith({ videoPlayerBuiltIn: false }))
     await waitFor(() => expect(sw).not.toBeChecked())
     // Act + Assert: ON
     await user.click(sw)
-    await waitFor(() => expect(update).toHaveBeenLastCalledWith({ videoPlayerVlc: true }))
-    expect((await api.getSettings()).videoPlayerVlc).toBe(true)
+    await waitFor(() => expect(update).toHaveBeenLastCalledWith({ videoPlayerBuiltIn: true }))
+    expect((await api.getSettings()).videoPlayerBuiltIn).toBe(true)
+  })
+
+  it("T-ui-vlcset-15 [Business rule] toggling the built-in player switch sends only { videoPlayerBuiltIn: false } and never the retired videoPlayerVlc key", async () => {
+    // Arrange
+    stubLayout()
+    const api = createMockApi({ count: 50 })
+    const update = vi.spyOn(api, "updateSettings")
+    const user = userEvent.setup()
+    renderApp(api)
+    const dialog = await openPlayer(user)
+    // Act
+    await user.click(within(dialog).getByRole("switch", { name: "동영상을 내장 플레이어로 재생" }))
+    // Assert
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1))
+    expect(update).toHaveBeenCalledWith({ videoPlayerBuiltIn: false })
+    expect(Object.keys(update.mock.calls[0][0])).toEqual(["videoPlayerBuiltIn"])
+    expect(await api.getSettings()).not.toHaveProperty("videoPlayerVlc")
   })
 })
 

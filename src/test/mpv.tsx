@@ -72,7 +72,7 @@ export async function mountMpv(opts: MpvOpts = {}) {
   vi.spyOn(api, "getAssetDetail").mockImplementation((id) => Promise.resolve({ ...detail, assetId: id, fileName: `v${id}.mxf` }))
   vi.spyOn(api, "mediaUrl").mockImplementation((id) => `media://${id}`)
   // 기본은 자동 재생 — 정지 상태 설정이면 내장 플레이어도 정지로 열린다 (VideoPoster.test.tsx)
-  await api.updateSettings({ videoPlayerVlc: true, mediaOpenAutoplay: true, ...opts.settings })
+  await api.updateSettings({ videoPlayerBuiltIn: true, mediaOpenAutoplay: true, ...opts.settings })
   let stored: PlayRange[] = mergeRanges(opts.ranges ?? [])
   const getRanges = vi.spyOn(api, "playRangesGet").mockImplementation(async () => structuredClone(stored))
   const setRanges = vi.spyOn(api, "playRangesSet").mockImplementation(async (_id, r) => {

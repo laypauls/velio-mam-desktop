@@ -63,7 +63,7 @@ export function createMockApi(opts: MockOptions = {}): UiApi {
     titleEditEnabled: false,
     originalActionsEnabled: false,
     sidebarRatingMenu: true,
-    videoPlayerVlc: true,
+    videoPlayerBuiltIn: true,
     hideShortcut: "Escape",
     closeViewerShortcut: "Q",
     slideshowImageSeconds: 5,

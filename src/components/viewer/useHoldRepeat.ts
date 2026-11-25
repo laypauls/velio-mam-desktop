@@ -8,7 +8,7 @@ export const HOLD_INTERVAL_MS = 70
 /**
  * 버튼을 누르고 있는 동안 동작을 반복한다 (프레임 이동 길게 누르기).
  * - 주 버튼 pointerdown 에서 즉시 1회, 400ms 뒤부터 반복. 반복은 고정 간격 타이머로 쌓지 않고 **이전 이동이 끝난 뒤에만** 다음을 요청한다
- *   (`step` 이 Promise 를 돌려주면 그것이 끝날 때까지 — libVLC IPC 왕복 — 기다리므로 손을 뗀 뒤에 대기 중인 이동이 계속 실행되지 않는다).
+ *   (`step` 이 Promise 를 돌려주면 그것이 끝날 때까지 — 플레이어 IPC 왕복 — 기다리므로 손을 뗀 뒤에 대기 중인 이동이 계속 실행되지 않는다).
  * - pointerup · pointerleave · pointercancel · lostpointercapture · window blur · 언마운트에서 멈춘다.
  * - pointerdown 이 이미 이동했으므로 이어지는 click 은 무시한다. pointer 없이 오는 click(키보드·프로그램)은 1회 이동한다.
  */

@@ -44,7 +44,7 @@ afterEach(() => {
 })
 
 /** 기본 상세를 덮어쓴 자산으로 보기 영역을 연다. `outside` 는 갤러리 역할의 포커스 가능 요소. */
-async function openWith(patch: Partial<AssetDetail>, opts: { open?: boolean; vlcSetting?: boolean; vlcAvailable?: boolean; placement?: "left" | "right" } = {}) {
+async function openWith(patch: Partial<AssetDetail>, opts: { open?: boolean; builtInSetting?: boolean; builtInAvailable?: boolean; placement?: "left" | "right" } = {}) {
   const api = createMockApi({ count: 20 })
   const base = await api.getAssetDetail(1)
   const detail: AssetDetail = { ...base, availability: "online", ...patch }
@@ -53,8 +53,8 @@ async function openWith(patch: Partial<AssetDetail>, opts: { open?: boolean; vlc
   // 열 때 자동 재생 — 정지 상태 설정이면 영상은 포스터가 먼저 뜬다 (VideoPoster.test.tsx)
   await api.updateSettings({ mediaOpenAutoplay: true })
   if (opts.placement) await api.updateSettings({ viewerPlacement: opts.placement })
-  if (opts.vlcSetting !== undefined) await api.updateSettings({ videoPlayerVlc: opts.vlcSetting })
-  vi.spyOn(api, "playerAvailable").mockResolvedValue(opts.vlcAvailable ?? false)
+  if (opts.builtInSetting !== undefined) await api.updateSettings({ videoPlayerBuiltIn: opts.builtInSetting })
+  vi.spyOn(api, "playerAvailable").mockResolvedValue(opts.builtInAvailable ?? false)
   const thumbUrl = vi.spyOn(api, "thumbUrl").mockImplementation((id, size) => `thumb://${id}/${size}`)
   const openOriginal = vi.spyOn(api, "openOriginal").mockResolvedValue(undefined)
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -478,32 +478,32 @@ describe("ContentViewer — image", () => {
   })
 })
 
-describe("ContentViewer — video engine setting (videoPlayerVlc)", () => {
+describe("ContentViewer — video engine setting (videoPlayerBuiltIn)", () => {
   // Categories: Business rule (routing matrix) / Boundary (built-in player unavailable) / External failure (offline) / Concurrency (setting change while open)
-  const vlcPlayer = (name: string) => screen.findByRole("group", { name: `mpv:${name}` })
+  const builtInPlayer = (name: string) => screen.findByRole("group", { name: `mpv:${name}` })
   const htmlVideo = (name: string) => screen.findByLabelText(name, { selector: "video" })
 
   it("T-ui-vlcset-01 [Business rule] ON + playable video + built-in player available uses the built-in player, not <video>", async () => {
     stubMedia()
-    await openWith({ mediaType: "video", playable: true, fileName: "clip.mp4" }, { vlcSetting: true, vlcAvailable: true })
-    expect(await vlcPlayer("clip.mp4")).toBeInTheDocument()
+    await openWith({ mediaType: "video", playable: true, fileName: "clip.mp4" }, { builtInSetting: true, builtInAvailable: true })
+    expect(await builtInPlayer("clip.mp4")).toBeInTheDocument()
     expect(document.querySelector("video")).toBeNull()
   })
 
   it("T-ui-vlcset-02 [Business rule] ON + non-playable video + built-in player available uses the built-in player", async () => {
-    await openWith({ mediaType: "video", playable: false, fileName: "clip.mxf" }, { vlcSetting: true, vlcAvailable: true })
-    expect(await vlcPlayer("clip.mxf")).toBeInTheDocument()
+    await openWith({ mediaType: "video", playable: false, fileName: "clip.mxf" }, { builtInSetting: true, builtInAvailable: true })
+    expect(await builtInPlayer("clip.mxf")).toBeInTheDocument()
   })
 
   it("T-ui-vlcset-03 [Boundary] ON + playable video + built-in player unavailable falls back to <video>", async () => {
     stubMedia()
-    await openWith({ mediaType: "video", playable: true, fileName: "clip.mp4" }, { vlcSetting: true, vlcAvailable: false })
+    await openWith({ mediaType: "video", playable: true, fileName: "clip.mp4" }, { builtInSetting: true, builtInAvailable: false })
     expect(await htmlVideo("clip.mp4")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "외부 프로그램으로 열기" })).not.toBeInTheDocument()
   })
 
   it("T-ui-vlcset-04 [Boundary] ON + non-playable video + built-in player unavailable shows the player-unavailable notice", async () => {
-    await openWith({ mediaType: "video", playable: false, fileName: "clip.mxf" }, { vlcSetting: true, vlcAvailable: false })
+    await openWith({ mediaType: "video", playable: false, fileName: "clip.mxf" }, { builtInSetting: true, builtInAvailable: false })
     expect(await screen.findByText(/내장 플레이어를 사용할 수 없어/)).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "외부 프로그램으로 열기" })).toBeInTheDocument()
     expect(document.querySelector("video")).toBeNull()
@@ -511,23 +511,23 @@ describe("ContentViewer — video engine setting (videoPlayerVlc)", () => {
 
   it("T-ui-vlcset-05 [Business rule] OFF + playable video keeps <video> even when built-in player is available", async () => {
     stubMedia()
-    await openWith({ mediaType: "video", playable: true, fileName: "clip.mp4" }, { vlcSetting: false, vlcAvailable: true })
+    await openWith({ mediaType: "video", playable: true, fileName: "clip.mp4" }, { builtInSetting: false, builtInAvailable: true })
     expect(await htmlVideo("clip.mp4")).toBeInTheDocument()
     expect(screen.queryByRole("group", { name: "mpv:clip.mp4" })).not.toBeInTheDocument()
   })
 
   it("T-ui-vlcset-06 [Business rule] OFF + non-playable video uses the built-in player when available", async () => {
-    await openWith({ mediaType: "video", playable: false, fileName: "clip.mxf" }, { vlcSetting: false, vlcAvailable: true })
-    expect(await vlcPlayer("clip.mxf")).toBeInTheDocument()
+    await openWith({ mediaType: "video", playable: false, fileName: "clip.mxf" }, { builtInSetting: false, builtInAvailable: true })
+    expect(await builtInPlayer("clip.mxf")).toBeInTheDocument()
   })
 
   it("T-ui-vlcset-07 [Boundary] OFF + non-playable video + built-in player unavailable shows the player-unavailable notice", async () => {
-    await openWith({ mediaType: "video", playable: false, fileName: "clip.mxf" }, { vlcSetting: false, vlcAvailable: false })
+    await openWith({ mediaType: "video", playable: false, fileName: "clip.mxf" }, { builtInSetting: false, builtInAvailable: false })
     expect(await screen.findByText(/내장 플레이어를 사용할 수 없어/)).toBeInTheDocument()
   })
 
   it("T-ui-vlcset-08 [External failure] an offline video shows the offline notice with the setting ON and no player", async () => {
-    await openWith({ mediaType: "video", playable: true, availability: "offline", fileName: "nas.mp4" }, { vlcSetting: true, vlcAvailable: true })
+    await openWith({ mediaType: "video", playable: true, availability: "offline", fileName: "nas.mp4" }, { builtInSetting: true, builtInAvailable: true })
     expect(await screen.findByText(/저장 장치가 연결되어 있지 않아/)).toBeInTheDocument()
     expect(screen.queryByRole("group", { name: "mpv:nas.mp4" })).not.toBeInTheDocument()
     expect(document.querySelector("video")).toBeNull()
@@ -535,13 +535,13 @@ describe("ContentViewer — video engine setting (videoPlayerVlc)", () => {
 
   it("T-ui-vlcset-09 [Business rule] audio never routes to the built-in player with the setting ON", async () => {
     stubMedia()
-    await openWith({ mediaType: "audio", playable: true, fileName: "song.mp3" }, { vlcSetting: true, vlcAvailable: true })
+    await openWith({ mediaType: "audio", playable: true, fileName: "song.mp3" }, { builtInSetting: true, builtInAvailable: true })
     expect(await screen.findByLabelText("song.mp3", { selector: "audio" })).toBeInTheDocument()
     expect(screen.queryByRole("group", { name: "mpv:song.mp3" })).not.toBeInTheDocument()
   })
 
   it("T-ui-vlcset-10 [Business rule] non-playable audio keeps the external-open notice with the setting ON", async () => {
-    await openWith({ mediaType: "audio", playable: false, fileName: "song.ape" }, { vlcSetting: true, vlcAvailable: true })
+    await openWith({ mediaType: "audio", playable: false, fileName: "song.ape" }, { builtInSetting: true, builtInAvailable: true })
     expect(await screen.findByRole("button", { name: "외부 프로그램으로 열기" })).toBeInTheDocument()
     expect(screen.queryByRole("group", { name: "mpv:song.ape" })).not.toBeInTheDocument()
   })
@@ -549,10 +549,10 @@ describe("ContentViewer — video engine setting (videoPlayerVlc)", () => {
   it("T-ui-vlcset-11 [Concurrency] changing the setting while a video is open keeps its engine; the next opened video uses the new value", async () => {
     // Arrange
     stubMedia()
-    const { queryClient, api } = await openWith({ mediaType: "video", playable: true, fileName: "clip.mp4" }, { vlcSetting: true, vlcAvailable: true })
-    expect(await vlcPlayer("clip.mp4")).toBeInTheDocument()
+    const { queryClient, api } = await openWith({ mediaType: "video", playable: true, fileName: "clip.mp4" }, { builtInSetting: true, builtInAvailable: true })
+    expect(await builtInPlayer("clip.mp4")).toBeInTheDocument()
     // Act: 재생 중 OFF
-    const next = await api.updateSettings({ videoPlayerVlc: false })
+    const next = await api.updateSettings({ videoPlayerBuiltIn: false })
     act(() => queryClient.setQueryData(qk.settings, next))
     // Assert: 현재 영상은 그대로
     expect(screen.getByRole("group", { name: "mpv:clip.mp4" })).toBeInTheDocument()

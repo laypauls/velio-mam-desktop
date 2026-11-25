@@ -27,7 +27,7 @@ interface PlayerVolumeState extends PlayerVolumeSettings {
   hydrate: (v: PlayerVolumeSettings) => void
 }
 
-/** 두 재생 경로(`<video>`·libVLC)가 공유하는 음량·음소거. 파일을 바꿔도 유지된다 */
+/** 두 재생 경로(`<video>`·libmpv)가 공유하는 음량·음소거. 파일을 바꿔도 유지된다 */
 export const usePlayerVolumeStore = create<PlayerVolumeState>((set) => ({
   ...DEFAULT_PLAYER_VOLUME,
   rev: 0,

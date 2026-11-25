@@ -7,7 +7,7 @@ import type { SubtitleTrack } from "@/lib/ipc-contract"
 import { useSubtitleStore } from "@/stores"
 import { pickTrack } from "./subtitlePick"
 
-/** 자막 메뉴와 재생 경로(`<video>`/libVLC)가 공유하는 자막 상태 */
+/** 자막 메뉴와 재생 경로(`<video>`/libmpv)가 공유하는 자막 상태 */
 export interface SubtitleUi {
   tracks: SubtitleTrack[]
   /** 사용자가 고르거나 자동으로 정해진 트랙 (설정이 꺼져 있어도 유지) */

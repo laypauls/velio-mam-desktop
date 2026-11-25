@@ -5,8 +5,9 @@
 
 mod common;
 
-use common::migrated_db;
-use mam_db::settings;
+use common::{FixedClock, T0, TestDb, migrated_db, shipped_migrations};
+use mam_db::{migrate, migrate_with, open, settings};
+use tempfile::TempDir;
 use mam_db::{
     CapturedAtFallback, DoubleClickAction, GalleryPaging, IndexRailMode, Settings, SettingsError,
     SortFieldsEnabled,
@@ -445,36 +446,36 @@ fn t_rating_set_04_corrupt_stored_sidebar_rating_menu_falls_back_to_true_with_a_
     assert!(warnings.iter().all(|w| !w.contains("off\"")));
 }
 
-// ---------------------------------------------------------------- 동영상 VLC 설정 (T-vlcset-*)
+// ---------------------------------------------------------------- 동영상 내장 플레이어 설정 (T-vlcset-*, 구 libVLC 설정 이름)
 // Categories: Happy (기본값·왕복) / Validation (잘못된 값) / External (손상 저장값·모르는 키)
 
 #[test]
-fn t_vlcset_01_video_player_vlc_defaults_to_true_with_contract_name() {
+fn t_vlcset_01_video_player_builtin_defaults_to_true_with_contract_name() {
     let (s, warnings) = settings::load(&migrated_db().conn).unwrap();
 
-    assert!(s.video_player_vlc);
+    assert!(s.video_player_builtin);
     let v = serde_json::to_value(&s).unwrap();
-    assert_eq!(v["videoPlayerVlc"], json!(true));
+    assert_eq!(v["videoPlayerBuiltIn"], json!(true));
     assert!(warnings.is_empty());
 }
 
 #[test]
-fn t_vlcset_02_video_player_vlc_round_trips() {
+fn t_vlcset_02_video_player_builtin_round_trips() {
     let mut db = migrated_db();
     for flag in [false, true] {
-        let s = settings::update(&mut db.conn, &patch(json!({"videoPlayerVlc": flag}))).unwrap();
-        assert_eq!(s.video_player_vlc, flag);
+        let s = settings::update(&mut db.conn, &patch(json!({"videoPlayerBuiltIn": flag}))).unwrap();
+        assert_eq!(s.video_player_builtin, flag);
         assert_eq!(settings::load(&db.conn).unwrap().0, s);
     }
 }
 
 #[test]
-fn t_vlcset_03_non_boolean_video_player_vlc_is_rejected_and_changes_nothing() {
+fn t_vlcset_03_non_boolean_video_player_builtin_is_rejected_and_changes_nothing() {
     let mut db = migrated_db();
     for bad in [json!("true"), json!(1), json!(0), Value::Null, json!([true])] {
         let err =
-            settings::update(&mut db.conn, &patch(json!({"videoPlayerVlc": bad.clone()}))).unwrap_err();
-        assert!(matches!(&err, SettingsError::Invalid(f) if f == "videoPlayerVlc"), "{bad}");
+            settings::update(&mut db.conn, &patch(json!({"videoPlayerBuiltIn": bad.clone()}))).unwrap_err();
+        assert!(matches!(&err, SettingsError::Invalid(f) if f == "videoPlayerBuiltIn"), "{bad}");
     }
     let n: i64 = db
         .conn
@@ -484,16 +485,90 @@ fn t_vlcset_03_non_boolean_video_player_vlc_is_rejected_and_changes_nothing() {
 }
 
 #[test]
-fn t_vlcset_04_corrupt_stored_video_player_vlc_falls_back_to_true_and_unknown_key_is_ignored() {
+fn t_vlcset_04_corrupt_stored_video_player_builtin_falls_back_to_true_and_unknown_key_is_ignored() {
     let db = migrated_db();
-    put_raw(&db.conn, "video_player_vlc", "\"off\"");
+    put_raw(&db.conn, "video_player_builtin", "\"off\"");
     put_raw(&db.conn, "some_future_setting", "true");
 
     let (s, warnings) = settings::load(&db.conn).unwrap();
 
-    assert!(s.video_player_vlc);
+    assert!(s.video_player_builtin);
     assert_eq!(warnings.len(), 1, "{warnings:?}");
     assert!(warnings.iter().all(|w| !w.contains("off\"")));
+}
+
+// V27 (video_player_vlc -> video_player_builtin). Categories: Business rule (옛 값 이전·옛 행 보존) / Boundary (옛 행 없음) / Validation (옛 필드 거부)
+
+/// V26 까지만 적용된 DB — "V26 시점 앱"에서 V27 로 올라오는 시나리오
+fn v26_db() -> TestDb {
+    let dir = TempDir::new().unwrap();
+    let db_path = dir.path().join("mam.sqlite");
+    let backup_dir = dir.path().join("backups");
+    let mut conn = open(&db_path).unwrap();
+    let upto26: Vec<_> = shipped_migrations().into_iter().filter(|m| m.version() <= 26).collect();
+    migrate_with(&mut conn, &upto26, &backup_dir, &FixedClock(T0)).unwrap();
+    TestDb { dir, db_path, backup_dir, conn }
+}
+
+fn raw_value(conn: &Connection, key: &str) -> Option<String> {
+    conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| r.get(0)).ok()
+}
+
+#[test]
+fn t_vlcset_05_old_false_row_is_carried_to_video_player_builtin_by_v27() {
+    // Arrange: V26 시점 DB 에 옛 키 false
+    let mut db = v26_db();
+    put_raw(&db.conn, "video_player_vlc", "false");
+    // Act
+    let report = migrate(&mut db.conn, &db.backup_dir, &FixedClock(T0 + 1)).unwrap();
+    let (s, warnings) = settings::load(&db.conn).unwrap();
+    // Assert
+    assert_eq!(report.applied, vec![27]);
+    assert!(!s.video_player_builtin);
+    assert_eq!(serde_json::to_value(&s).unwrap()["videoPlayerBuiltIn"], json!(false));
+    assert!(warnings.is_empty());
+    assert_eq!(raw_value(&db.conn, "video_player_builtin").as_deref(), Some("false"));
+}
+
+#[test]
+fn t_vlcset_06_without_old_row_v27_adds_nothing_and_default_is_true() {
+    // Arrange: 옛 행 없는 V26 DB
+    let mut db = v26_db();
+    // Act
+    migrate(&mut db.conn, &db.backup_dir, &FixedClock(T0 + 1)).unwrap();
+    let (s, warnings) = settings::load(&db.conn).unwrap();
+    // Assert
+    assert!(s.video_player_builtin);
+    assert!(warnings.is_empty());
+    let n: i64 = db.conn.query_row("SELECT COUNT(*) FROM settings", [], |r| r.get(0)).unwrap();
+    assert_eq!(n, 0);
+}
+
+#[test]
+fn t_vlcset_07_old_field_video_player_vlc_patch_is_rejected_and_changes_nothing() {
+    // Arrange
+    let mut db = migrated_db();
+    // Act
+    let err = settings::update(&mut db.conn, &patch(json!({"videoPlayerVlc": false}))).unwrap_err();
+    // Assert: 모르는 필드 -> Unknown, 아무 행도 쓰지 않는다
+    assert!(matches!(&err, SettingsError::Unknown(f) if f == "videoPlayerVlc"), "{err:?}");
+    let n: i64 = db.conn.query_row("SELECT COUNT(*) FROM settings", [], |r| r.get(0)).unwrap();
+    assert_eq!(n, 0);
+    assert!(settings::load(&db.conn).unwrap().0.video_player_builtin);
+}
+
+#[test]
+fn t_vlcset_08_v27_keeps_the_old_row_and_does_not_overwrite_an_existing_new_row() {
+    // Arrange: 옛 키 false, 새 키가 이미 true 인 V26 DB (재실행·수동 편집 방어)
+    let mut db = v26_db();
+    put_raw(&db.conn, "video_player_vlc", "false");
+    put_raw(&db.conn, "video_player_builtin", "true");
+    // Act
+    migrate(&mut db.conn, &db.backup_dir, &FixedClock(T0 + 1)).unwrap();
+    // Assert: 옛 행 보존(구 앱 롤백용), 새 행은 INSERT OR IGNORE 로 덮어쓰지 않음
+    assert_eq!(raw_value(&db.conn, "video_player_vlc").as_deref(), Some("false"));
+    assert_eq!(raw_value(&db.conn, "video_player_builtin").as_deref(), Some("true"));
+    assert!(settings::load(&db.conn).unwrap().0.video_player_builtin);
 }
 
 // ---------------------------------------------------------------- 숨기기 단축키 (T-hidekey-set-*)

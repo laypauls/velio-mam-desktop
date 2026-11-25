@@ -82,7 +82,7 @@ fn t_store_08b_serializes_to_the_frontend_contract_shape() {
             "theme": {"mode": "system", "systemDark": "dim"},
             "capturedAtFallback": "modified",
             "sidebarRatingMenu": true,
-            "videoPlayerVlc": true,
+            "videoPlayerBuiltIn": true,
             "viewerPlacement": "left",
             "language": "en",
             "hideShortcut": "Escape",

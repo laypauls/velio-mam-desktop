@@ -152,7 +152,7 @@ fn t_sub_16_sources_are_untouched_by_discovery_and_parsing() {
 
 #[test]
 fn t_sub_13b_to_srt_replaces_angle_brackets_but_not_ampersand() {
-    // Arrange: 꺾쇠는 libVLC 마크업으로 해석된다 (P6) - 엔티티는 해석되지 않으므로 & 는 그대로
+    // Arrange: 꺾쇠는 마크업으로 해석될 수 있다 (P6, libVLC 실측) - 엔티티는 해석되지 않으므로 & 는 그대로
     let cues = [cue(0, 1000, "A<B & C>D\n<b>x</b> &amp; &lt;")];
     // Act
     let srt = to_srt(&cues);

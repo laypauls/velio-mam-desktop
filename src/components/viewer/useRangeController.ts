@@ -50,7 +50,7 @@ export interface RangeController {
 
 /**
  * 영상·음성 구간 편집의 중심 — 서버 구간(디바운스 저장), 선택·대기 In/Out 상태, 구간 키 동작, "구간만 재생" 설정을 묶는다.
- * 재생 엔진(`<video>` / libVLC)은 `controls` 어댑터로만 접근하므로 두 경로가 같은 코드를 쓴다.
+ * 재생 엔진(`<video>` / libmpv)은 `controls` 어댑터로만 접근하므로 두 경로가 같은 코드를 쓴다.
  */
 export function useRangeController(asset: AssetDetail, controls: ControlsBinding): RangeController {
   const { t } = useTranslation()

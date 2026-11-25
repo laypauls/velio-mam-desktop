@@ -49,7 +49,7 @@ export function createNotchAccumulator(now: () => number = () => Date.now()): No
 }
 
 /**
- * 휠 음량의 단일 누적 지점 — 웹 stage 휠(`useVolumeWheel`)과 libVLC 네이티브 입력(`useVlcInput`)이 이 함수 하나를 함께 써서
+ * 휠 음량의 단일 누적 지점 — `MediaPlayer` 의 stage 휠(`useVolumeWheel`)과 내장 플레이어(`MpvPlayer`)의 스테이지·컨트롤 바 휠이 이 함수 하나를 함께 써서
  * 어느 경로로 들어오든 같은 누적·리셋 규칙을 따른다. 반환 함수는 안정적이며 (소수) 노치와 Shift 상태를 받아
  * 정수 노치마다 Shift 없으면 `volumeBy(n × VOLUME_STEP)`(앱 음량), Shift 면 `systemVolumeBy(n × VOLUME_STEP)`(시스템 음량)를 부른다.
  * 앱·시스템 누적기는 따로 두고, 한쪽을 쓰면 다른 쪽의 나머지를 버려 섞어 돌려도 서로의 소수 노치가 새지 않는다.

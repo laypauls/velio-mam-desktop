@@ -68,7 +68,7 @@ export function rangeIndexAt(ranges: readonly PlayRange[], ms: number): number {
   return ranges.findIndex((r) => ms >= r.startMs && ms <= r.endMs)
 }
 
-/** 위치 판정 허용 오차(ms) — libVLC 시간 갱신 지연으로 방금 이동한 경계가 조금 어긋나 보이는 것을 흡수한다 */
+/** 위치 판정 허용 오차(ms) — 플레이어 시각 이벤트(재생 중 최대 5Hz) 갱신 지연으로 방금 이동한 경계가 조금 어긋나 보이는 것을 흡수한다 */
 export const RANGE_NAV_TOLERANCE_MS = 250
 
 /** 현재 위치보다 앞에 있는 마지막 구간의 시작 — "이전 구간 시작으로 이동" */

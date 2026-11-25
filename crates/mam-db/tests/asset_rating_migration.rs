@@ -61,7 +61,7 @@ fn t_rating_db_01_v10_applies_to_a_v9_db_keeping_existing_rows_unrated() {
     let report = migrate(&mut db.conn, &db.backup_dir, &FixedClock(T0 + 1)).unwrap();
 
     // Assert
-    assert_eq!(report.applied, vec![10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]); // V11(edge_sig)·V12(컬렉션 순서)·V13(재생 구간)·V14(폴더 숨김)·V15(장면 컷)·V16(jobs scene)·V17(폴더 별칭)·V18(폴더 유형)·V19(사용자 필드)·V20(저장 검색 삭제)·V21(변경 감지)·V22(변경 대기열)·V23(원격 접속)·V24(이어보기)도 이어서 적용된다
+    assert_eq!(report.applied, vec![10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]); // V11(edge_sig)·V12(컬렉션 순서)·V13(재생 구간)·V14(폴더 숨김)·V15(장면 컷)·V16(jobs scene)·V17(폴더 별칭)·V18(폴더 유형)·V19(사용자 필드)·V20(저장 검색 삭제)·V21(변경 감지)·V22(변경 대기열)·V23(원격 접속)·V24(이어보기)도 이어서 적용된다
     assert!(report.backup.is_some_and(|b| b.is_file()));
     assert_eq!(rating_of(&db.conn, 1), 0);
 }

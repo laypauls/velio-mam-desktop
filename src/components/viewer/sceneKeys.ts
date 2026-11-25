@@ -36,7 +36,7 @@ export function halfFrameMs(fps: number | null): number {
   return validFps(fps) ? Math.max(1, Math.round(500 / fps)) : 20
 }
 
-/** 마지막 이동 목표를 현재 위치 대신 기준으로 삼는 시간(ms) — libVLC 가 보고하는 시각은 약 500ms 계단이라 연타하면 낡은 값이다 */
+/** 마지막 이동 목표를 현재 위치 대신 기준으로 삼는 시간(ms) — 플레이어가 보고하는 시각은 최대 5Hz 로 갱신돼 연타하면 낡은 값이다 */
 export const SCENE_NAV_BASE_WINDOW_MS = 1000
 
 /**

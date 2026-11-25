@@ -52,7 +52,7 @@ describe("scene keys on the player (video)", () => {
   })
 
   it("T-ui-scene-03e [Business rule] rapid presses use the last target (not the stale reported time) and walk one cut at a time; after 1s the current time is the base again; edges do nothing", async () => {
-    // Arrange: 위치 보고가 갱신되지 않는 상황(libVLC 계단 시각) — currentTime 은 5s 에 고정으로 보고
+    // Arrange: 위치 보고가 갱신되지 않는 상황(플레이어 시각 이벤트가 낡은 상황) — currentTime 은 5s 에 고정으로 보고
     const { el } = await mount()
     const now = vi.spyOn(Date, "now")
     now.mockReturnValue(1_000_000)

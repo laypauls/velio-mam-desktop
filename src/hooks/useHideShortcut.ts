@@ -6,7 +6,7 @@ import { useViewStore } from "@/stores"
 import { useSettings } from "./useSettings"
 import { useToastError } from "./useUserData"
 
-/** 문서의 모든 `<video>`/`<audio>` 를 멈춘다 (libVLC 는 `hide_main_window` 가 코어에서 멈춘다) */
+/** 문서의 모든 `<video>`/`<audio>` 를 멈춘다 (내장 플레이어(libmpv)는 `hide_main_window` 가 코어에서 멈춘다) */
 export function pauseAllMedia() {
   document.querySelectorAll<HTMLMediaElement>("video, audio").forEach((m) => {
     if (!m.paused) m.pause()

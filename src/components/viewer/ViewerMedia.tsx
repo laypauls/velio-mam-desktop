@@ -14,7 +14,7 @@ import { VideoPoster } from "./VideoPoster"
 
 /**
  * 온라인 영상·음성의 재생 경로 결정.
- * - 영상 + `videoPlayerVlc` ON: 내장 플레이어(libmpv), 없으면 `playable` 영상은 `<video>` 대체
+ * - 영상 + `videoPlayerBuiltIn` ON: 내장 플레이어(libmpv), 없으면 `playable` 영상은 `<video>` 대체
  * - 영상 + OFF, 음성: 재생 가능하면 `MediaPlayer`, 아니면 `BuiltInVideo`(내장 플레이어 / 외부 열기 안내)
  * 설정은 이 컴포넌트가 마운트될 때(자산마다 key) 한 번만 읽는다 — 재생 중 설정을 바꿔도 현재 영상의 엔진은 유지된다.
  * 설정 로딩 중에는 스켈레톤(잘못된 플레이어가 잠깐 뜨지 않게), 로딩 실패 시 기본값(ON)으로 판단한다.
@@ -31,7 +31,7 @@ export function ViewerMedia({ asset, name, playable }: { asset: AssetDetail; nam
   const isVideo = asset.mediaType === "video"
   const builtInOn = useRef<boolean | null>(null)
   if (builtInOn.current === null && isVideo) {
-    if (settings.data) builtInOn.current = settings.data.videoPlayerVlc // 설정 키 이름은 호환을 위해 유지
+    if (settings.data) builtInOn.current = settings.data.videoPlayerBuiltIn
     else if (settings.isError) builtInOn.current = true
   }
   const autoplay = useOpenAutoplay(asset.assetId)

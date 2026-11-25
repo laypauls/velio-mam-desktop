@@ -46,7 +46,7 @@ fn t_mig_01_latest_schema_has_no_saved_searches_but_keeps_recent_searches() {
     let report = migrate(&mut db.conn, &db.backup_dir, &FixedClock(T0 + 1)).unwrap();
 
     // Assert
-    assert_eq!(report.applied, vec![20, 21, 22, 23, 24, 25, 26]);
+    assert_eq!(report.applied, vec![20, 21, 22, 23, 24, 25, 26, 27]);
     assert!(!table_exists(&db.conn, "saved_searches"));
     assert!(table_exists(&db.conn, "recent_searches"));
 }
@@ -74,7 +74,7 @@ fn t_mig_02_v20_applies_to_a_v19_db_with_saved_rows_and_keeps_recent_rows() {
     let report = migrate(&mut db.conn, &db.backup_dir, &FixedClock(T0 + 1)).unwrap();
 
     // Assert
-    assert_eq!(report.applied, vec![20, 21, 22, 23, 24, 25, 26]);
+    assert_eq!(report.applied, vec![20, 21, 22, 23, 24, 25, 26, 27]);
     assert!(report.backup.is_some_and(|b| b.is_file()));
     assert!(!table_exists(&db.conn, "saved_searches"));
     let recent: i64 = db
@@ -95,5 +95,5 @@ fn t_mig_03_rerunning_after_v20_is_a_noop() {
 
     // Assert
     assert!(again.applied.is_empty());
-    assert_eq!(applied_versions(&db.conn).last(), Some(&26));
+    assert_eq!(applied_versions(&db.conn).last(), Some(&27));
 }

@@ -59,7 +59,7 @@ impl EjectScope {
     }
 }
 
-/// 준비 도중 불리는 콜백 (앱: libVLC 가 이 디스크 파일을 재생 중이면 정지). 반환 시점에 파일이 닫혀 있어야 한다.
+/// 준비 도중 불리는 콜백 (앱: 내장 플레이어(libmpv 워커)가 이 디스크 파일을 재생 중이면 닫기). 반환 시점에 파일이 닫혀 있어야 한다.
 pub type EjectHook = Arc<dyn Fn(&EjectScope) + Send + Sync>;
 
 #[derive(Default)]

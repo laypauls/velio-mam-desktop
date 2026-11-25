@@ -21,11 +21,11 @@ export function PlayerSection({ settings }: { settings: Settings }) {
   return (
     <section aria-label={t("settings.player.section")} className="flex flex-col gap-4">
       <SettingsSubsection title={t("settings.sub.playback")}>
-        <SettingRow label={t("settings.view.videoVlc")} description={t("settings.view.videoVlcHint")}>
+        <SettingRow label={t("settings.view.videoBuiltIn")} description={t("settings.view.videoBuiltInHint")}>
           <Switch
-            aria-label={t("settings.view.videoVlc")}
-            checked={settings.videoPlayerVlc}
-            onCheckedChange={(videoPlayerVlc) => update.mutate({ videoPlayerVlc })}
+            aria-label={t("settings.view.videoBuiltIn")}
+            checked={settings.videoPlayerBuiltIn}
+            onCheckedChange={(videoPlayerBuiltIn) => update.mutate({ videoPlayerBuiltIn })}
           />
         </SettingRow>
         <OpenAutoplayRow value={settings.mediaOpenAutoplay} />

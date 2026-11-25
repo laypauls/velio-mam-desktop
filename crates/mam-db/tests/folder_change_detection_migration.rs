@@ -47,7 +47,7 @@ fn t_detect_db_01_upgrade_from_v20_leaves_existing_folder_null() {
     let report = migrate(&mut db.conn, &db.backup_dir, &FixedClock(T0 + 1)).unwrap();
 
     // Assert
-    assert_eq!(report.applied, vec![21, 22, 23, 24, 25, 26]);
+    assert_eq!(report.applied, vec![21, 22, 23, 24, 25, 26, 27]);
     let row: (Option<String>, Option<String>, Option<String>) = db
         .conn
         .query_row(

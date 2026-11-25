@@ -50,8 +50,8 @@ export interface SceneController {
 
 /**
  * 영상 한 편의 장면전환점 중심 — 서버 컷(추출 완료 이벤트로 갱신), 표시 설정, 추출·재추출·삭제, `Ctrl+←/→`·`C` 키 동작을 묶는다.
- * 재생 엔진(`<video>` / libVLC)은 `controls` 어댑터로만 접근하므로 두 경로가 같은 코드를 쓴다. `readTimeMs` 는 요소가 더 정확한 현재 시각을 알 때만 준다.
- * 이동 기준은 "마지막 이동 목표(1초 안)", 없으면 현재 시각 — libVLC 가 보고하는 시각은 약 500ms 계단이라 연타하면 같은 컷으로 되돌아가기 때문이다.
+ * 재생 엔진(`<video>` / libmpv)은 `controls` 어댑터로만 접근하므로 두 경로가 같은 코드를 쓴다. `readTimeMs` 는 요소가 더 정확한 현재 시각을 알 때만 준다.
+ * 이동 기준은 "마지막 이동 목표(1초 안)", 없으면 현재 시각 — 플레이어가 보고하는 시각은 최대 5Hz 로 갱신돼 연타하면 같은 컷으로 되돌아가기 때문이다.
  * 같은 기준을 `C` 추가에도 써서, 이동 직후 추가해도 방금 본 위치에 컷이 생긴다.
  */
 export function useSceneController(asset: AssetDetail, controls: ControlsBinding, readTimeMs?: () => number): SceneController {

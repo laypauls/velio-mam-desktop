@@ -75,8 +75,9 @@ pub struct Settings {
     pub captured_at_fallback: CapturedAtFallback,
     /// 사이드바 별점 메뉴 표시 (꺼도 별점 입력·필터·정렬은 그대로)
     pub sidebar_rating_menu: bool,
-    /// 동영상을 내장 플레이어(libVLC)로 재생 (꺼도 WebView 재생 불가 형식은 libVLC 로 대체)
-    pub video_player_vlc: bool,
+    /// 동영상을 내장 플레이어(libmpv)로 재생 (꺼도 WebView 재생 불가 형식은 내장 플레이어로 대체)
+    #[serde(rename = "videoPlayerBuiltIn")]
+    pub video_player_builtin: bool,
     /// 재생 정지 + 창 숨기기 단축키 (`KeyboardEvent.key` 기반 문자열, `None` = 사용 안 함)
     pub hide_shortcut: Option<String>,
     /// 플레이어 패널만 닫는 단축키 (형식은 `hide_shortcut` 과 동일, `None` = 사용 안 함)
@@ -303,8 +304,8 @@ const DEFS: &[Def] = &[
         valid: Value::is_boolean,
     },
     Def {
-        key: "video_player_vlc",
-        field: "videoPlayerVlc",
+        key: "video_player_builtin",
+        field: "videoPlayerBuiltIn",
         default: || json!(true),
         valid: Value::is_boolean,
     },
@@ -489,8 +490,8 @@ impl Settings {
                 .get("sidebarRatingMenu")
                 .and_then(Value::as_bool)
                 .unwrap_or(true),
-            video_player_vlc: values
-                .get("videoPlayerVlc")
+            video_player_builtin: values
+                .get("videoPlayerBuiltIn")
                 .and_then(Value::as_bool)
                 .unwrap_or(true),
             hide_shortcut: values

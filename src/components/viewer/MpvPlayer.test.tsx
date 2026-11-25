@@ -21,7 +21,7 @@ afterEach(() => {
 describe("MpvPlayer — selection", () => {
   it("T-ui-viewer-40 [Business rule] an online non-playable video opens the built-in player with the canvas size, not <video>", async () => {
     // Arrange + Act
-    const t = await mountMpv({ settings: { videoPlayerVlc: false } })
+    const t = await mountMpv({ settings: { videoPlayerBuiltIn: false } })
     await t.ready()
     // Assert
     // 열 때 자동 재생(설정) — 영상은 1920×1080, 무대 1000×600 안에 contain → 1000×563 장치 px
@@ -35,7 +35,7 @@ describe("MpvPlayer — selection", () => {
 
   it("T-ui-viewer-41 [Business rule] a playable video with the setting off keeps <video> and never touches the built-in player", async () => {
     // Arrange + Act
-    const t = await mountMpv({ settings: { videoPlayerVlc: false }, detail: { playable: true } })
+    const t = await mountMpv({ settings: { videoPlayerBuiltIn: false }, detail: { playable: true } })
     // Assert
     await screen.findByLabelText("v1.mxf", { selector: "video" })
     expect(t.api.playerAvailable).not.toHaveBeenCalled()
@@ -45,7 +45,7 @@ describe("MpvPlayer — selection", () => {
   it("T-ui-viewer-42 [Business rule] when the built-in player is unavailable the external-open fallback is shown and open is not attempted", async () => {
     // Arrange
     const user = userEvent.setup()
-    const t = await mountMpv({ settings: { videoPlayerVlc: false }, available: false })
+    const t = await mountMpv({ settings: { videoPlayerBuiltIn: false }, available: false })
     // Act
     expect(await screen.findByText(/내장 플레이어를 사용할 수 없어/)).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "외부 프로그램으로 열기" }))
@@ -56,7 +56,7 @@ describe("MpvPlayer — selection", () => {
 
   it("T-ui-viewer-62 [Business rule] regression: available=false says the player is missing, not that the format is unsupported", async () => {
     // Arrange + Act
-    await mountMpv({ settings: { videoPlayerVlc: false }, available: false })
+    await mountMpv({ settings: { videoPlayerBuiltIn: false }, available: false })
     // Assert
     expect(await screen.findByText(/다시 설치하거나 외부 프로그램으로 열어 주세요/)).toBeInTheDocument()
     expect(screen.queryByText(/이 형식은 앱에서 바로 재생할 수 없습니다/)).not.toBeInTheDocument()
@@ -64,15 +64,15 @@ describe("MpvPlayer — selection", () => {
 
   it("T-ui-viewer-63 [Business rule] the three failure causes show distinct messages", async () => {
     // Arrange + Act: 플레이어 없음
-    const missing = await mountMpv({ settings: { videoPlayerVlc: false }, available: false })
+    const missing = await mountMpv({ settings: { videoPlayerBuiltIn: false }, available: false })
     const missingText = (await screen.findByText(/내장 플레이어를 사용할 수 없어/)).textContent
     missing.view.unmount()
     // Arrange + Act: 열기 실패
-    const failed = await mountMpv({ settings: { videoPlayerVlc: false }, open: "fail" })
+    const failed = await mountMpv({ settings: { videoPlayerBuiltIn: false }, open: "fail" })
     const failedText = (await screen.findByRole("alert")).textContent
     failed.view.unmount()
     // Arrange + Act: 오프라인
-    await mountMpv({ settings: { videoPlayerVlc: false }, open: { code: "asset_offline", message: "x" } })
+    await mountMpv({ settings: { videoPlayerBuiltIn: false }, open: { code: "asset_offline", message: "x" } })
     const offlineText = (await screen.findByRole("alert")).textContent
     // Assert
     expect(failedText).toBe("내장 플레이어로 이 파일을 열지 못했습니다. 외부 프로그램으로 열어 주세요.")
@@ -82,7 +82,7 @@ describe("MpvPlayer — selection", () => {
 
   it("T-ui-viewer-64 [Boundary] a non-playable audio file keeps the format-unsupported message even when the player is available", async () => {
     // Arrange + Act
-    await mountMpv({ settings: { videoPlayerVlc: false }, detail: { mediaType: "audio", fileName: "voice.aif" } })
+    await mountMpv({ settings: { videoPlayerBuiltIn: false }, detail: { mediaType: "audio", fileName: "voice.aif" } })
     // Assert
     expect(await screen.findByText(/이 형식은 앱에서 바로 재생할 수 없습니다/)).toBeInTheDocument()
     expect(screen.queryByText(/내장 플레이어를 사용할 수 없어/)).not.toBeInTheDocument()
@@ -90,7 +90,7 @@ describe("MpvPlayer — selection", () => {
 
   it("T-ui-viewer-43 [Business rule] an offline non-playable video shows the offline notice without querying the player", async () => {
     // Arrange + Act
-    const t = await mountMpv({ settings: { videoPlayerVlc: false }, detail: { availability: "offline" } })
+    const t = await mountMpv({ settings: { videoPlayerBuiltIn: false }, detail: { availability: "offline" } })
     // Assert
     expect(await screen.findByText(/저장 장치가 연결되어 있지 않아/)).toBeInTheDocument()
     expect(t.api.playerAvailable).not.toHaveBeenCalled()
@@ -99,7 +99,7 @@ describe("MpvPlayer — selection", () => {
 
   it("T-ui-viewer-45 [Boundary] a non-playable audio file never uses the built-in player", async () => {
     // Arrange + Act
-    const t = await mountMpv({ settings: { videoPlayerVlc: false }, detail: { mediaType: "audio", fileName: "voice.aif" } })
+    const t = await mountMpv({ settings: { videoPlayerBuiltIn: false }, detail: { mediaType: "audio", fileName: "voice.aif" } })
     // Assert
     expect(await screen.findByRole("button", { name: "외부 프로그램으로 열기" })).toBeInTheDocument()
     expect(t.api.playerAvailable).not.toHaveBeenCalled()

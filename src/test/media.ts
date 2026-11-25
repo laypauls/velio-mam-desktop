@@ -42,5 +42,5 @@ export async function useStubbedDetail(api: UiApi, patch: Partial<AssetDetail> =
   vi.spyOn(api, "getAssetDetail").mockImplementation((id) => Promise.resolve({ ...detail, assetId: id }))
   vi.spyOn(api, "mediaUrl").mockImplementation((id) => `media://${id}`)
   // 열 때 자동 재생 — 정지 상태 설정이면 영상은 포스터가 먼저 뜬다 (VideoPoster.test.tsx)
-  await api.updateSettings({ videoPlayerVlc: false, mediaOpenAutoplay: true })
+  await api.updateSettings({ videoPlayerBuiltIn: false, mediaOpenAutoplay: true })
 }

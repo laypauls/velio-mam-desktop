@@ -176,7 +176,7 @@ describe("integrated track context menu", () => {
     return screen.findByRole("menu")
   }
 
-  it("T-ui-ranges-15 [Happy] right-click opens the menu (matches OPEN_LAYER so libVLC snapshots), selects the range, 'go to start' seeks, 'delete this range' saves the rest", async () => {
+  it("T-ui-ranges-15 [Happy] right-click opens the menu (matches OPEN_LAYER), selects the range, 'go to start' seeks, 'delete this range' saves the rest", async () => {
     // Arrange
     const user = userEvent.setup()
     const { lane, el, set } = await mountHtmlPlayer({ ranges: RANGES })
