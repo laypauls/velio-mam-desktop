@@ -7,7 +7,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6)
 ![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB)
 ![Rust](https://img.shields.io/badge/Rust-stable-000000)
-![License](https://img.shields.io/badge/license-Apache--2.0-blue)
+![License](https://img.shields.io/badge/license-GPL--3.0--only-blue)
 
 [한국어](README.ko.md) | **English**
 
@@ -174,7 +174,7 @@ It can only use the permissions it declares and the user grants (read metadata, 
 
 ## License
 
-This project is distributed under the [Apache License 2.0](LICENSE).
+This project is distributed under the [GNU General Public License v3.0 only](LICENSE) (GPL-3.0-only), with an additional permission for plugins: plugins that interact with the app only through the plugin API may use any license (see [LICENSE](LICENSE)).
 
 Notices for the third-party programs bundled with the installer (FFmpeg, whisper.cpp, libmpv), libraries and AI models are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
-Some components, such as the bundled FFmpeg build, are under their own licenses, such as the (L)GPL, rather than Apache-2.0.
+Some components, such as the bundled FFmpeg build, are under their own licenses, such as the LGPL; see the notices above.

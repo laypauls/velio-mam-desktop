@@ -7,7 +7,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6)
 ![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB)
 ![Rust](https://img.shields.io/badge/Rust-stable-000000)
-![License](https://img.shields.io/badge/license-Apache--2.0-blue)
+![License](https://img.shields.io/badge/license-GPL--3.0--only-blue)
 
 **한국어** | [English](README.md)
 
@@ -174,7 +174,7 @@ NSIS 설치 프로그램을 만들며, 업데이트 서명 키가 필요합니�
 
 ## 라이선스
 
-이 프로젝트는 [Apache License 2.0](LICENSE) 으로 배포됩니다.
+이 프로젝트는 [GNU General Public License v3.0 only](LICENSE)(GPL-3.0-only)로 배포됩니다. 단, 플러그인 예외가 있어 플러그인 API 로만 앱과 상호작용하는 플러그인은 어떤 라이선스든 쓸 수 있습니다([LICENSE](LICENSE) 참고).
 
 설치 프로그램에 동봉되는 서드파티 프로그램(FFmpeg, whisper.cpp, libmpv)과 라이브러리·AI 모델의 고지는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 와 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) 에 있습니다.
-동봉된 FFmpeg 빌드 등 일부 구성요소는 Apache-2.0 이 아닌 (L)GPL 등 자체 라이선스를 따릅니다.
+동봉된 FFmpeg 빌드 등 일부 구성요소는 LGPL 등 자체 라이선스를 따릅니다(위 고지 참고).
