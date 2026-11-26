@@ -1,6 +1,6 @@
 [package]
 name = "mam-desktop"
-version = "0.1.0"
+version = "0.1.1"
 description = "velio. - local media asset manager"
 authors = []
 edition = "2024"
