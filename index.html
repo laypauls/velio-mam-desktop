@@ -6,11 +6,67 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>velio.</title>
     <script src="/theme-boot.js"></script>
+    <!-- index.css 는 JS 번들 이후에 적용되므로 스플래시 전용 스타일만 여기에 둔다(선택자는 [data-boot-splash] 한정). 인라인 style 은 CSP 허용 -->
+    <style>
+      [data-boot-splash] {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      [data-boot-splash] svg {
+        width: 64px;
+        height: 64px;
+        animation: boot-splash-pulse 1.6s ease-in-out infinite;
+      }
+      @keyframes boot-splash-pulse {
+        0%,
+        100% {
+          opacity: 0.45;
+          transform: scale(0.94);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        [data-boot-splash] svg {
+          animation: none;
+        }
+      }
+    </style>
   </head>
 
   <body>
-    <!-- 스크립트(개발 서버는 첫 의존성 번들 동안 수십 초)가 올라오기 전에 빈 창이 보이지 않도록 하는 자리표시. React 마운트가 통째로 교체한다. i18n 이전이라 번역 키를 쓸 수 없다 -->
-    <div id="root"><p role="status" data-boot-splash>불러오는 중입니다…</p></div>
+    <!-- 스크립트(개발 서버는 첫 의존성 번들 동안 수십 초)가 올라오기 전에 빈 창이 보이지 않도록 하는 중앙 로딩 심볼 자리표시(보이는 텍스트 없음, 접근 이름만). React 마운트가 통째로 교체한다. 심볼은 src/assets/velio-symbol.svg 의 인라인 사본 — 로고 변경 시 함께 갱신 -->
+    <div id="root">
+      <div role="status" aria-label="불러오는 중" data-boot-splash>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="48 85 1160 1160" aria-hidden="true">
+          <defs>
+            <linearGradient id="boot-blue" x1="1120" y1="300" x2="600" y2="1030" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#00ECFF" />
+              <stop offset="0.3" stop-color="#02C6FC" />
+              <stop offset="0.62" stop-color="#0A7CFA" />
+              <stop offset="1" stop-color="#2230F5" />
+            </linearGradient>
+            <linearGradient id="boot-purple" x1="180" y1="320" x2="520" y2="940" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#A729FF" />
+              <stop offset="0.55" stop-color="#7A0CF5" />
+              <stop offset="1" stop-color="#3F03C4" />
+            </linearGradient>
+            <linearGradient id="boot-fold" x1="560" y1="860" x2="470" y2="800" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#2A0290" stop-opacity="0.55" />
+              <stop offset="1" stop-color="#2A0290" stop-opacity="0" />
+            </linearGradient>
+          </defs>
+          <path fill="url(#boot-blue)" d="M97 303 L300 304 C372 305 418 332 447 384 L625 722 L792 404 C818 352 868 304 950 303 L1158 303 C1140 325 1110 370 1086 415 L822 915 C790 985 720 1028 630 1028 C540 1028 470 1000 432 940 L166 415 C140 372 116 328 97 303 Z" />
+          <path fill="url(#boot-purple)" d="M97 303 L300 304 C372 305 418 332 447 384 L625 722 L597 780 C575 826 545 880 502 914 C482 931 462 944 436 946 L166 415 C140 372 116 328 97 303 Z" />
+          <path fill="url(#boot-fold)" d="M625 722 L597 780 C575 826 545 880 502 914 C482 931 462 944 436 946 L400 875 C470 870 540 820 600 720 Z" />
+        </svg>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
