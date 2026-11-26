@@ -21,7 +21,14 @@
 ; Template order (Section Install): registry writes -> Start Menu shortcut -> desktop shortcut (silent/passive only)
 ; -> NSIS_HOOK_POSTINSTALL. The interactive desktop shortcut is created later by the finish page, see .onGUIEnd below.
 ; Update mode (/UPDATE) and /NS skip shortcut creation, so an existing "velio..lnk" is left as the user has it.
+; Explorer's desktop view misses a create -> immediate rename, so "velio." stayed invisible until F5. Tell the shell
+; about every rename (SHCNE_RENAMEITEM) right after it. Must not depend on PRODUCTNAME (used by .onGUIEnd).
 !define VELIO_LNK "velio..lnk"
+
+; SHChangeNotify(SHCNE_RENAMEITEM=0x1, SHCNF_PATHW|SHCNF_FLUSH=0x1005, old, new)
+!macro VELIO_NOTIFY_RENAME old new
+  System::Call 'shell32::SHChangeNotify(i 0x1, i 0x1005, w "${old}", w "${new}")'
+!macroend
 
 ; Rename "<dir>\<PRODUCTNAME>.lnk" -> "<dir>\velio..lnk" only when it points at our exe (never touch foreign shortcuts)
 !macro VELIO_RENAME_LNK dir
@@ -31,6 +38,7 @@
     ${If} $0 = 1
       Delete "${dir}\${VELIO_LNK}"
       Rename "${dir}\${PRODUCTNAME}.lnk" "${dir}\${VELIO_LNK}"
+      !insertmacro VELIO_NOTIFY_RENAME "${dir}\${PRODUCTNAME}.lnk" "${dir}\${VELIO_LNK}"
     ${EndIf}
   ${EndIf}
 !macroend
@@ -56,6 +64,7 @@ Function .onGUIEnd
     ${If} $0 = 1
       Delete "$DESKTOP\velio..lnk"
       Rename "$DESKTOP\velio.lnk" "$DESKTOP\velio..lnk"
+      !insertmacro VELIO_NOTIFY_RENAME "$DESKTOP\velio.lnk" "$DESKTOP\velio..lnk"
     ${EndIf}
   ${EndIf}
 FunctionEnd

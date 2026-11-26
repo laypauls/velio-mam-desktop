@@ -1,4 +1,4 @@
-// Categories: Happy (T-ui-boot-04 자리표시가 있고 마운트로 교체됨) / Boundary (스크립트 로드 전 빈 #root 가 아님)
+// Categories: Happy (T-ui-boot-04 자리표시가 있고 마운트로 교체됨) / Boundary (스크립트 로드 전 빈 #root 가 아님 — 텍스트 없는 중앙 심볼 + 접근 이름, reduced-motion 정지)
 import { render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import "@/i18n"
@@ -23,8 +23,21 @@ describe("first-window placeholder", () => {
     const root = doc.getElementById("root")
     // Assert
     expect(root).not.toBeNull()
-    expect(root?.querySelector("[role=status]")?.textContent?.trim()).not.toBe("")
+    const status = root?.querySelector("[role=status]")
+    expect(status).not.toBeNull()
+    expect(status?.getAttribute("aria-label")?.trim()).toBeTruthy()
+    expect(status?.querySelector("svg")).not.toBeNull()
+    expect(status?.textContent?.trim()).toBe("")
     expect(html.indexOf('id="root"')).toBeLessThan(html.indexOf("/src/main.tsx"))
+  })
+
+  it("T-ui-boot-04c [Boundary] splash style honours prefers-reduced-motion and stays scoped to the splash", () => {
+    // Arrange / Act
+    const css = new DOMParser().parseFromString(html, "text/html").querySelector("head style")?.textContent ?? ""
+    const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"))
+    // Assert
+    expect(css).toContain("@media (prefers-reduced-motion: reduce)")
+    expect(reduced).toMatch(/\[data-boot-splash\][^{]*\{[^}]*animation:\s*none/)
   })
 
   it("T-ui-boot-04b [Happy] mounting the app replaces the placeholder", async () => {
