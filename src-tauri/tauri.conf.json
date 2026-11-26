@@ -22,8 +22,8 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' data: http://mamthumb.localhost mamthumb:; media-src 'self' http://mammedia.localhost mammedia:; connect-src 'self' ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'; font-src 'self' data:",
-      "devCsp": "default-src 'self'; img-src 'self' data: http://mamthumb.localhost mamthumb:; media-src 'self' http://mammedia.localhost mammedia:; connect-src 'self' ipc: http://ipc.localhost ws://localhost:1420 http://localhost:1420; style-src 'self' 'unsafe-inline'; font-src 'self' data:"
+      "csp": "default-src 'self'; img-src 'self' data: http://mamthumb.localhost mamthumb: http://mammedia.localhost mammedia:; media-src 'self' http://mammedia.localhost mammedia:; connect-src 'self' ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'; font-src 'self' data:",
+      "devCsp": "default-src 'self'; img-src 'self' data: http://mamthumb.localhost mamthumb: http://mammedia.localhost mammedia:; media-src 'self' http://mammedia.localhost mammedia:; connect-src 'self' ipc: http://ipc.localhost ws://localhost:1420 http://localhost:1420; style-src 'self' 'unsafe-inline'; font-src 'self' data:"
     }
   },
   "bundle": {
