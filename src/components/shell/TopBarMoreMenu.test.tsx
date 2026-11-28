@@ -1,5 +1,5 @@
-// Categories: Happy (T-ui-topbar-08 items + same actions, 10 card display, 11 settings) / Business rule (T-ui-topbar-09 semantic + list-mode disabled, 12 update badge/action) / Boundary (T-ui-topbar-13 360px markup contract)
-// jsdom 은 컨테이너 쿼리를 계산하지 않는다 — 360px 단계는 "어떤 요소가 @max-[360px] 클래스를 갖는가" 라는 마크업 계약으로, 메뉴 동작은 접근성 역할로 검증한다.
+// Categories: Happy (T-ui-topbar-08 items + same actions, 10 card display, 11 no settings item) / Business rule (T-ui-topbar-09 semantic + list-mode disabled, 12 update badge/action) / Boundary (T-ui-topbar-13 426px markup contract)
+// jsdom 은 컨테이너 쿼리를 계산하지 않는다 — 426px 단계는 "어떤 요소가 @max-[426px] 클래스를 갖는가" 라는 마크업 계약으로, 메뉴 동작은 접근성 역할로 검증한다.
 import { act, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -27,7 +27,7 @@ async function setup() {
   return { user }
 }
 
-const topBar = (): HTMLElement => document.querySelector("[data-viewer-sibling] > header") as HTMLElement
+const topBar = (): HTMLElement => screen.getByTestId("topbar")
 const moreButton = () => within(topBar()).getByRole("button", { name: /^더보기/ })
 
 async function openMore(user: ReturnType<typeof userEvent.setup>) {
@@ -46,14 +46,15 @@ async function openSub(user: ReturnType<typeof userEvent.setup>, menu: HTMLEleme
 const UPDATE = { available: true, currentVersion: "1.0.0", version: "1.2.0", notes: null, date: null }
 
 describe("TopBar more (⋯) menu", () => {
-  it("T-ui-topbar-08 [Happy] the menu lists sort/direction/view mode/card display/settings and sort + direction + view mode act like the wide controls", async () => {
+  it("T-ui-topbar-08 [Happy] the menu lists sort/direction/view mode/card display (no settings item any more) and sort + direction + view mode act like the wide controls", async () => {
     // Arrange
     const { user } = await setup()
     const dir0 = useSearchStore.getState().sort.direction
     // Act
     const menu = await openMore(user)
     // Assert: 항목
-    for (const name of ["정렬 기준", "보기 방식", "카드 표시", "설정"]) expect(within(menu).getByRole("menuitem", { name })).toBeInTheDocument()
+    for (const name of ["정렬 기준", "보기 방식", "카드 표시"]) expect(within(menu).getByRole("menuitem", { name })).toBeInTheDocument()
+    expect(within(menu).queryByRole("menuitem", { name: "설정" })).not.toBeInTheDocument()
     expect(within(menu).getByRole("menuitem", { name: /^정렬 방향/ })).toBeEnabled()
     // Act: 정렬 기준 → 제목
     await openSub(user, menu, "정렬 기준")
@@ -105,14 +106,18 @@ describe("TopBar more (⋯) menu", () => {
     expect(useViewStore.getState().cardDisplay.favorite).toBe(!before)
   })
 
-  it("T-ui-topbar-11 [Happy] the settings item calls the same onOpenSettings (opens settings)", async () => {
+  it("T-ui-topbar-11 [Business rule] the more menu has no settings item and the TopBar has no settings button — the rail is the only entry", async () => {
     // Arrange
     const { user } = await setup()
-    expect(useProtectStore.getState().settingsOpen).toBe(false)
-    const menu = await openMore(user)
     // Act
-    await user.click(within(menu).getByRole("menuitem", { name: "설정" }))
+    const menu = await openMore(user)
     // Assert
+    expect(within(menu).queryByRole("menuitem", { name: "설정" })).not.toBeInTheDocument()
+    expect(within(topBar()).queryByRole("button", { name: "설정" })).not.toBeInTheDocument()
+    expect(useProtectStore.getState().settingsOpen).toBe(false)
+    // Act: 레일의 설정 버튼은 설정 화면을 연다
+    await user.keyboard("{Escape}")
+    await user.click(screen.getByRole("button", { name: "설정" }))
     expect(useProtectStore.getState().settingsOpen).toBe(true)
   })
 
@@ -155,21 +160,20 @@ describe("TopBar more (⋯) menu", () => {
   })
 })
 
-describe("TopBar 360px breakpoint (container query contract)", () => {
-  it("T-ui-topbar-13 [Boundary] below 360px the right group hides and only ⋯ shows; ⋯ is hidden at wider widths", async () => {
+describe("TopBar 426px breakpoint (container query contract)", () => {
+  it("T-ui-topbar-13 [Boundary] below 426px the right group hides and only ⋯ shows; ⋯ is hidden at wider widths", async () => {
     // Arrange + Act
     await setup()
     const bar = topBar()
-    const settings = within(bar).getByRole("button", { name: "설정" })
-    const group = settings.parentElement as HTMLElement
-    // Assert: 정렬·보기·카드 표시·업데이트·설정이 든 묶음이 한 번에 숨는다
-    expect(group.className).toContain("@max-[360px]:hidden")
+    const group = within(bar).getByRole("combobox", { name: "정렬 기준" }).closest("div.shrink-0") as HTMLElement
+    // Assert: 정렬·보기·카드 표시·업데이트가 든 묶음이 한 번에 숨는다
+    expect(group.className).toContain("@max-[426px]:hidden")
     expect(group.contains(within(bar).getByRole("combobox", { name: "정렬 기준" }))).toBe(true)
     expect(group.contains(within(bar).getByRole("button", { name: "표시 옵션" }))).toBe(true)
-    // Assert: ⋯ 는 기본 숨김, 360px 미만에서만 표시
+    // Assert: ⋯ 는 기본 숨김, 426px 미만에서만 표시
     expect(moreButton().className).toContain("hidden")
-    expect(moreButton().className).toContain("@max-[360px]:inline-flex")
-    // Assert: 남는 컨트롤(메뉴·검색 아이콘·필터)은 이 묶음 밖이다
-    for (const name of ["사이드바 열기/닫기", "검색 열기", "필터"]) expect(group.contains(within(bar).getByRole("button", { name }))).toBe(false)
+    expect(moreButton().className).toContain("@max-[426px]:inline-flex")
+    // Assert: 남는 컨트롤(검색 아이콘·필터)과 창 버튼은 이 묶음 밖이다
+    for (const name of ["검색 열기", "필터", "최소화", "최대화", "닫기"]) expect(group.contains(within(bar).getByRole("button", { name }))).toBe(false)
   })
 })

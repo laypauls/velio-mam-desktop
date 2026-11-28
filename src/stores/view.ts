@@ -5,7 +5,7 @@ import {
   type CardDisplayPatch,
   type CardPresetName,
 } from "@/components/gallery/cardDisplay"
-import type { CardSize, GalleryCardDisplay, LayoutSettings } from "@/lib/ipc-contract"
+import type { CardSize, GalleryCardDisplay, LayoutSettings, SidebarSection } from "@/lib/ipc-contract"
 
 export const VIEWER_MIN_WIDTH = 320
 export const VIEWER_DEFAULT_WIDTH = 520
@@ -25,7 +25,8 @@ export type ViewMode = "grid" | "list" | "filmstrip"
 /** 갤러리가 실제로 그리는 배치 — 필름스트립 중에도 숨은 갤러리는 직전 배치를 유지한다 */
 export type GalleryLayoutMode = Exclude<ViewMode, "filmstrip">
 export type DetailTab = "info" | "ai" | "similar"
-export type SidebarTab = "library" | "collections"
+/** 왼쪽 레일 섹션 — 저장은 `useLayoutPersistence` 가 설정 `layout.sidebarSection` 으로 보낸다 */
+export type SidebarTab = SidebarSection
 
 interface ViewState {
   viewMode: ViewMode
@@ -44,8 +45,12 @@ interface ViewState {
   /** 페이지 모드의 0-기준 쪽 번호 — 검색 조건이 바뀌면 갤러리가 0 으로 되돌린다 */
   galleryPage: number
   sidebarOpen: boolean
-  /** 사이드바 탭 — 세션 동안만 유지(저장 안 함), 재시작하면 라이브러리 */
+  /** 왼쪽 레일에서 열어 둔 섹션 — 마지막 값을 기억한다(저장은 `useLayoutPersistence`) */
   sidebarTab: SidebarTab
+  /** 보기 영역이 열려 폭이 모자라 섹션 패널을 임시로 접었는가 — 저장 안 함, `sidebarOpen` 은 그대로. `usePanelAutoCollapse` 가 갱신 */
+  panelAutoCollapsed: boolean
+  /** 자동 접힘 중 사용자가 로고·섹션으로 다시 펼쳤는가 — 보기 영역이 닫히거나 자동 접힘 판정이 바뀌면 해제 */
+  panelForced: boolean
   detailOpen: boolean
   /** 상세 패널 탭 — 자산을 바꿔도(로딩 중 포함) 유지한다 */
   detailTab: DetailTab
@@ -75,8 +80,16 @@ interface ViewState {
   hydrateCardDisplay: (display: GalleryCardDisplay) => void
   /** 저장된 레이아웃으로 채운다 — 사용자가 이미 바꿨으면(layoutRev > 0) 무시한다. 저장을 유발하지 않는다 */
   hydrateLayout: (layout: LayoutSettings) => void
+  /** 로고 버튼 — 패널 숨김/표시. 자동 접힘 중이면 접힌 패널을 다시 펼친다 */
   toggleSidebar: () => void
+  /** 섹션 지정만(패널 표시 여부는 건드리지 않음) */
   setSidebarTab: (tab: SidebarTab) => void
+  /** 레일 섹션 버튼 — 보이는 활성 섹션을 다시 누르면 패널 접기, 그 외에는 그 섹션을 펼친다 */
+  selectSection: (tab: SidebarTab) => void
+  /** 섹션을 지정하고 패널을 펼친다(설정 화면에서 돌아올 때) */
+  showSection: (tab: SidebarTab) => void
+  setPanelAutoCollapsed: (collapsed: boolean) => void
+  clearPanelForced: () => void
   setDetailOpen: (open: boolean) => void
   setDetailTab: (tab: DetailTab) => void
   setDetailMetaOpen: (open: boolean) => void
@@ -86,6 +99,11 @@ interface ViewState {
   seekPreview: (id: number, ms: number) => void
   closePreview: () => void
   setFullscreen: (on: boolean) => void
+}
+
+/** 섹션 패널이 실제로 보이는가 — 저장된 열림 상태이면서 자동 접힘(폭 부족)에 걸리지 않았거나 사용자가 다시 펼친 경우 */
+export function selectPanelVisible(s: Pick<ViewState, "sidebarOpen" | "panelAutoCollapsed" | "panelForced">): boolean {
+  return s.sidebarOpen && (!s.panelAutoCollapsed || s.panelForced)
 }
 
 export const useViewStore = create<ViewState>()((set) => ({
@@ -99,6 +117,8 @@ export const useViewStore = create<ViewState>()((set) => ({
   galleryPage: 0,
   sidebarOpen: true,
   sidebarTab: "library",
+  panelAutoCollapsed: false,
+  panelForced: false,
   detailOpen: true,
   detailTab: "info",
   detailMetaOpen: false,
@@ -133,9 +153,23 @@ export const useViewStore = create<ViewState>()((set) => ({
   resetCardDisplay: () =>
     set((s) => ({ cardDisplay: { ...structuredClone(DEFAULT_CARD_DISPLAY), cardSize: s.cardDisplay.cardSize }, cardDisplayRev: s.cardDisplayRev + 1 })),
   hydrateCardDisplay: (cardDisplay) => set((s) => (s.cardDisplayRev === 0 ? { cardDisplay } : s)),
-  hydrateLayout: (l) => set((s) => (s.layoutRev === 0 ? { detailOpen: l.detailOpen, sidebarOpen: l.sidebarOpen, viewerWidth: l.viewerWidth, detailTab: l.detailTab, filmstripHeight: clampFilmstripHeight(l.filmstripHeight) } : s)),
-  toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen, layoutRev: s.layoutRev + 1 })),
-  setSidebarTab: (sidebarTab) => set({ sidebarTab }),
+  hydrateLayout: (l) => set((s) => (s.layoutRev === 0 ? { detailOpen: l.detailOpen, sidebarOpen: l.sidebarOpen, sidebarTab: l.sidebarSection, viewerWidth: l.viewerWidth, detailTab: l.detailTab, filmstripHeight: clampFilmstripHeight(l.filmstripHeight) } : s)),
+  toggleSidebar: () =>
+    set((s) => {
+      // 자동 접힘 중인 패널은 저장값(열림)은 그대로 두고 다시 펼치기만 한다
+      if (s.sidebarOpen && s.panelAutoCollapsed && !s.panelForced) return { panelForced: true }
+      const sidebarOpen = !s.sidebarOpen
+      return { sidebarOpen, panelForced: sidebarOpen, layoutRev: s.layoutRev + 1 }
+    }),
+  setSidebarTab: (sidebarTab) => set((s) => (s.sidebarTab === sidebarTab ? s : { sidebarTab, layoutRev: s.layoutRev + 1 })),
+  selectSection: (sidebarTab) =>
+    set((s) => {
+      if (sidebarTab === s.sidebarTab && selectPanelVisible(s)) return { sidebarOpen: false, panelForced: false, layoutRev: s.layoutRev + 1 }
+      return { sidebarTab, sidebarOpen: true, panelForced: true, layoutRev: s.layoutRev + 1 }
+    }),
+  showSection: (sidebarTab) => set((s) => ({ sidebarTab, sidebarOpen: true, panelForced: true, layoutRev: s.layoutRev + 1 })),
+  setPanelAutoCollapsed: (panelAutoCollapsed) => set((s) => (s.panelAutoCollapsed === panelAutoCollapsed ? s : { panelAutoCollapsed, panelForced: false })),
+  clearPanelForced: () => set((s) => (s.panelForced ? { panelForced: false } : s)),
   setDetailOpen: (detailOpen) => set((s) => (s.detailOpen === detailOpen ? s : { detailOpen, layoutRev: s.layoutRev + 1 })),
   setDetailTab: (detailTab) => set((s) => (s.detailTab === detailTab ? s : { detailTab, layoutRev: s.layoutRev + 1 })),
   setDetailMetaOpen: (detailMetaOpen) => set({ detailMetaOpen }),

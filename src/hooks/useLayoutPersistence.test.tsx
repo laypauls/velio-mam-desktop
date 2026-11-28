@@ -24,7 +24,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-const STORED: LayoutSettings = { detailOpen: false, sidebarOpen: false, viewerWidth: 700, detailTab: "ai", filmstripHeight: 140 }
+const STORED: LayoutSettings = { detailOpen: false, sidebarOpen: false, viewerWidth: 700, detailTab: "ai", filmstripHeight: 140, sidebarSection: "tags" }
 
 /** getSettings/updateSettings 를 즉시 해결되는 스파이로 바꾸고 훅만 렌더한다. `load: false` 면 getSettings 를 직접 풀어 준다 */
 async function setup(stored: unknown = STORED, opts: { load?: boolean; updateFails?: boolean } = {}) {
@@ -54,8 +54,8 @@ async function setup(stored: unknown = STORED, opts: { load?: boolean; updateFai
 }
 
 const layoutOf = () => {
-  const { detailOpen, sidebarOpen, viewerWidth, detailTab, filmstripHeight } = useViewStore.getState()
-  return { detailOpen, sidebarOpen, viewerWidth, detailTab, filmstripHeight }
+  const { detailOpen, sidebarOpen, viewerWidth, detailTab, filmstripHeight, sidebarTab } = useViewStore.getState()
+  return { detailOpen, sidebarOpen, viewerWidth, detailTab, filmstripHeight, sidebarSection: sidebarTab }
 }
 
 describe("useLayoutPersistence", () => {
@@ -77,10 +77,10 @@ describe("useLayoutPersistence", () => {
     act(() => useViewStore.getState().setDetailTab("similar"))
     await release()
     // Assert: 저장값(sidebarOpen=false, 700, ai)으로 덮이지 않는다
-    expect(layoutOf()).toEqual({ detailOpen: false, sidebarOpen: true, viewerWidth: 520, detailTab: "similar", filmstripHeight: 104 })
+    expect(layoutOf()).toEqual({ detailOpen: false, sidebarOpen: true, viewerWidth: 520, detailTab: "similar", filmstripHeight: 104, sidebarSection: "library" })
     await act(() => vi.advanceTimersByTimeAsync(LAYOUT_SAVE_DELAY_MS))
     expect(update).toHaveBeenCalledTimes(1)
-    expect(update).toHaveBeenCalledWith({ layout: { detailOpen: false, sidebarOpen: true, viewerWidth: 520, detailTab: "similar", filmstripHeight: 104 } })
+    expect(update).toHaveBeenCalledWith({ layout: { detailOpen: false, sidebarOpen: true, viewerWidth: 520, detailTab: "similar", filmstripHeight: 104, sidebarSection: "library" } })
   })
 
   it("T-ui-layout-03 [Time] saves once, 300ms after the last change (width drag collapses into one write)", async () => {
@@ -116,11 +116,11 @@ describe("useLayoutPersistence", () => {
     // Arrange + Act
     await setup({ detailOpen: "no", sidebarOpen: false, viewerWidth: 100, detailTab: "bogus", extra: 1 })
     // Assert
-    expect(layoutOf()).toEqual({ detailOpen: true, sidebarOpen: false, viewerWidth: 320, detailTab: "info", filmstripHeight: 104 })
+    expect(layoutOf()).toEqual({ detailOpen: true, sidebarOpen: false, viewerWidth: 320, detailTab: "info", filmstripHeight: 104, sidebarSection: "library" })
   })
 
   it("T-ui-layout-06 [Boundary] normalizeLayout handles non-objects, NaN and fractional widths", () => {
-    const defaults = { detailOpen: true, sidebarOpen: true, viewerWidth: 520, detailTab: "info", filmstripHeight: 104 }
+    const defaults = { detailOpen: true, sidebarOpen: true, viewerWidth: 520, detailTab: "info", filmstripHeight: 104, sidebarSection: "library" }
     expect(normalizeLayout(null)).toEqual(defaults)
     expect(normalizeLayout("x")).toEqual(defaults)
     expect(normalizeLayout({ viewerWidth: Number.NaN })).toEqual(defaults)
@@ -167,5 +167,36 @@ describe("useLayoutPersistence", () => {
     await act(() => vi.advanceTimersByTimeAsync(LAYOUT_SAVE_DELAY_MS * 2))
     // Assert
     expect(update).not.toHaveBeenCalled()
+  })
+
+  it("T-ui-rail-layout-01 [Happy] the stored section hydrates without saving; picking another section is saved with the other fields (D7)", async () => {
+    // Arrange
+    const { update } = await setup()
+    expect(useViewStore.getState().sidebarTab).toBe("tags")
+    expect(useViewStore.getState().layoutRev).toBe(0)
+    // Act
+    act(() => useViewStore.getState().setSidebarTab("collections"))
+    await act(() => vi.advanceTimersByTimeAsync(LAYOUT_SAVE_DELAY_MS))
+    // Assert
+    expect(update).toHaveBeenCalledWith({ layout: { ...STORED, sidebarSection: "collections" } })
+  })
+
+  it("T-ui-rail-layout-02 [Validation] unknown or missing sidebarSection falls back to library; every valid value is kept", () => {
+    expect(normalizeLayout({}).sidebarSection).toBe("library")
+    expect(normalizeLayout({ sidebarSection: "bogus" }).sidebarSection).toBe("library")
+    expect(normalizeLayout({ sidebarSection: 3 }).sidebarSection).toBe("library")
+    for (const section of ["library", "rating", "folders", "tags", "collections"] as const) {
+      expect(normalizeLayout({ sidebarSection: section }).sidebarSection).toBe(section)
+    }
+  })
+
+  it("T-ui-rail-layout-03 [Concurrency] a section picked before settings load wins over the stored one", async () => {
+    // Arrange
+    const { release } = await setup(STORED, { load: false })
+    // Act
+    act(() => useViewStore.getState().setSidebarTab("folders"))
+    await release()
+    // Assert
+    expect(useViewStore.getState().sidebarTab).toBe("folders")
   })
 })

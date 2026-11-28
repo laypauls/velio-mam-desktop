@@ -34,7 +34,7 @@ pub use backup_set::{
 pub use connection::{BUSY_TIMEOUT, open};
 pub use error::DbError;
 pub use gallery_display::{CardCheck, CardDateBy, CardInfoFields, CardSize, GalleryCardDisplay};
-pub use layout::{DetailTab, LayoutSetting};
+pub use layout::{DetailTab, LayoutSetting, SidebarSection};
 pub use migrate::{Clock, MigrateReport, SystemClock, latest_version, migrate, migrate_with};
 pub use path_key::{PathKeyError, path_key};
 pub use player_volume::PlayerVolumeSetting;

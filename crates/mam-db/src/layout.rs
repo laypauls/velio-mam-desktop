@@ -28,6 +28,17 @@ pub enum DetailTab {
     Similar,
 }
 
+/// 왼쪽 레일에서 마지막으로 열어 둔 섹션.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SidebarSection {
+    Library,
+    Rating,
+    Folders,
+    Tags,
+    Collections,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LayoutSetting {
@@ -37,6 +48,8 @@ pub struct LayoutSetting {
     pub detail_tab: DetailTab,
     /// 필름스트립 높이(px) — 72..=160 으로 clamp, 기본 104.
     pub filmstrip_height: u32,
+    /// 왼쪽 레일 열린 섹션 — 기본 `library`.
+    pub sidebar_section: SidebarSection,
 }
 
 impl Default for LayoutSetting {
@@ -47,6 +60,7 @@ impl Default for LayoutSetting {
             viewer_width: DEFAULT_VIEWER_WIDTH,
             detail_tab: DetailTab::Info,
             filmstrip_height: DEFAULT_FILMSTRIP_HEIGHT,
+            sidebar_section: SidebarSection::Library,
         }
     }
 }
@@ -86,12 +100,21 @@ impl LayoutSetting {
             Some("similar") => DetailTab::Similar,
             _ => d.detail_tab,
         };
+        let sidebar_section = match obj.get("sidebarSection").and_then(Value::as_str) {
+            Some("library") => SidebarSection::Library,
+            Some("rating") => SidebarSection::Rating,
+            Some("folders") => SidebarSection::Folders,
+            Some("tags") => SidebarSection::Tags,
+            Some("collections") => SidebarSection::Collections,
+            _ => d.sidebar_section,
+        };
         Some(Self {
             detail_open: flag("detailOpen", d.detail_open),
             sidebar_open: flag("sidebarOpen", d.sidebar_open),
             viewer_width,
             detail_tab,
             filmstrip_height,
+            sidebar_section,
         })
     }
 }

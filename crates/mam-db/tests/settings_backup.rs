@@ -100,7 +100,7 @@ fn t_store_08b_serializes_to_the_frontend_contract_shape() {
             "playerPlayingStepSec": 5,
             "resumeEnabled": true,
             "resumeMinDurationSec": 180,
-            "layout": {"detailOpen": true, "sidebarOpen": true, "viewerWidth": 520, "detailTab": "info", "filmstripHeight": 104},
+            "layout": {"detailOpen": true, "sidebarOpen": true, "viewerWidth": 520, "detailTab": "info", "filmstripHeight": 104, "sidebarSection": "library"},
             "playerVolume": {"level": 100, "muted": false},
             "galleryCardDisplay": {
                 "info": {"typeIcon": true, "name": true, "ext": true, "resolution": true, "size": true, "date": true},

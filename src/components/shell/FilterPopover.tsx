@@ -55,7 +55,7 @@ export function FilterPopover() {
         <Button variant="outline" aria-label={t("filter.label")}>
           <ListFilter aria-hidden="true" />
           {/* 상단 바 컨테이너 < 640px 에서는 라벨을 숨기고 아이콘 + 활성 개수만 (접근 가능한 이름은 aria-label) */}
-          <span className="@max-[640px]:hidden">{t("filter.label")}</span>
+          <span className="@max-[706px]:hidden">{t("filter.label")}</span>
           {count > 0 && (
             <Badge className="rounded-sm px-1.5" aria-label={t("filter.active", { count })}>
               {count}

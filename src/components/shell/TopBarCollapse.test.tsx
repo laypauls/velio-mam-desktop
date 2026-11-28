@@ -25,23 +25,23 @@ async function setup() {
   return { api, user }
 }
 
-const topBar = (): HTMLElement => document.querySelector("[data-viewer-sibling] > header") as HTMLElement
+const topBar = (): HTMLElement => screen.getByTestId("topbar")
 
 describe("TopBar collapse (container query contract)", () => {
-  it("T-ui-topbar-01 [Happy] the header is the @container and each collapse stage hangs off its own threshold (sort/filter at 640, search at 420)", async () => {
+  it("T-ui-topbar-01 [Happy] the header is the @container and each collapse stage hangs off its own threshold (sort/filter at 706, search at 486 — the old 640/420 raised by the net 66px the window buttons take)", async () => {
     // Arrange + Act
     await setup()
     const bar = topBar()
     // Assert: 판정 기준은 창이 아니라 헤더 컨테이너
     expect(bar.className).toContain("@container")
-    // 단계 1 (< 640): 정렬 Select 숨김 + 정렬 아이콘 메뉴 노출, 필터 라벨 숨김(이름은 aria-label 로 유지)
-    expect(within(bar).getByRole("combobox", { name: "정렬 기준" }).className).toContain("@max-[640px]:hidden")
-    expect(within(bar).getByRole("button", { name: "정렬 기준" }).className).toContain("@max-[640px]:inline-flex")
+    // 단계 1 (< 706): 정렬 Select 숨김 + 정렬 아이콘 메뉴 노출, 필터 라벨 숨김(이름은 aria-label 로 유지)
+    expect(within(bar).getByRole("combobox", { name: "정렬 기준" }).className).toContain("@max-[706px]:hidden")
+    expect(within(bar).getByRole("button", { name: "정렬 기준" }).className).toContain("@max-[706px]:inline-flex")
     const filter = within(bar).getByRole("button", { name: "필터" })
-    expect(filter.querySelector("span")?.className).toContain("@max-[640px]:hidden")
-    // 단계 2 (< 420): 검색 박스 숨김 + 돋보기 노출
-    expect(within(bar).getByTestId("top-search").className).toContain("@max-[420px]:hidden")
-    expect(within(bar).getByRole("button", { name: "검색 열기" }).className).toContain("@max-[420px]:inline-flex")
+    expect(filter.querySelector("span")?.className).toContain("@max-[706px]:hidden")
+    // 단계 2 (< 486): 검색 박스 숨김 + 돋보기 노출
+    expect(within(bar).getByTestId("top-search").className).toContain("@max-[486px]:hidden")
+    expect(within(bar).getByRole("button", { name: "검색 열기" }).className).toContain("@max-[486px]:inline-flex")
   })
 
   it("T-ui-topbar-06 [Regression] the search input can shrink to 0 and ellipsizes its placeholder instead of overflowing onto the filter button", async () => {
@@ -100,7 +100,7 @@ describe("TopBar collapsed search", () => {
     await user.click(openButton())
     // Assert: 상단 바 전체를 덮는 입력 + 포커스 + 닫기 버튼, 입력은 같은 인스턴스라 검색어 유지
     expect(wrap.dataset.open).toBe("true")
-    expect(wrap.className).toContain("@max-[420px]:absolute")
+    expect(wrap.className).toContain("@max-[486px]:absolute")
     const input = within(wrap).getByRole("combobox", { name: "검색" })
     await waitFor(() => expect(input).toHaveFocus())
     expect(input).toHaveValue("beach")

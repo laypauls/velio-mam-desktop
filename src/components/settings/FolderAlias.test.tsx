@@ -20,7 +20,7 @@ async function setup(preset?: string) {
   const user = userEvent.setup()
   const api = createMockApi({ count: 10 })
   if (preset) await api.setFolderAlias(1, preset)
-  renderApp(api)
+  renderApp(api, { section: "folders" })
   const nav = await screen.findByRole("navigation", { name: "라이브러리 탐색" })
   return { user, api, nav }
 }

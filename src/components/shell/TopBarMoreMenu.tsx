@@ -1,4 +1,4 @@
-import { ArrowDownWideNarrow, ArrowUpNarrowWide, Download, Ellipsis, Settings } from "lucide-react"
+import { ArrowDownWideNarrow, ArrowUpNarrowWide, Download, Ellipsis } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import {
@@ -23,11 +23,11 @@ import { useSortModel } from "./useSortModel"
 const SUB_CLASS = "relative max-h-(--radix-dropdown-menu-content-available-height) max-w-[calc(100vw-1rem)] overflow-y-auto"
 
 /**
- * 상단 바 "더보기"(⋯) — 컨테이너 < 360px 에서 정렬 기준·정렬 방향·보기 방식·카드 표시·업데이트·설정을 한 메뉴로 모은다.
+ * 상단 바 "더보기"(⋯) — 컨테이너 < 426px 에서 정렬 기준·정렬 방향·보기 방식·카드 표시·업데이트를 한 메뉴로 모은다.
  * 선택지·상태·동작·비활성 규칙은 넓은 폭의 컨트롤과 같은 소스(`useSortModel`, `viewStore`, `CardDisplayItems`, `useUpdater`)를 쓴다.
  * 이 버튼은 넓은 폭에서는 CSS 로 숨고, 반대로 나머지 컨트롤이 이 폭에서 숨는다(TopBar).
  */
-export function TopBarMoreMenu({ onOpenSettings }: { onOpenSettings?: () => void }) {
+export function TopBarMoreMenu() {
   const { t } = useTranslation()
   const { open: openUpdate } = useUpdater()
   const version = useUpdateStore((s) => s.available?.version)
@@ -39,7 +39,7 @@ export function TopBarMoreMenu({ onOpenSettings }: { onOpenSettings?: () => void
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label={label} title={label} className="relative ml-auto hidden @max-[360px]:inline-flex">
+        <Button variant="ghost" size="icon" aria-label={label} title={label} className="relative hidden @max-[426px]:inline-flex">
           <Ellipsis aria-hidden="true" />
           {version && <span data-testid="more-update-dot" aria-hidden="true" className="absolute top-1.5 right-1.5 size-2 rounded-full bg-primary" />}
         </Button>
@@ -79,17 +79,15 @@ export function TopBarMoreMenu({ onOpenSettings }: { onOpenSettings?: () => void
             <CardDisplayItems />
           </DropdownMenuSubContent>
         </DropdownMenuSub>
-        <DropdownMenuSeparator />
         {updateLabel && (
-          <DropdownMenuItem onSelect={openUpdate}>
-            <Download aria-hidden="true" />
-            {updateLabel}
-          </DropdownMenuItem>
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={openUpdate}>
+              <Download aria-hidden="true" />
+              {updateLabel}
+            </DropdownMenuItem>
+          </>
         )}
-        <DropdownMenuItem onSelect={() => onOpenSettings?.()}>
-          <Settings aria-hidden="true" />
-          {t("shell.settings")}
-        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )

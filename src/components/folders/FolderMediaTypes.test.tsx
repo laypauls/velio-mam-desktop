@@ -95,7 +95,7 @@ describe("add folder dialog (media types)", () => {
     const api = createMockApi({ count: 40 })
     vi.spyOn(api, "pickDirectory").mockResolvedValue(NEW_PATH)
     const add = vi.spyOn(api, "addFolder")
-    renderApp(api)
+    renderApp(api, { section: "folders" })
     const nav = await screen.findByRole("navigation", { name: "라이브러리 탐색" })
     await user.click(within(nav).getByRole("button", { name: "관리 폴더 추가" }))
     const dialog = await screen.findByRole("dialog", { name: "관리 폴더 추가" })

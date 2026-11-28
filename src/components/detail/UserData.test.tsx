@@ -89,8 +89,8 @@ describe("user data (P2-7)", () => {
     const create = vi.spyOn(api, "createCollection")
     const user = userEvent.setup()
     renderApp(api)
-    // Act: 컬렉션 탭으로 전환 (컬렉션은 사이드바 별도 탭)
-    await user.click(await screen.findByRole("tab", { name: /^컬렉션/ }))
+    // Act: 컬렉션 섹션으로 전환 (레일의 독립 섹션)
+    await user.click(await screen.findByRole("button", { name: "컬렉션" }))
     await user.click(await screen.findByRole("button", { name: "컬렉션 추가" }))
     const dialog = await screen.findByRole("dialog", { name: "새 컬렉션" })
     const input = within(dialog).getByRole("textbox", { name: "컬렉션 이름" })
@@ -117,7 +117,7 @@ describe("user data (P2-7)", () => {
     const rename = vi.spyOn(api, "renameTag")
     const update = vi.spyOn(api, "updateAssetTags")
     const user = userEvent.setup()
-    renderApp(api)
+    renderApp(api, { section: "tags" })
     // Act: 태그 관리 → 이름 변경에서 비우기
     await user.click(await screen.findByRole("button", { name: "태그 관리" }))
     const dialog = await screen.findByRole("dialog", { name: "태그 관리" })
@@ -149,7 +149,7 @@ describe("user data (P2-7)", () => {
     renderApp(api)
     const { totalAssets } = await api.jobSummary()
     const nav = await screen.findByRole("navigation", { name: "라이브러리 탐색" })
-    await user.click(await within(nav).findByRole("tab", { name: /^컬렉션/ }))
+    await user.click(await screen.findByRole("button", { name: "컬렉션" }))
     await within(nav).findByRole("button", { name: /^포트폴리오/ })
     // Act: 메뉴 → 삭제
     await user.click(within(nav).getByRole("button", { name: "컬렉션 포트폴리오 메뉴" }))

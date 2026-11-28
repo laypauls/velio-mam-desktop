@@ -81,9 +81,27 @@
     "ai": { "done": "Análisis de IA completado", "failed": "Error en el análisis de IA" }
   },
   "shell": {
-    "more": "Más",
+    "more": "Más"
+  },
+  "rail": {
+    "label": "Menú principal",
     "toggleSidebar": "Mostrar u ocultar la barra lateral",
-    "settings": "Configuración"
+    "section": {
+      "library": "Biblioteca",
+      "rating": "Valoración",
+      "folders": "Carpetas administradas",
+      "tags": "Etiquetas",
+      "collections": "Colecciones"
+    },
+    "settings": "Configuración",
+    "currentView": "Vista actual"
+  },
+  "window": {
+    "controls": "Controles de ventana",
+    "minimize": "Minimizar",
+    "maximize": "Maximizar",
+    "restore": "Restaurar",
+    "close": "Cerrar"
   },
   "search": {
     "placeholder": "Buscar nombre de archivo, etiqueta o nota",
@@ -226,11 +244,6 @@
   },
   "sidebar": {
     "label": "Explorar biblioteca",
-    "tab": {
-      "label": "Vista de la barra lateral",
-      "library": "Biblioteca",
-      "collections": "Colecciones"
-    },
     "playing": "Reproduciendo",
     "library": "Biblioteca",
     "view": {
@@ -246,6 +259,11 @@
     "addCollection": "Agregar colección",
     "tags": "Etiquetas",
     "manageTags": "Administrar etiquetas",
+    "tagSearch": "Buscar etiquetas",
+    "tagsEmpty": "Aún no hay etiquetas.",
+    "tagsNoMatch": "No hay etiquetas coincidentes.",
+    "tagsError": "No se pudieron cargar las etiquetas.",
+    "tagsMore": "Se muestran {{shown}}. Acote con la búsqueda.",
     "collectionsEmpty": "No hay colecciones.",
     "folders": "Carpetas administradas",
     "addFolder": "Agregar carpeta administrada",

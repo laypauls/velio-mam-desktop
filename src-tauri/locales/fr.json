@@ -81,9 +81,27 @@
     "ai": { "done": "Analyse IA terminée", "failed": "Échec de l'analyse IA" }
   },
   "shell": {
-    "more": "Plus",
+    "more": "Plus"
+  },
+  "rail": {
+    "label": "Menu principal",
     "toggleSidebar": "Afficher/masquer la barre latérale",
-    "settings": "Paramètres"
+    "section": {
+      "library": "Bibliothèque",
+      "rating": "Classement",
+      "folders": "Dossiers gérés",
+      "tags": "Tags",
+      "collections": "Collections"
+    },
+    "settings": "Paramètres",
+    "currentView": "Vue actuelle"
+  },
+  "window": {
+    "controls": "Commandes de la fenêtre",
+    "minimize": "Réduire",
+    "maximize": "Agrandir",
+    "restore": "Restaurer",
+    "close": "Fermer"
   },
   "search": {
     "placeholder": "Rechercher nom de fichier, tag, note",
@@ -226,11 +244,6 @@
   },
   "sidebar": {
     "label": "Navigation dans la bibliothèque",
-    "tab": {
-      "label": "Vue de la barre latérale",
-      "library": "Bibliothèque",
-      "collections": "Collections"
-    },
     "playing": "Lecture en cours",
     "library": "Bibliothèque",
     "view": {
@@ -246,6 +259,11 @@
     "addCollection": "Ajouter une collection",
     "tags": "Tags",
     "manageTags": "Gérer les tags",
+    "tagSearch": "Rechercher des tags",
+    "tagsEmpty": "Aucun tag pour le moment.",
+    "tagsNoMatch": "Aucun tag correspondant.",
+    "tagsError": "Impossible de charger les tags.",
+    "tagsMore": "{{shown}} affichés. Affinez avec la recherche.",
     "collectionsEmpty": "Aucune collection.",
     "folders": "Dossiers gérés",
     "addFolder": "Ajouter un dossier géré",

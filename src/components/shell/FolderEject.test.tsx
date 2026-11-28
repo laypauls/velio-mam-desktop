@@ -21,7 +21,7 @@ afterEach(() => {
 
 /** E: 에 관리 폴더 `extra`+1 개를 추가한 뒤 앱을 띄운다 (기본 폴더: D:\Photos, D:\Videos, \\NAS\Archive) */
 async function setup(extraOnE = 0, opts: { unplugged?: boolean } = {}) {
-  stubLayout()
+  stubLayout({ width: 1600 }) // 보기 영역이 열려도 섹션 패널이 자동으로 접히지 않는 폭
   const api = createMockApi({ count: 5 })
   await api.addFolder("E:\\data", ALL)
   for (let i = 0; i < extraOnE; i++) await api.addFolder(`E:\\more${i}`, ALL)
@@ -32,7 +32,7 @@ async function setup(extraOnE = 0, opts: { unplugged?: boolean } = {}) {
       (await real()).map((f) => (f.path.startsWith("E:") ? { ...f, availability: "offline" as const } : f)),
     )
   }
-  renderApp(api)
+  renderApp(api, { section: "folders" })
   await screen.findByRole("navigation", { name: "라이브러리 탐색" })
   await screen.findByRole("button", { name: "E:\\data" })
   return { api, user: userEvent.setup() }

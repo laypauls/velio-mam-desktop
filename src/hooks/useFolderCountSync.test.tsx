@@ -38,7 +38,7 @@ async function setup(): Promise<Harness> {
       return () => void handlers.delete(h)
     },
   }
-  const view = renderApp(api)
+  const view = renderApp(api, { section: "folders" })
   const row = () => within(screen.getByRole("navigation", { name: "라이브러리 탐색" })).getByRole("button", { name: folder.path }).closest("li") as HTMLElement
   await within(await screen.findByRole("navigation", { name: "라이브러리 탐색" })).findByRole("button", { name: folder.path })
   vi.useFakeTimers()

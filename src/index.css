@@ -264,6 +264,11 @@
   html {
     @apply font-sans;
     }
+  /* 제목 표시줄 높이 — 레일 로고 칸 · TopBar · 설정 헤더가 한 값을 공유해 경계선이 이어진다. 레일 폭 */
+  :root {
+    --chrome-h: 3.25rem;
+    --rail-w: 3.25rem;
+    }
 }
 /* 가로 스크롤은 유지하고 스크롤바만 숨긴다 (Tailwind arbitrary variant 는 WebView2 에서 무효) */
 @utility scrollbar-hidden {

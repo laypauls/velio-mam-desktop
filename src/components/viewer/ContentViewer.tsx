@@ -94,7 +94,7 @@ function ViewerPane({ assetId }: { assetId: number }) {
   const idle = useFullscreenIdle(fullscreen)
   const left = useViewerPlacement() === "left"
   // 저장된 폭을 현재 창에 맞게 줄인 표시 폭 — 저장 값은 그대로
-  const width = useFittedViewerWidth(paneRef, left ? "left" : "right")
+  const width = useFittedViewerWidth(paneRef)
   // 전체화면에서는 분할선을 숨긴다 (자리 표시 false 라 aside 의 트리 위치는 그대로 — 플레이어가 다시 마운트되지 않는다)
   const handle = fullscreen ? null : <ViewerResizeHandle paneRef={paneRef} side={left ? "left" : "right"} />
   return (
@@ -129,7 +129,7 @@ function ViewerPane({ assetId }: { assetId: number }) {
   )
 }
 
-/** 분할 보기 영역 — 갤러리 오른쪽(설정에 따라 창 맨 왼쪽)의 콘텐츠 보기 영역 — `previewId` 가 있을 때만 나타난다 (이미지 보기 / 영상·음성 플레이어 / 안내). */
+/** 분할 보기 영역 — TopBar 아래 본문 행의 갤러리 오른쪽(설정에 따라 섹션 패널과 갤러리 사이)의 콘텐츠 보기 영역 — `previewId` 가 있을 때만 나타난다 (이미지 보기 / 영상·음성 플레이어 / 안내). */
 export function ContentViewer() {
   usePlaybackGuards()
   const previewId = useViewStore((s) => s.previewId)

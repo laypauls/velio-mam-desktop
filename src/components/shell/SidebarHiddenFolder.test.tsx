@@ -23,7 +23,7 @@ describe("sidebar and hidden managed folders", () => {
     const api = createMockApi({ count: 10 })
     await api.setFolderHidden(1, true)
     // Act
-    renderApp(api)
+    renderApp(api, { section: "folders" })
     // Assert
     const nav = await screen.findByRole("navigation", { name: "라이브러리 탐색" })
     expect(await within(nav).findByRole("button", { name: VIDEOS })).toBeInTheDocument()
@@ -34,7 +34,7 @@ describe("sidebar and hidden managed folders", () => {
     // Arrange
     stubLayout()
     const user = userEvent.setup()
-    renderApp(createMockApi({ count: 10 }))
+    renderApp(createMockApi({ count: 10 }), { section: "folders" })
     const nav = await screen.findByRole("navigation", { name: "라이브러리 탐색" })
     await user.click(await within(nav).findByRole("button", { name: PHOTOS }))
     expect(useSearchStore.getState().view).toMatchObject({ kind: "folder", folderId: 1 })
@@ -69,7 +69,7 @@ describe("sidebar and hidden managed folders", () => {
     const api = createMockApi({ count: 10 })
     for (const f of await api.listFolders()) await api.setFolderHidden(f.folderId, true)
     // Act
-    renderApp(api)
+    renderApp(api, { section: "folders" })
     // Assert
     expect(await screen.findByText(/모든 관리 폴더가 숨겨져 있습니다/)).toBeInTheDocument()
     expect(screen.queryByText("등록된 관리 폴더가 없습니다.")).not.toBeInTheDocument()

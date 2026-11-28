@@ -27,7 +27,7 @@ export function SortControl() {
         <SelectTrigger
           aria-label={t("sort.label")}
           aria-describedby={semantic ? "sort-semantic-note" : undefined}
-          className="w-36 @max-[640px]:hidden"
+          className="w-36 @max-[706px]:hidden"
         >
           <SelectValue />
         </SelectTrigger>
@@ -49,7 +49,7 @@ export function SortControl() {
             aria-describedby={semantic ? "sort-semantic-note" : undefined}
             title={`${t("sort.label")}: ${t(`sort.field.${sort.field}`)}`}
             disabled={semantic}
-            className="hidden @max-[640px]:inline-flex"
+            className="hidden @max-[706px]:inline-flex"
           >
             <ArrowUpDown aria-hidden="true" />
           </Button>

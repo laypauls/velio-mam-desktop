@@ -217,7 +217,10 @@ export interface ThemeSetting {
   systemDark: ThemeSystemDark
 }
 
-/** 레이아웃 기억 (설정 키 `layout`, 값은 JSON 객체 1개). 프론트는 항상 네 필드를 모두 보낸다 */
+/** 왼쪽 레일에서 마지막으로 연 섹션 */
+export type SidebarSection = "library" | "rating" | "folders" | "tags" | "collections"
+
+/** 레이아웃 기억 (설정 키 `layout`, 값은 JSON 객체 1개). 프론트는 항상 여섯 필드를 모두 보낸다 */
 export interface LayoutSettings {
   detailOpen: boolean
   sidebarOpen: boolean
@@ -226,6 +229,8 @@ export interface LayoutSettings {
   detailTab: "info" | "ai" | "similar"
   /** 필름스트립 높이(px, 72~160, 기본 104). Rust 가 범위 밖 값을 clamp 한다 */
   filmstripHeight: number
+  /** 왼쪽 레일 마지막 섹션(기본 "library"). Rust 가 알 수 없는 값을 "library" 로 보정한다 */
+  sidebarSection: SidebarSection
 }
 
 /** 플레이어 음량 기억 (설정 키 `playerVolume`, 값은 JSON 객체 1개). 음소거와 level 0 은 구분된다 */

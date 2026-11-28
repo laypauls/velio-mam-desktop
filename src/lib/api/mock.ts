@@ -88,7 +88,7 @@ export function createMockApi(opts: MockOptions = {}): UiApi {
     sceneDetectSensitivity: "medium",
     playerPlayingStepSec: 5,
     viewerPlacement: "left",
-    layout: { detailOpen: true, sidebarOpen: true, viewerWidth: 520, detailTab: "info", filmstripHeight: 104 },
+    layout: { detailOpen: true, sidebarOpen: true, viewerWidth: 520, detailTab: "info", filmstripHeight: 104, sidebarSection: "library" },
     playerVolume: { level: 100, muted: false },
     resumeEnabled: true,
     resumeMinDurationSec: 180,

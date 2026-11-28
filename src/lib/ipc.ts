@@ -227,7 +227,7 @@ export interface Settings {
   playerPlayingStepSec: number
   /** 기본 "right" (갤러리 오른쪽), "left" = 창 맨 왼쪽 */
   viewerPlacement: ViewerPlacement
-  /** 기본 { detailOpen: true, sidebarOpen: true, viewerWidth: 520, detailTab: "info", filmstripHeight: 104 } */
+  /** 기본 { detailOpen: true, sidebarOpen: true, viewerWidth: 520, detailTab: "info", filmstripHeight: 104, sidebarSection: "library" } */
   layout: LayoutSettings
   /** 기본 { level: 100, muted: false } (level 은 0~100 정수). 음소거와 level 0 은 구분 저장 */
   playerVolume: PlayerVolumeSettings

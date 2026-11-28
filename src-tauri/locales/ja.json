@@ -81,9 +81,27 @@
     "ai": { "done": "AI 分析完了", "failed": "AI 分析失敗" }
   },
   "shell": {
-    "more": "その他",
+    "more": "その他"
+  },
+  "rail": {
+    "label": "メインメニュー",
     "toggleSidebar": "サイドバーの表示/非表示",
-    "settings": "設定"
+    "section": {
+      "library": "ライブラリ",
+      "rating": "評価",
+      "folders": "管理フォルダー",
+      "tags": "タグ",
+      "collections": "コレクション"
+    },
+    "settings": "設定",
+    "currentView": "現在の表示"
+  },
+  "window": {
+    "controls": "ウィンドウ操作",
+    "minimize": "最小化",
+    "maximize": "最大化",
+    "restore": "元に戻す",
+    "close": "閉じる"
   },
   "search": {
     "placeholder": "ファイル名・タグ・メモを検索",
@@ -226,11 +244,6 @@
   },
   "sidebar": {
     "label": "ライブラリの参照",
-    "tab": {
-      "label": "サイドバー表示",
-      "library": "ライブラリ",
-      "collections": "コレクション"
-    },
     "playing": "再生中",
     "library": "ライブラリ",
     "view": {
@@ -246,6 +259,11 @@
     "addCollection": "コレクションを追加",
     "tags": "タグ",
     "manageTags": "タグの管理",
+    "tagSearch": "タグを検索",
+    "tagsEmpty": "タグがありません。",
+    "tagsNoMatch": "一致するタグがありません。",
+    "tagsError": "タグを読み込めませんでした。",
+    "tagsMore": "{{shown}} 件を表示しています。検索で絞り込んでください。",
     "collectionsEmpty": "コレクションがありません。",
     "folders": "管理フォルダー",
     "addFolder": "管理フォルダーを追加",

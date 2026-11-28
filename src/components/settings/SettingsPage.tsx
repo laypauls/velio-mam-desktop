@@ -2,6 +2,7 @@ import { ArrowLeft } from "lucide-react"
 import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
+import { WindowControls } from "@/components/shell/WindowControls"
 import { useSettings } from "@/hooks/useSettings"
 import { OPEN_LAYER } from "@/lib/openLayer"
 import { useProtectStore } from "@/stores"
@@ -9,7 +10,10 @@ import { SettingsNav } from "./SettingsNav"
 import { SETTINGS_MENU } from "./settingsMenu"
 
 
-/** 설정 전체 화면 — 상단 바(← 라이브러리로) / 사이드 메뉴(nav) / 본문(main, 유일한 세로 스크롤 영역). 상태 표시줄은 AppShell 이 아래에 유지한다. */
+/**
+ * 설정 화면 — 상단 바(← 라이브러리로) / 사이드 메뉴(nav) / 본문(main, 유일한 세로 스크롤 영역). 레일 오른쪽 영역만 덮으며 레일·상태 표시줄은 AppShell 이 유지한다.
+ * 상단 바는 TopBar 와 같은 높이의 창 이동 영역이고 오른쪽에 창 버튼을 이어받는다(드래그 속성은 헤더·래퍼·빈 칸에만, 버튼에는 없음).
+ */
 export function SettingsPage() {
   const { t } = useTranslation()
   const section = useProtectStore((s) => s.settingsSection)
@@ -31,12 +35,18 @@ export function SettingsPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="flex items-center gap-2 border-b border-border px-3 py-2">
-        <Button variant="ghost" size="sm" onClick={close}>
-          <ArrowLeft aria-hidden="true" />
-          {t("settings.backToLibrary")}
-        </Button>
-        <h1 className="text-sm font-semibold">{t("settings.title")}</h1>
+      <header data-tauri-drag-region className="h-(--chrome-h) shrink-0 border-b border-border">
+        <div data-tauri-drag-region className="flex h-full items-center gap-2 pl-3">
+          <Button variant="ghost" size="sm" onClick={close}>
+            <ArrowLeft aria-hidden="true" />
+            {t("settings.backToLibrary")}
+          </Button>
+          <h1 data-tauri-drag-region className="text-sm font-semibold">
+            {t("settings.title")}
+          </h1>
+          <div data-tauri-drag-region className="h-full min-w-4 flex-1" />
+          <WindowControls />
+        </div>
       </header>
       <div className="flex min-h-0 flex-1">
         <SettingsNav active={item.id} onSelect={setSection} />

@@ -81,9 +81,27 @@
     "ai": { "done": "AI analysis complete", "failed": "AI analysis failed" }
   },
   "shell": {
-    "more": "More",
+    "more": "More"
+  },
+  "rail": {
+    "label": "Main menu",
     "toggleSidebar": "Show/hide sidebar",
-    "settings": "Settings"
+    "section": {
+      "library": "Library",
+      "rating": "Rating",
+      "folders": "Managed folders",
+      "tags": "Tags",
+      "collections": "Collections"
+    },
+    "settings": "Settings",
+    "currentView": "Current view"
+  },
+  "window": {
+    "controls": "Window controls",
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "restore": "Restore down",
+    "close": "Close"
   },
   "search": {
     "placeholder": "Search file names, tags, notes",
@@ -226,11 +244,6 @@
   },
   "sidebar": {
     "label": "Library navigation",
-    "tab": {
-      "label": "Sidebar view",
-      "library": "Library",
-      "collections": "Collections"
-    },
     "playing": "Now playing",
     "library": "Library",
     "view": {
@@ -246,6 +259,11 @@
     "addCollection": "Add collection",
     "tags": "Tags",
     "manageTags": "Manage tags",
+    "tagSearch": "Search tags",
+    "tagsEmpty": "No tags yet.",
+    "tagsNoMatch": "No matching tags.",
+    "tagsError": "Couldn't load tags.",
+    "tagsMore": "Showing {{shown}}. Narrow down with search.",
     "collectionsEmpty": "No collections.",
     "folders": "Managed folders",
     "addFolder": "Add managed folder",

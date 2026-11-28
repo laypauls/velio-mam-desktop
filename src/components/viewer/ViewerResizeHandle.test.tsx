@@ -7,14 +7,12 @@ import { VIEWER_MIN_WIDTH } from "@/stores/view"
 import { ViewerResizeHandle } from "./ViewerResizeHandle"
 import { useRef } from "react"
 
-/** 레이아웃 스텁 값 — 한 줄: [viewer 500] [사이드바 256] [main 600] (왼쪽 배치) / [main 600] [viewer 500] (오른쪽 배치) */
+/** 레이아웃 스텁 값 — 본문 행: [viewer 500] [handle] [main 600] (왼쪽 배치) / [main 600] [handle] [viewer 500] (오른쪽 배치). 보기 영역 폭 계산은 형제 main 만 본다 */
 interface Geometry {
   paneLeft: number
   paneWidth: number
-  /** 오른쪽 배치: `main` 폭 / 왼쪽 배치: 오른쪽 열(`data-viewer-sibling`) 폭 */
+  /** 형제 `main`(갤러리) 폭 — 왼쪽·오른쪽 배치 공통 */
   galleryWidth: number
-  /** 왼쪽 배치의 사이드바(nav) 폭 — 오른쪽 열 안에 든다 */
-  navWidth?: number
 }
 
 function rect(left: number, width: number): DOMRect {
@@ -24,13 +22,12 @@ function rect(left: number, width: number): DOMRect {
 function stubGeometry(g: Geometry) {
   vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
     if (this.tagName === "ASIDE") return rect(g.paneLeft, g.paneWidth)
-    if (this.tagName === "NAV") return rect(0, g.navWidth ?? 0)
-    if (this.tagName === "MAIN" || this.hasAttribute("data-viewer-sibling")) return rect(0, g.galleryWidth)
+    if (this.tagName === "MAIN") return rect(0, g.galleryWidth)
     return rect(0, 0)
   })
 }
 
-/** withMain=false 면 형제 영역(오른쪽 배치의 main / 왼쪽 배치의 data-viewer-sibling 열)을 만들지 않는다 */
+/** withMain=false 면 형제 `main` 을 만들지 않는다 */
 function Harness({ side, withMain = true }: { side: "left" | "right"; withMain?: boolean }) {
   const ref = useRef<HTMLElement>(null)
   const handle = <ViewerResizeHandle paneRef={ref} side={side} />
@@ -49,15 +46,7 @@ function Harness({ side, withMain = true }: { side: "left" | "right"; withMain?:
           {handle}
         </>
       )}
-      {withMain && side === "left" && (
-        <div data-viewer-sibling="">
-          <header />
-          <div>
-            <nav />
-            <main />
-          </div>
-        </div>
-      )}
+      {withMain && side === "left" && <main />}
     </div>
   )
 }
@@ -91,7 +80,7 @@ describe("ViewerResizeHandle — direction", () => {
   })
 
   it("T-ui-vresize-02 [Happy] left side: dragging uses clientX - pane.left and ArrowRight widens", () => {
-    // Arrange: 보기 영역 x 0..500, 오른쪽 열 900 (최대 900+500-288 = 1112)
+    // Arrange: 보기 영역 x 0..500, 갤러리 900 (최대 900+500-288 = 1112)
     stubGeometry({ paneLeft: 0, paneWidth: 500, galleryWidth: 900 })
     render(<Harness side="left" />)
     // Act: 분할선을 x=620 으로 끌기 → 620 - 0
@@ -121,8 +110,8 @@ describe("ViewerResizeHandle — direction", () => {
 })
 
 describe("ViewerResizeHandle — limits", () => {
-  it("T-ui-vresize-03 [Boundary] right: the gallery keeps at least 288px (max = pane + main - 288); left: the right column keeps the collapsed TopBar minimum 288px (= gallery minimum)", () => {
-    // Arrange: 왼쪽 — pane 500 + 오른쪽 열 700 = 1200 → 최대 912 (TopBar 접힌 최소 = 갤러리 최소 288)
+  it("T-ui-vresize-03 [Boundary] both sides: the gallery keeps at least 288px (max = pane + main - 288)", () => {
+    // Arrange: 왼쪽 — pane 500 + main 700 = 1200 → 최대 912
     stubGeometry({ paneLeft: 0, paneWidth: 500, galleryWidth: 700 })
     const { unmount } = render(<Harness side="left" />)
     // Act
@@ -152,7 +141,7 @@ describe("ViewerResizeHandle — limits", () => {
     expect(width()).toBe(VIEWER_MIN_WIDTH)
   })
 
-  it("T-ui-vresize-06 [Boundary] without a main element or without layout (0 width) the max is unbounded, not NaN", () => {
+  it("T-ui-vresize-06 [Boundary] without a sibling main (e.g. filmstrip) or without layout (0 width) the max is unbounded, not NaN", () => {
     // Arrange: main 없음
     stubGeometry({ paneLeft: 0, paneWidth: 500, galleryWidth: 700 })
     const { unmount } = render(<Harness side="left" withMain={false} />)
@@ -170,19 +159,19 @@ describe("ViewerResizeHandle — limits", () => {
     expect(width()).toBe(700)
   })
 
-  it("T-ui-vresize-07 [Business rule] left: an open sidebar widens the right column's minimum (gallery 288 + sidebar) when that exceeds the TopBar minimum", () => {
-    // Arrange: pane 500 + 열 900 = 1400, 사이드바 400 → 최소 max(288, 288+400=688) → 최대 712
-    stubGeometry({ paneLeft: 0, paneWidth: 500, galleryWidth: 900, navWidth: 400 })
+  it("T-ui-vresize-07 [Business rule] left uses the same limit as right — an open sidebar panel or TopBar does not change it (only pane + main - 288)", () => {
+    // Arrange: pane 500 + main 900 = 1400 → 최대 1112. 패널·상세는 이 합계 밖이라 영향이 없다
+    stubGeometry({ paneLeft: 0, paneWidth: 500, galleryWidth: 900 })
     render(<Harness side="left" />)
     // Act
     fireEvent.pointerDown(handle(), { button: 0, pointerId: 1 })
     fireEvent.pointerMove(handle(), { clientX: 5000, pointerId: 1 })
     // Assert
-    expect(width()).toBe(712)
+    expect(width()).toBe(1112)
   })
 
-  it("T-ui-vresize-08 [Regression] left: the sibling column is found under the new structure, so the limit is finite for pointer and keyboard", () => {
-    // Arrange: 구조 변경 전 방식(`:scope > main`)이면 Infinity 가 되어 제한이 사라졌다
+  it("T-ui-vresize-08 [Regression] left: the sibling main is found in the body row (no data-viewer-sibling column any more), so the limit is finite for pointer and keyboard", () => {
+    // Arrange: 형제를 못 찾으면 Infinity 가 되어 제한이 사라진다
     stubGeometry({ paneLeft: 0, paneWidth: 500, galleryWidth: 900 })
     useViewStore.setState({ viewerWidth: 1112 })
     render(<Harness side="left" />)

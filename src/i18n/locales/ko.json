@@ -80,9 +80,27 @@
     "ai": { "done": "AI 분석 완료", "failed": "AI 분석 실패" }
   },
   "shell": {
-    "more": "더보기",
-    "toggleSidebar": "사이드바 열기/닫기",
-    "settings": "설정"
+    "more": "더보기"
+  },
+  "rail": {
+    "label": "주 메뉴",
+    "toggleSidebar": "사이드바 숨기기/표시",
+    "section": {
+      "library": "라이브러리",
+      "rating": "별점",
+      "folders": "관리 폴더",
+      "tags": "태그",
+      "collections": "컬렉션"
+    },
+    "settings": "설정",
+    "currentView": "현재 보기"
+  },
+  "window": {
+    "controls": "창 조절",
+    "minimize": "최소화",
+    "maximize": "최대화",
+    "restore": "이전 크기로 복원",
+    "close": "닫기"
   },
   "search": {
     "placeholder": "파일명·태그·메모 검색",
@@ -225,11 +243,6 @@
   },
   "sidebar": {
     "label": "라이브러리 탐색",
-    "tab": {
-      "label": "사이드바 보기",
-      "library": "라이브러리",
-      "collections": "컬렉션"
-    },
     "playing": "재생 중",
     "library": "라이브러리",
     "view": {
@@ -245,6 +258,11 @@
     "addCollection": "컬렉션 추가",
     "tags": "태그",
     "manageTags": "태그 관리",
+    "tagSearch": "태그 검색",
+    "tagsEmpty": "등록된 태그가 없습니다.",
+    "tagsNoMatch": "일치하는 태그가 없습니다.",
+    "tagsError": "태그 목록을 불러오지 못했습니다.",
+    "tagsMore": "{{shown}}개만 표시했습니다. 검색으로 좁혀 보세요.",
     "collectionsEmpty": "컬렉션이 없습니다.",
     "folders": "관리 폴더",
     "addFolder": "관리 폴더 추가",

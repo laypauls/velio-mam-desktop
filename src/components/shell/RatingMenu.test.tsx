@@ -9,7 +9,7 @@ import { qk } from "@/hooks/keys"
 import { createMockApi } from "@/lib/api/mock"
 import * as ipcMetadata from "@/lib/ipc-metadata"
 import { resetAllStores, useSearchStore } from "@/stores"
-import { renderApp, stubLayout } from "@/test/layout"
+import { openSidebarSection, renderApp, stubLayout } from "@/test/layout"
 import { FilterPopover } from "./FilterPopover"
 
 afterEach(() => {
@@ -18,7 +18,12 @@ afterEach(() => {
 })
 
 const nav = () => screen.findByRole("navigation", { name: "라이브러리 탐색" })
-const ratingGroup = async () => within(await nav()).findByRole("region", { name: "별점" })
+/** 별점은 레일의 독립 섹션 — 섹션을 연 뒤 그룹을 찾는다 */
+const ratingGroup = async () => {
+  const panel = await nav()
+  openSidebarSection("rating")
+  return within(panel).findByRole("region", { name: "별점" })
+}
 
 describe("sidebar rating menu", () => {
   it("T-ui-rating-menu-01 [Happy] shows the group by default with ★5..★1 + 미평가 and counts from rating_counts", async () => {
@@ -64,6 +69,7 @@ describe("sidebar rating menu", () => {
     // Act
     renderApp(api)
     await nav()
+    openSidebarSection("rating") // 꺼져 있으면 별점 섹션은 라이브러리로 보정된다
     await screen.findAllByRole("option") // 설정·목록 조회가 끝난 뒤
     // Assert
     expect(within(await nav()).queryByRole("region", { name: "별점" })).not.toBeInTheDocument()
@@ -79,9 +85,9 @@ describe("sidebar rating menu", () => {
     render(<App api={api} queryClient={queryClient} />)
     await ratingGroup()
     act(() => useSearchStore.getState().setView({ kind: "rating", value: 3 }))
-    // Act: 설정 화면 저장 경로와 같이 설정 캐시를 갱신
-    const settings = await api.getSettings()
-    act(() => queryClient.setQueryData(qk.settings, { ...settings, sidebarRatingMenu: false }))
+    // Act: 설정 화면 저장 경로와 같이 저장한 뒤 설정 캐시를 갱신 — API 도 같이 바꿔야 뒤이은 레이아웃 저장 응답이 옛 값으로 덮지 않는다
+    const settings = await api.updateSettings({ sidebarRatingMenu: false })
+    act(() => queryClient.setQueryData(qk.settings, settings))
     // Assert
     await waitFor(() => expect(useSearchStore.getState().view).toEqual({ kind: "all" }))
     expect(within(await nav()).queryByRole("region", { name: "별점" })).not.toBeInTheDocument()

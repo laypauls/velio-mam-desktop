@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react"
 import { Play } from "lucide-react"
-import type { ReactNode } from "react"
+import type { MouseEvent, ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { formatNumber } from "@/lib/format"
 import { cn } from "@/lib/utils"
@@ -17,7 +17,7 @@ interface NavItemProps {
   active: boolean
   /** 연속 재생 중인 항목 — 개수 앞에 ▷ 를 보인다 */
   playing?: boolean
-  onClick: () => void
+  onClick: (e: MouseEvent<HTMLButtonElement>) => void
   menu?: ReactNode
 }
 

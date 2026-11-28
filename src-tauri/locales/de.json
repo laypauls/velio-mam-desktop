@@ -81,9 +81,27 @@
     "ai": { "done": "KI-Analyse abgeschlossen", "failed": "KI-Analyse fehlgeschlagen" }
   },
   "shell": {
-    "more": "Mehr",
+    "more": "Mehr"
+  },
+  "rail": {
+    "label": "Hauptmenü",
     "toggleSidebar": "Seitenleiste ein-/ausblenden",
-    "settings": "Einstellungen"
+    "section": {
+      "library": "Bibliothek",
+      "rating": "Bewertung",
+      "folders": "Medienordner",
+      "tags": "Tags",
+      "collections": "Sammlungen"
+    },
+    "settings": "Einstellungen",
+    "currentView": "Aktuelle Ansicht"
+  },
+  "window": {
+    "controls": "Fenstersteuerung",
+    "minimize": "Minimieren",
+    "maximize": "Maximieren",
+    "restore": "Wiederherstellen",
+    "close": "Schließen"
   },
   "search": {
     "placeholder": "Dateiname, Tags, Notizen durchsuchen",
@@ -226,11 +244,6 @@
   },
   "sidebar": {
     "label": "Bibliothek durchsuchen",
-    "tab": {
-      "label": "Seitenleistenansicht",
-      "library": "Bibliothek",
-      "collections": "Sammlungen"
-    },
     "playing": "Wiedergabe",
     "library": "Bibliothek",
     "view": {
@@ -246,6 +259,11 @@
     "addCollection": "Sammlung hinzufügen",
     "tags": "Tags",
     "manageTags": "Tags verwalten",
+    "tagSearch": "Tags durchsuchen",
+    "tagsEmpty": "Noch keine Tags.",
+    "tagsNoMatch": "Keine passenden Tags.",
+    "tagsError": "Tags konnten nicht geladen werden.",
+    "tagsMore": "{{shown}} angezeigt. Mit der Suche eingrenzen.",
     "collectionsEmpty": "Keine Sammlungen.",
     "folders": "Medienordner",
     "addFolder": "Medienordner hinzufügen",

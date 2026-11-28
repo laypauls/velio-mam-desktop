@@ -97,7 +97,7 @@ fn t_set_layout_01_defaults_match_contract_shape() {
 
     assert_eq!(
         layout_json(&s),
-        json!({"detailOpen": true, "sidebarOpen": true, "viewerWidth": 520, "detailTab": "info", "filmstripHeight": 104})
+        json!({"detailOpen": true, "sidebarOpen": true, "viewerWidth": 520, "detailTab": "info", "filmstripHeight": 104, "sidebarSection": "library"})
     );
     assert!(warnings.is_empty());
 }
@@ -105,7 +105,7 @@ fn t_set_layout_01_defaults_match_contract_shape() {
 #[test]
 fn t_set_layout_02_saves_and_reloads_every_field() {
     let mut db = migrated_db();
-    let want = json!({"detailOpen": false, "sidebarOpen": false, "viewerWidth": 777, "detailTab": "similar", "filmstripHeight": 120});
+    let want = json!({"detailOpen": false, "sidebarOpen": false, "viewerWidth": 777, "detailTab": "similar", "filmstripHeight": 120, "sidebarSection": "tags"});
 
     let s = settings::update(&mut db.conn, &patch(json!({"layout": want.clone()}))).unwrap();
 
@@ -130,7 +130,7 @@ fn t_set_layout_03_missing_fields_default_per_field_and_unknown_fields_are_ignor
 
     assert_eq!(
         layout_json(&s),
-        json!({"detailOpen": false, "sidebarOpen": true, "viewerWidth": 520, "detailTab": "info", "filmstripHeight": 104})
+        json!({"detailOpen": false, "sidebarOpen": true, "viewerWidth": 520, "detailTab": "info", "filmstripHeight": 104, "sidebarSection": "library"})
     );
 }
 
@@ -141,14 +141,14 @@ fn t_set_layout_04_bad_fields_normalize_to_defaults_without_failing() {
     let s = settings::update(
         &mut db.conn,
         &patch(json!({"layout": {
-            "detailOpen": "yes", "sidebarOpen": 0, "viewerWidth": "wide", "detailTab": "nope", "filmstripHeight": "tall"
+            "detailOpen": "yes", "sidebarOpen": 0, "viewerWidth": "wide", "detailTab": "nope", "filmstripHeight": "tall", "sidebarSection": 3
         }})),
     )
     .unwrap();
 
     assert_eq!(
         layout_json(&s),
-        json!({"detailOpen": true, "sidebarOpen": true, "viewerWidth": 520, "detailTab": "info", "filmstripHeight": 104})
+        json!({"detailOpen": true, "sidebarOpen": true, "viewerWidth": 520, "detailTab": "info", "filmstripHeight": 104, "sidebarSection": "library"})
     );
 }
 
@@ -206,7 +206,7 @@ fn t_set_layout_07_corrupt_stored_values_recover_on_read() {
 
     assert_eq!(
         layout_json(&s),
-        json!({"detailOpen": false, "sidebarOpen": true, "viewerWidth": 320, "detailTab": "info", "filmstripHeight": 104})
+        json!({"detailOpen": false, "sidebarOpen": true, "viewerWidth": 320, "detailTab": "info", "filmstripHeight": 104, "sidebarSection": "library"})
     );
     assert!(warnings.is_empty(), "{warnings:?}");
 
@@ -234,7 +234,7 @@ fn t_set_layout_08_filmstrip_height_defaults_to_104_when_missing_and_round_trips
     let (s, warnings) = settings::load(&db.conn).unwrap();
     assert_eq!(
         layout_json(&s),
-        json!({"detailOpen": false, "sidebarOpen": false, "viewerWidth": 700, "detailTab": "ai", "filmstripHeight": 104})
+        json!({"detailOpen": false, "sidebarOpen": false, "viewerWidth": 700, "detailTab": "ai", "filmstripHeight": 104, "sidebarSection": "library"})
     );
     assert!(warnings.is_empty(), "{warnings:?}");
 
@@ -293,4 +293,65 @@ fn t_set_layout_10_filmstrip_height_wrong_type_falls_back_to_default() {
         .unwrap();
         assert_eq!(layout_json(&s)["filmstripHeight"], json!(104), "{bad}");
     }
+}
+
+#[test]
+fn t_set_layout_11_sidebar_section_every_value_round_trips() {
+    let mut db = migrated_db();
+    for sec in ["library", "rating", "folders", "tags", "collections"] {
+        let s = settings::update(
+            &mut db.conn,
+            &patch(json!({"layout": {"sidebarSection": sec}})),
+        )
+        .unwrap();
+        assert_eq!(layout_json(&s)["sidebarSection"], json!(sec));
+        assert_eq!(
+            layout_json(&settings::load(&db.conn).unwrap().0)["sidebarSection"],
+            json!(sec)
+        );
+    }
+}
+
+#[test]
+fn t_set_layout_12_sidebar_section_invalid_or_missing_falls_back_to_library() {
+    let mut db = migrated_db();
+    for bad in [
+        json!("nope"),
+        json!("Library"),
+        json!(""),
+        json!(1),
+        json!(null),
+        json!(true),
+        json!(["tags"]),
+    ] {
+        let s = settings::update(
+            &mut db.conn,
+            &patch(json!({"layout": {"sidebarSection": bad.clone()}})),
+        )
+        .unwrap();
+        assert_eq!(layout_json(&s)["sidebarSection"], json!("library"), "{bad}");
+    }
+    // 필드 누락(구버전 저장값) -> library
+    let s = settings::update(&mut db.conn, &patch(json!({"layout": {"detailOpen": false}})))
+        .unwrap();
+    assert_eq!(layout_json(&s)["sidebarSection"], json!("library"));
+}
+
+#[test]
+fn t_set_layout_13_bad_sidebar_section_does_not_affect_other_fields() {
+    let mut db = migrated_db();
+
+    let s = settings::update(
+        &mut db.conn,
+        &patch(json!({"layout": {
+            "detailOpen": false, "sidebarOpen": false, "viewerWidth": 700, "detailTab": "ai",
+            "filmstripHeight": 120, "sidebarSection": "bogus"
+        }})),
+    )
+    .unwrap();
+
+    assert_eq!(
+        layout_json(&s),
+        json!({"detailOpen": false, "sidebarOpen": false, "viewerWidth": 700, "detailTab": "ai", "filmstripHeight": 120, "sidebarSection": "library"})
+    );
 }

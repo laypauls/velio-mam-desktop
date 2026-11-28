@@ -14,7 +14,7 @@ export function UpdateIndicator() {
   return (
     <Button variant="outline" size="sm" aria-label={label} title={label} onClick={open}>
       <Download aria-hidden="true" />
-      <span className="break-keep @max-[420px]:hidden">{t("update.indicatorShort")}</span>
+      <span className="break-keep @max-[486px]:hidden">{t("update.indicatorShort")}</span>
     </Button>
   )
 }

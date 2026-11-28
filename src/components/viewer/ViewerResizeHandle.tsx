@@ -20,7 +20,7 @@ export function ViewerResizeHandle({ paneRef, side }: Props) {
   const setWidth = useViewStore((s) => s.setViewerWidth)
   const dragging = useRef(false)
 
-  const maxWidth = (): number => measureViewerMaxWidth(paneRef.current, side)
+  const maxWidth = (): number => measureViewerMaxWidth(paneRef.current)
   const apply = (next: number) => setWidth(Math.min(Math.max(next, VIEWER_MIN_WIDTH), maxWidth()))
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
