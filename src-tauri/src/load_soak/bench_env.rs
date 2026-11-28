@@ -188,6 +188,7 @@ impl Bench {
                     data_root: paths.root().to_path_buf(),
                     stats: Arc::clone(&embed_stats),
                 }),
+                utc_offset: Arc::new(|| 0),
             },
             jobs_cfg.clone(),
         );

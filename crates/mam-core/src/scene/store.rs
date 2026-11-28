@@ -123,6 +123,19 @@ pub(super) fn defer_job(conn: &Connection, job_id: i64, not_before: i64) -> Resu
     Ok(())
 }
 
+/// 실행 직전 안전망: 자동 추출 옵션이 꺼져 있고 이 자산이 자동 등록 대기 행이면 지운다 (수동 요청은 그대로). 지웠으면 `true`.
+pub(super) fn drop_disabled_auto(
+    conn: &mut Connection,
+    now: i64,
+    asset_id: i64,
+) -> Result<bool, ProcError> {
+    let tx = conn.transaction()?;
+    let dropped = !scene_cuts::load_scene_detect_auto(&tx)?
+        && scene_cuts::drop_auto_pending_tx(&tx, Some(asset_id), now).map_err(scene_err)? > 0;
+    tx.commit()?;
+    Ok(dropped)
+}
+
 /// 한 번의 쓰기 트랜잭션이 잡는 최대 행 수 — 수십만 건이 pending 이어도 DB 쓰기 스레드를 오래 붙잡지 않는다
 const REQUEUE_CHUNK: usize = 2_000;
 
@@ -142,6 +155,17 @@ pub fn requeue_pending_in_chunks(
     chunk: usize,
 ) -> Result<usize, ProcError> {
     let chunk = chunk.max(1);
+    // 자동 추출 옵션이 꺼져 있으면 자동 등록분은 재등록하지 않고 지운다 (재시작/볼륨 복귀마다 꺼진 옵션의 작업이 되살아나지 않게)
+    pool.write(Priority::Low, move |c| {
+        Ok((|| -> Result<(), ProcError> {
+            let tx = c.transaction()?;
+            if !scene_cuts::load_scene_detect_auto(&tx)? {
+                scene_cuts::drop_auto_pending_tx(&tx, None, now).map_err(scene_err)?;
+            }
+            tx.commit()?;
+            Ok(())
+        })())
+    })??;
     let mut total = 0;
     loop {
         let added = pool.write(Priority::Low, move |c| {

@@ -73,6 +73,7 @@ fn gated() -> Gated {
                 external: ext.clone(),
                 stt: e.stt.clone(),
                 embedding: e.emb.clone(),
+                utc_offset: Arc::new(|| 0),
             },
             AiJobsConfig::new(e.cache.clone()),
         )

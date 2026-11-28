@@ -576,7 +576,7 @@ fn t_vlcset_05_old_false_row_is_carried_to_video_player_builtin_by_v27() {
     let report = migrate(&mut db.conn, &db.backup_dir, &FixedClock(T0 + 1)).unwrap();
     let (s, warnings) = settings::load(&db.conn).unwrap();
     // Assert
-    assert_eq!(report.applied, vec![27]);
+    assert_eq!(report.applied, vec![27, 28, 29, 30, 31]);
     assert!(!s.video_player_builtin);
     assert_eq!(
         serde_json::to_value(&s).unwrap()["videoPlayerBuiltIn"],

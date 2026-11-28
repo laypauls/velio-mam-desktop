@@ -5,7 +5,7 @@ use std::sync::Arc;
 use mam_db::scene_cuts::{SceneState, select_auto};
 use mam_media::{MediaError, MediaKind, SceneDetectOptions, detect_scene_cuts};
 
-use super::store::{Ctx, commit_cuts, commit_outcome, defer_job, load_ctx};
+use super::store::{Ctx, commit_cuts, commit_outcome, defer_job, drop_disabled_auto, load_ctx};
 use super::threshold_for;
 use crate::jobs::{Job, JobContext, JobError, JobExecutor, JobOutcome};
 use crate::processing::{ProcessingEnv, Source, Verdict, judge, load_source};
@@ -45,6 +45,12 @@ impl SceneExecutor {
 
     fn run(&self, job: &Job, ctx: &JobContext<'_>, asset_id: i64) -> Result<JobOutcome, JobError> {
         let env = &self.env;
+        // 안전망: 자동 추출 옵션이 꺼진 뒤 남은 자동 등록분은 실행하지 않고 지운다 (FFmpeg 미실행). 수동 요청은 그대로 실행
+        let auto_on = env.read(|c| Ok(mam_db::scene_cuts::load_scene_detect_auto(c)?))?;
+        let clock = Arc::clone(&env.clock);
+        if !auto_on && env.write(move |c| drop_disabled_auto(c, clock.now_ms(), asset_id))? {
+            return Ok(JobOutcome::Done);
+        }
         let (snap, path) = match env.read(|c| Ok(load_source(c, asset_id)?))? {
             Source::Ready(snap, path) => (snap, path),
             // 비활성은 할 일이 없고, 오프라인·파일 없음은 삭제가 아니다 - 행은 pending 으로 남고 볼륨이 돌아오면 재등록된다

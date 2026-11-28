@@ -4,17 +4,19 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 
 use mam_db::{DbError, DbPool, Priority};
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::Connection;
 
 use super::config::{AiRuntimeSettings, local_hour};
+use super::origin::Origin;
 use super::plan::{
-    ACTIVE_SQL, CHUNK, EMBEDDING_BACKFILL_SQL, FAILED_SQL, QueueResult, UNANALYZED_SQL, ids_page,
-    mark_skipped, plan,
+    ACTIVE_SQL, CHUNK, EMBEDDING_BACKFILL_SQL, QueueResult, UNANALYZED_SQL, ids_page, mark_skipped,
+    plan,
 };
 use super::types::StepKind;
+
+mod ops;
 use super::{AiJobError, state};
 use crate::SharedClock;
-use crate::ai_store::{AnalysisEdit, AnalysisView, SEMANTIC_ONLY_CODE, update_analysis};
 use crate::jobs::{JobKind, JobQueue, NewJob};
 
 pub struct AiScheduler {
@@ -42,7 +44,7 @@ impl AiScheduler {
         }
     }
 
-    fn write<T: Send + 'static>(
+    pub(super) fn write<T: Send + 'static>(
         &self,
         f: impl FnOnce(&mut Connection, i64) -> Result<T, AiJobError> + Send + 'static,
     ) -> Result<T, AiJobError> {
@@ -67,6 +69,7 @@ impl AiScheduler {
         force: bool,
         st: &AiRuntimeSettings,
         mark_skipped_when_empty: bool,
+        origin: Origin,
     ) -> Result<QueueResult, AiJobError> {
         let st = st.clone();
         let (res, to_enqueue) = self.write(move |c, now| {
@@ -91,7 +94,7 @@ impl AiScheduler {
                     if mark_skipped_when_empty && st.consent_given {
                         mark_skipped(&tx, now, id, &media)?;
                     }
-                } else if state::upsert_queued(&tx, now, id, &kinds, force)? > 0 {
+                } else if state::upsert_queued(&tx, now, id, &kinds, force, origin)? > 0 {
                     res.queued += 1;
                     jobs.push(id);
                 }
@@ -115,7 +118,7 @@ impl AiScheduler {
                 skipped: 1,
             });
         }
-        self.queue_assets(vec![asset_id], None, false, st, false)
+        self.queue_assets(vec![asset_id], None, false, st, false, Origin::AutoNew)
     }
 
     /// 미분석 자산 백그라운드 분석: `backgroundAnalyze` + 동의 + 예약 시간대 안일 때만, 대기 중 AI 작업을 포함해
@@ -136,7 +139,7 @@ impl AiScheduler {
         let ids = self
             .pool
             .read(|c| Ok::<_, DbError>(ids_page(c, UNANALYZED_SQL, 0, budget)))?;
-        self.queue_assets(ids?, None, false, st, true)
+        self.queue_assets(ids?, None, false, st, true, Origin::Background)
     }
 
     /// `sweep_batch` 에서 대기 중 AI 작업 수를 뺀 남은 등록 예산.
@@ -174,7 +177,14 @@ impl AiScheduler {
             .pool
             .read(|c| Ok::<_, DbError>(ids_page(c, EMBEDDING_BACKFILL_SQL, after, budget)))??;
         let last = ids.last().copied();
-        let res = self.queue_assets(ids, Some(vec![StepKind::Embedding]), false, st, false)?;
+        let res = self.queue_assets(
+            ids,
+            Some(vec![StepKind::Embedding]),
+            false,
+            st,
+            false,
+            Origin::Backfill,
+        )?;
         // 등록이 성공한 뒤에만 커서를 옮긴다 (실패하면 같은 자산을 다시 시도)
         if let Some(last) = last {
             self.backfill_cursor.store(last, Ordering::Relaxed);
@@ -198,6 +208,7 @@ impl AiScheduler {
                 force,
                 st,
                 false,
+                Origin::Manual,
             )?);
         }
         Ok(total)
@@ -224,88 +235,14 @@ impl AiScheduler {
                 return Ok(total);
             };
             after = last;
-            total.add(self.queue_assets(ids, None, !only_unanalyzed, st, only_unanalyzed)?);
+            total.add(self.queue_assets(
+                ids,
+                None,
+                !only_unanalyzed,
+                st,
+                only_unanalyzed,
+                Origin::Manual,
+            )?);
         }
-    }
-
-    /// 실패한 단계를 다시 대기시킨다 (수동 재시도). `ids = None` 이면 실패가 있는 모든 자산.
-    /// 시도 한도로 `failed` 가 된 AI 작업 행은 지우고 새로 등록한다.
-    pub fn retry_failed(&self, ids: Option<&[i64]>) -> Result<QueueResult, AiJobError> {
-        let ids: Option<Vec<i64>> = ids.map(<[_]>::to_vec);
-        let (res, requeued) = self.write(move |c, now| {
-            let tx = c.transaction()?;
-            let targets: Vec<i64> = match ids {
-                Some(v) => v,
-                None => {
-                    let mut stmt = tx.prepare(FAILED_SQL)?;
-                    stmt.query_map([], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?
-                }
-            };
-            let mut res = QueueResult::default();
-            let mut requeued = Vec::new();
-            for id in targets {
-                let n = tx.execute(
-                    "UPDATE ai_task_state SET state = 'queued', error_code = NULL, attempts = 0, updated_at = ?2
-                     WHERE asset_id = ?1 AND state = 'failed'",
-                    params![id, now],
-                )?;
-                if n == 0 {
-                    res.skipped += 1;
-                    continue;
-                }
-                tx.execute(
-                    "DELETE FROM jobs WHERE kind = 'ai' AND asset_id = ?1 AND status = 'failed'",
-                    [id],
-                )?;
-                res.queued += 1;
-                requeued.push(id);
-            }
-            tx.commit()?;
-            Ok((res, requeued))
-        })?;
-        self.enqueue_jobs(&requeued)?;
-        Ok(res)
-    }
-
-    /// 사용자 편집(설명·키워드) 저장. `ai_store::update_analysis`(고우선 outbox, 낡은 의미 벡터를 같은 트랜잭션에서
-    /// 의미 전용으로 재대기) 뒤 재대기된 경우 자산의 AI 작업을 등록한다 (대기 작업이 있으면 중복 등록 안 함).
-    /// 외부 분석은 요청하지 않는다 - 편집이 덮어써질 수 있기 때문이다.
-    pub fn edit_analysis(
-        &self,
-        asset_id: i64,
-        edit: &AnalysisEdit,
-    ) -> Result<AnalysisView, AiJobError> {
-        let (edit, clock) = (edit.clone(), Arc::clone(&self.clock));
-        let (view, requeued) = self.pool.write(Priority::High, move |c| {
-            Ok::<_, DbError>((|| {
-                let view = update_analysis(c, &*clock, asset_id, &edit)?;
-                let requeued = c
-                    .query_row(
-                        "SELECT 1 FROM ai_task_state WHERE asset_id = ?1 AND kind = 'embedding'
-                           AND state = 'queued' AND error_code = ?2",
-                        params![asset_id, SEMANTIC_ONLY_CODE],
-                        |_| Ok(()),
-                    )
-                    .optional()?
-                    .is_some();
-                Ok::<_, AiJobError>((view, requeued))
-            })())
-        })??;
-        if requeued {
-            self.enqueue_jobs(&[asset_id])?;
-        }
-        Ok(view)
-    }
-
-    /// 동의 철회: 대기 중(queued)인 외부 분석 단계를 skipped(consent_required)로 바꾼다. 기존 결과는 보존하고,
-    /// 이미 실행 중인 요청은 끝까지 간다. 바뀐 단계 수를 돌려준다.
-    pub fn cancel_external_pending(&self) -> Result<usize, AiJobError> {
-        self.write(|c, now| {
-            Ok(c.execute(
-                "UPDATE ai_task_state SET state = 'skipped', error_code = 'consent_required', updated_at = ?1
-                 WHERE kind IN ('describe', 'keywords', 'ocr', 'summary') AND state = 'queued'",
-                [now],
-            )?)
-        })
     }
 }

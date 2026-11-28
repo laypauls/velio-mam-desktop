@@ -207,6 +207,7 @@ impl AiEnv {
                 external: ext.clone(),
                 stt: stt.clone(),
                 embedding: emb.clone(),
+                utc_offset: Arc::new(|| 0),
             },
             cfg,
         );

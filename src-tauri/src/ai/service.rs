@@ -16,8 +16,8 @@ use mam_ai::keys::{KeyError, KeyStorage, KeyVault};
 use mam_ai::local::embed::{CLIP_IMAGE_MODEL_ID, E5_MODEL_ID};
 use mam_core::SharedClock;
 use mam_core::ai_jobs::{
-    AiDeps, AiExecutor, AiJobsConfig, AiRuntimeSettings, AiScheduler, QueueResult, StepKind,
-    StepStatus, list_status,
+    AiDeps, AiExecutor, AiJobsConfig, AiRuntimeSettings, AiScheduler, Origin, QueueResult,
+    StepKind, StepStatus, list_status,
 };
 use mam_core::ai_store::{
     AiStoreError, AiUsageRow, AnalysisEdit, AnalysisRun, AnalysisView, TranscriptView, UsageEntry,
@@ -32,7 +32,7 @@ use super::embed::{EmbeddingAdapter, LocalEmbedders};
 use super::events::{AnalysisNotifier, EventSink, NotifyingExecutor};
 use super::external::ExternalAdapter;
 use super::models::{LocalModel, ModelService};
-use super::settings::{AiSettings, AiSettingsPatch, LastCheck, apply_patch};
+use super::settings::{AiSettings, AiSettingsPatch, LastCheck, apply_patch, origins_turned_off};
 use super::store::AiStore;
 use super::stt::{LocalStt, ToolResolver};
 use super::{AiFailure, sysinfo};
@@ -265,6 +265,7 @@ impl AiService {
                 external: Arc::clone(&self.external) as _,
                 stt: Arc::clone(&self.stt) as _,
                 embedding: Arc::clone(&self.embedding) as _,
+                utc_offset: Arc::clone(&self.utc_offset),
             },
             self.jobs_cfg.clone(),
         )
@@ -310,10 +311,18 @@ impl AiService {
         let patch: AiSettingsPatch =
             serde_json::from_value(patch).map_err(|_| AiFailure::Invalid("patch"))?;
         let ready = self.models.any_embedding_ready();
-        let (_, doc) = self.store.update(|d| {
+        let (before, doc) = self.store.update(|d| {
+            let before = d.settings.clone();
             d.settings = apply_patch(&d.settings, patch, ready)?;
-            Ok(())
+            Ok(before)
         })?;
+        // 자동 옵션이 꺼졌다 - 이미 등록된 그 출처의 대기 작업도 정리한다 (사용자가 직접 요청한 분석은 보존)
+        let off = origins_turned_off(&before, &doc.settings);
+        if !off.is_empty() {
+            self.scheduler
+                .cancel_auto_pending(&off)
+                .map_err(job_failure)?;
+        }
         Ok(doc.settings)
     }
 
@@ -337,6 +346,9 @@ impl AiService {
             d.settings.background_analyze = false;
             Ok(())
         })?;
+        self.scheduler
+            .cancel_auto_pending(&[Origin::AutoNew, Origin::Background])
+            .map_err(job_failure)?;
         self.scheduler
             .cancel_external_pending()
             .map_err(job_failure)?;

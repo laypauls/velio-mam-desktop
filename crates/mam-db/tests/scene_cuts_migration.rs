@@ -87,7 +87,9 @@ fn t_scene_01_v15_upgrade_from_v14_adds_table_check_and_partial_index() {
     // Assert: 업그레이드 + 백업 + 기존 행 보존 + 재실행 no-op
     assert_eq!(
         report.applied,
-        vec![15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
+        vec![
+            15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
+        ]
     );
     assert!(report.backup.is_some_and(|b| b.is_file()));
     assert_eq!(count(&db.conn, "SELECT COUNT(*) FROM media_assets"), 1);
@@ -204,7 +206,9 @@ fn t_scene_02_v16_preserves_every_job_row_column_and_index() {
     // Assert: 값·열 정의·인덱스 동일, FK ON·위반 0
     assert_eq!(
         report.applied,
-        vec![15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
+        vec![
+            15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
+        ]
     );
     assert_eq!(jobs_dump(&db.conn), before_rows);
     assert_eq!(jobs_columns(&db.conn), before_cols);

@@ -68,7 +68,10 @@ fn t_umeta_mig_01_v19_applies_to_a_v18_db_keeping_existing_rows() {
     let report = migrate(&mut db.conn, &db.backup_dir, &FixedClock(T0 + 1)).unwrap();
 
     // Assert
-    assert_eq!(report.applied, vec![19, 20, 21, 22, 23, 24, 25, 26, 27]);
+    assert_eq!(
+        report.applied,
+        vec![19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+    );
     assert!(report.backup.is_some_and(|b| b.is_file()));
     assert_eq!(count(&db.conn, "media_assets"), 1);
     for t in [

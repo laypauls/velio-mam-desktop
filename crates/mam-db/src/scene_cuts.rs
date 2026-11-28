@@ -13,9 +13,9 @@ pub use codec::{
     MAX_USER_CUTS, MIN_GAP_MS, decode, encode, half_frame_ms, select_auto, tolerance_ms,
 };
 pub use jobs::{
-    BACKFILL_BATCH, BACKFILL_COUNT_SQL, BACKFILL_PAGE_SQL, BackfillBatch, REQUEUE_SQL,
-    RequestOptions, RequestOutcome, backfill_batch_tx, backfill_count, enqueue_auto_tx, request_tx,
-    requeue_pending_tx,
+    BACKFILL_BATCH, BACKFILL_COUNT_SQL, BACKFILL_PAGE_SQL, BackfillBatch, ORIGIN_AUTO,
+    ORIGIN_MANUAL, REQUEUE_SQL, RequestOptions, RequestOutcome, backfill_batch_tx, backfill_count,
+    drop_auto_pending_tx, enqueue_auto_tx, request_tx, requeue_pending_tx,
 };
 
 use codec::{has_within, nearest_within};

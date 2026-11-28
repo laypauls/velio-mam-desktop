@@ -78,7 +78,7 @@ fn t_store_08b_serializes_to_the_frontend_contract_shape() {
             "similarMinSimilarity": 0.75,
             "galleryPaging": "infinite",
             "galleryPageSize": 100,
-            "indexRail": "auto",
+            "indexRail": "always",
             "theme": {"mode": "system", "systemDark": "dim"},
             "capturedAtFallback": "modified",
             "sidebarRatingMenu": true,

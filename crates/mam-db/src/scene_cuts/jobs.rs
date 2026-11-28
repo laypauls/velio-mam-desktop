@@ -6,6 +6,11 @@
 use rusqlite::{Connection, OptionalExtension, params};
 
 use super::{SCENE_JOB_KIND, SCENE_PRIORITY_BACKGROUND, SceneError};
+
+/// `asset_scene_cuts.origin` 값 - 자동 등록(메타 완료 직후)
+pub const ORIGIN_AUTO: &str = "auto";
+/// 사용자 요청·백필 (NULL 구 행도 manual 취급)
+pub const ORIGIN_MANUAL: &str = "manual";
 use crate::view_options::SceneSensitivity;
 
 /// 백필 한 배치 크기
@@ -96,10 +101,10 @@ pub fn request_tx(
             continue;
         }
         conn.prepare_cached(
-            "INSERT INTO asset_scene_cuts (asset_id, state, requested_sensitivity, updated_at)
-             VALUES (?1, 'pending', ?2, ?3)
+            "INSERT INTO asset_scene_cuts (asset_id, state, requested_sensitivity, updated_at, origin)
+             VALUES (?1, 'pending', ?2, ?3, 'manual')
              ON CONFLICT(asset_id) DO UPDATE SET
-               state = 'pending', requested_sensitivity = excluded.requested_sensitivity,
+               state = 'pending', requested_sensitivity = excluded.requested_sensitivity, origin = 'manual',
                error = NULL, updated_at = excluded.updated_at,
                suppressed = CASE WHEN ?4 THEN NULL ELSE suppressed END",
         )?
@@ -140,7 +145,8 @@ pub fn backfill_batch_tx(
         .query_map(params![after, limit], |r| r.get(0))?
         .collect::<Result<_, _>>()?;
     let mut ins_row = conn.prepare_cached(
-        "INSERT OR IGNORE INTO asset_scene_cuts (asset_id, state, updated_at) VALUES (?1, 'pending', ?2)",
+        "INSERT OR IGNORE INTO asset_scene_cuts (asset_id, state, updated_at, origin)
+         VALUES (?1, 'pending', ?2, 'manual')",
     )?;
     for &id in &ids {
         ins_row.execute(params![id, now])?;
@@ -175,7 +181,8 @@ pub fn requeue_pending_tx(conn: &Connection, now: i64) -> Result<usize, SceneErr
 pub fn enqueue_auto_tx(conn: &Connection, asset_id: i64, now: i64) -> Result<bool, SceneError> {
     let inserted = conn
         .prepare_cached(
-            "INSERT OR IGNORE INTO asset_scene_cuts (asset_id, state, updated_at) VALUES (?1, 'pending', ?2)",
+            "INSERT OR IGNORE INTO asset_scene_cuts (asset_id, state, updated_at, origin)
+             VALUES (?1, 'pending', ?2, 'auto')",
         )?
         .execute(params![asset_id, now])?;
     if inserted == 0 {
@@ -183,4 +190,40 @@ pub fn enqueue_auto_tx(conn: &Connection, asset_id: i64, now: i64) -> Result<boo
     }
     insert_job(conn, asset_id, SCENE_PRIORITY_BACKGROUND, now)?;
     Ok(true)
+}
+
+/// 자동 추출 옵션이 꺼졌을 때: 자동 등록(`origin = 'auto'`)된 대기(pending) 행과 그 대기 작업을 정리한다
+/// (`asset_id` 를 주면 그 자산만). 호출자의 트랜잭션 안에서 부른다. 정리한 행 수(삭제 + done 전환)를 돌려준다. 멱등.
+/// - 실행 중(running) 작업은 건드리지 않는다 (실행기가 시작 시 스스로 정리한다).
+/// - 컷·숨김이 이미 있는 행(사용자가 pending 중에 편집)은 지우지 않고 `done` 으로 바꿔 편집을 보존한다.
+/// - 행을 지우므로 옵션을 다시 켜도 기존 영상은 자동 재등록되지 않는다 (신규 영상만 메타 완료 시 등록, 기존은 백필 명령).
+pub fn drop_auto_pending_tx(
+    conn: &Connection,
+    asset_id: Option<i64>,
+    now: i64,
+) -> Result<usize, SceneError> {
+    // 보간하는 값은 i64 와 고정 상수뿐이다. 전체 범위는 부분 인덱스(state = 'pending')를 쓴다.
+    let scope = asset_id.map_or_else(String::new, |id| format!("AND asset_id = {id}"));
+    let pending_auto = format!("state = 'pending' AND origin = '{ORIGIN_AUTO}' {scope}");
+    conn.execute(
+        &format!(
+            "DELETE FROM jobs WHERE kind = 'scene' AND status = 'pending'
+               AND asset_id IN (SELECT asset_id FROM asset_scene_cuts WHERE {pending_auto})"
+        ),
+        [],
+    )?;
+    let kept = conn.execute(
+        &format!(
+            "UPDATE asset_scene_cuts SET state = 'done', origin = '{ORIGIN_MANUAL}',
+                    requested_sensitivity = NULL, updated_at = {now}
+             WHERE {pending_auto}
+               AND (auto_cuts IS NOT NULL OR user_cuts IS NOT NULL OR suppressed IS NOT NULL)"
+        ),
+        [],
+    )?;
+    let deleted = conn.execute(
+        &format!("DELETE FROM asset_scene_cuts WHERE {pending_auto}"),
+        [],
+    )?;
+    Ok(kept + deleted)
 }

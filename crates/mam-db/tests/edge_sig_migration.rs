@@ -59,7 +59,7 @@ fn t_edge_db_01_v11_applies_to_a_v10_db_keeping_existing_rows_without_edge_sig()
     assert_eq!(
         report.applied,
         vec![
-            11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27
+            11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
         ]
     );
     assert!(report.backup.is_some_and(|b| b.is_file()));

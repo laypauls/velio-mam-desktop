@@ -7,7 +7,9 @@
 use std::collections::BTreeMap;
 
 use mam_ai::external::{AuthMode, Provider, TransferScope};
-use mam_core::ai_jobs::{AiRuntimeSettings, AiSettingsSource, Schedule, StepKind, Transfer};
+use mam_core::ai_jobs::{
+    AiRuntimeSettings, AiSettingsSource, Origin, Schedule, StepKind, Transfer,
+};
 use serde::{Deserialize, Deserializer, Serialize};
 
 use super::AiFailure;
@@ -327,5 +329,46 @@ impl AiSettings {
 impl AiSettingsSource for super::store::AiStore {
     fn snapshot(&self) -> AiRuntimeSettings {
         self.settings().runtime()
+    }
+}
+
+/// 설정 변경으로 새로 꺼진 자동 분석 출처 - 그 출처의 대기 단계를 정리해야 한다 (true -> false 전이만).
+pub fn origins_turned_off(before: &AiSettings, after: &AiSettings) -> Vec<Origin> {
+    let mut v = Vec::new();
+    if before.auto_analyze_new && !after.auto_analyze_new {
+        v.push(Origin::AutoNew);
+    }
+    if before.background_analyze && !after.background_analyze {
+        v.push(Origin::Background);
+    }
+    if before.semantic_search.enabled && !after.semantic_search.enabled {
+        v.push(Origin::Backfill);
+    }
+    v
+}
+
+#[cfg(test)]
+mod origin_tests {
+    //! 분류: Business rule - true -> false 전이만 정리 대상 (T-aioff-10)
+    use super::*;
+
+    #[test]
+    fn t_aioff_10_only_true_to_false_transitions_name_an_origin() {
+        // Arrange
+        let mut on = AiSettings {
+            auto_analyze_new: true,
+            background_analyze: true,
+            ..AiSettings::default()
+        };
+        on.semantic_search.enabled = true;
+        let off = AiSettings::default();
+
+        // Act / Assert
+        assert_eq!(
+            origins_turned_off(&on, &off),
+            vec![Origin::AutoNew, Origin::Background, Origin::Backfill]
+        );
+        assert!(origins_turned_off(&off, &on).is_empty());
+        assert!(origins_turned_off(&on, &on).is_empty());
     }
 }

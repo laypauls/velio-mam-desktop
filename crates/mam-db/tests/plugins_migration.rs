@@ -76,7 +76,7 @@ fn t_pdb_01_empty_db_has_strict_tables_partial_indexes_and_is_idempotent() {
     let mut db = migrated_db();
 
     // Assert
-    assert_eq!(latest_version(), 27);
+    assert_eq!(latest_version(), 31);
     for table in ["plugins", "plugin_providers", "plugin_kv", "plugin_tasks"] {
         let strict: bool = db
             .conn
@@ -157,7 +157,7 @@ fn t_pdb_02_upgrade_from_v25_preserves_every_job_row_column_and_index() {
     let report = migrate(&mut db.conn, &db.backup_dir, &FixedClock(T0 + 1)).unwrap();
 
     // Assert: 값·열·인덱스 동일, 백업 존재, FK ON·위반 0, 폴더 CASCADE 유지
-    assert_eq!(report.applied, vec![26, 27]);
+    assert_eq!(report.applied, vec![26, 27, 28, 29, 30, 31]);
     assert!(report.backup.is_some_and(|b| b.is_file()));
     assert_eq!(jobs_dump(&db.conn), rows);
     assert_eq!(jobs_columns(&db.conn), cols);

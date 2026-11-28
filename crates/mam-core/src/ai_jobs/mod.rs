@@ -14,12 +14,15 @@ mod external;
 mod failure;
 mod frames;
 mod inflight;
+mod origin;
 mod plan;
 mod sanitize;
 mod schedule;
 mod state;
 mod steps;
 mod types;
+mod wait_cap;
+mod window_gate;
 
 pub use config::{
     AiJobsConfig, AiRuntimeSettings, AiSettingsSource, Schedule, SttTimeout, local_hour,
@@ -27,6 +30,7 @@ pub use config::{
 pub use executor::{AiDeps, AiExecutor};
 pub use failure::{FailureClass, classify};
 pub use inflight::{InFlight, InFlightGuard};
+pub use origin::Origin;
 pub use plan::{ACTIVE_SQL, EMBEDDING_BACKFILL_SQL, FAILED_SQL, QueueResult, UNANALYZED_SQL};
 pub use schedule::AiScheduler;
 pub use state::list_status;

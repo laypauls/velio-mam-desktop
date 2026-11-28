@@ -176,7 +176,7 @@ fn t_pref_11_empty_db_is_at_v26_with_the_failed_partial_index() {
     let mut db = migrated_db();
 
     // Assert
-    assert_eq!(latest_version(), 27);
+    assert_eq!(latest_version(), 31);
     let sql: String = db
         .conn
         .query_row(
@@ -229,7 +229,7 @@ fn t_pref_11_v25_db_upgrades_to_v26_with_a_backup_and_empty_plugin_tables() {
     let report = migrate(&mut conn, &db.backup_dir, &FixedClock(T0 + 1)).unwrap();
 
     // Assert
-    assert_eq!(report.applied, vec![26, 27]);
+    assert_eq!(report.applied, vec![26, 27, 28, 29, 30, 31]);
     assert!(report.backup.is_some_and(|b| b.is_file()));
     assert_eq!(
         count(&conn, "SELECT COUNT(*) FROM plugin_tasks")

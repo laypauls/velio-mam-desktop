@@ -10,6 +10,7 @@ use mam_db::{DbPool, Priority, SystemClock, migrate, open};
 use mam_vector::{EmbedStore, ModelKey, NewVector, VectorKind, VectorSource};
 use tempfile::TempDir;
 
+use super::origin::Origin;
 use super::plan::mark_skipped;
 use super::state::upsert_queued;
 use super::types::StepKind;
@@ -120,7 +121,15 @@ fn finish_like_a_late_job(fx: &Fx) {
     crate::processing::set_state(c, now, id, DerivKind::Meta, DerivState::Failed, Some("x"))
         .unwrap();
     // AI 단계 행·실행 이력
-    upsert_queued(c, now, id, &[StepKind::Describe, StepKind::Embedding], true).unwrap();
+    upsert_queued(
+        c,
+        now,
+        id,
+        &[StepKind::Describe, StepKind::Embedding],
+        true,
+        Origin::Manual,
+    )
+    .unwrap();
     mark_skipped(c, now, id, "image").unwrap();
     record_run(c, &SystemClock, &run_record(id)).unwrap();
     // 장면전환점 결과
@@ -282,7 +291,7 @@ fn t_late_02_the_same_writes_still_land_for_an_active_asset() {
     let c = &mut conn;
     crate::processing::set_state(c, now, id, DerivKind::Meta, DerivState::Failed, Some("x"))
         .unwrap();
-    upsert_queued(c, now, id, &[StepKind::Describe], true).unwrap();
+    upsert_queued(c, now, id, &[StepKind::Describe], true, Origin::Manual).unwrap();
     record_run(c, &SystemClock, &run_record(id)).unwrap();
     mam_db::scene_cuts::replace_auto_tx(c, id, &[1000], "medium", None, now).unwrap();
     let ids = put_vector(&fx, c, now);

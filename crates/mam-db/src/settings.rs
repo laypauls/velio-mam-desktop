@@ -18,7 +18,9 @@ use crate::error::DbError;
 use crate::gallery_display::GalleryCardDisplay;
 use crate::layout::LayoutSetting;
 use crate::locale_code::{DEFAULT_LANGUAGE, is_valid_locale_code};
+use crate::migrate::{Clock, SystemClock};
 use crate::player_volume::PlayerVolumeSetting;
+use crate::scene_cuts;
 use crate::theme::ThemeSetting;
 use crate::view_options::{
     CapturedAtFallback, DoubleClickAction, GALLERY_PAGE_SIZES, GalleryPaging, IndexRailMode,
@@ -679,13 +681,25 @@ pub fn update(
         }
         changes.push((def.key, value));
     }
+    let turns_off_scene_auto = changes.iter().any(|(key, value)| {
+        *key == scene_cuts::SETTING_DETECT_AUTO && **value == Value::Bool(false)
+    });
     let tx = conn.transaction()?;
+    // 장면 자동 추출을 끄는 변경이면 자동 등록분의 대기 행·작업을 같은 트랜잭션에서 정리한다 (true -> false 전이만)
+    let was_on = turns_off_scene_auto && scene_cuts::load_scene_detect_auto(&tx)?;
     for (key, value) in changes {
         tx.execute(
             "INSERT INTO settings (key, value) VALUES (?1, ?2)
              ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             params![key, value.to_string()],
         )?;
+    }
+    if was_on {
+        let now = SystemClock.now_ms();
+        scene_cuts::drop_auto_pending_tx(&tx, None, now).map_err(|e| match e {
+            scene_cuts::SceneError::Sqlite(e) => SettingsError::from(e),
+            scene_cuts::SceneError::InvalidInput(f) => SettingsError::Invalid(f.into()),
+        })?;
     }
     tx.commit()?;
     Ok(load(conn)?.0)

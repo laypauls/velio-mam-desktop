@@ -26,6 +26,17 @@ impl Schedule {
             local_hour >= self.start_hour || local_hour < self.end_hour
         }
     }
+
+    /// `now_ms` 이후 처음 오는 시간대 시작 시각(로컬 `start_hour`:00)의 UTC epoch ms. `utc_offset_min` = 로컬 - UTC (분).
+    pub fn next_start_ms(&self, now_ms: i64, utc_offset_min: i32) -> i64 {
+        let offset = i64::from(utc_offset_min) * 60;
+        let local = now_ms.div_euclid(1000) + offset;
+        let mut start = local.div_euclid(86_400) * 86_400 + i64::from(self.start_hour) * 3600;
+        if start <= local {
+            start += 86_400;
+        }
+        (start - offset).saturating_mul(1000)
+    }
 }
 
 /// 로컬 시각의 시(0~23). `utc_offset_min` = 로컬 - UTC (분).

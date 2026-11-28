@@ -2,6 +2,7 @@
 
 use rusqlite::{Connection, params};
 
+use super::origin::Origin;
 use super::types::{StepKind, StepState, StepStatus};
 
 /// 이 자산에서 처리할 단계 (queued, 그리고 비정상 종료로 남은 running) - 시도 횟수와 함께.
@@ -35,7 +36,8 @@ pub fn set_step(
 ) -> rusqlite::Result<()> {
     conn.execute(
         "UPDATE ai_task_state
-         SET state = ?3, error_code = ?4, attempts = COALESCE(?5, attempts), updated_at = ?6
+         SET state = ?3, error_code = ?4, attempts = COALESCE(?5, attempts), updated_at = ?6,
+             wait_since = NULL
          WHERE asset_id = ?1 AND kind = ?2",
         params![
             asset_id,
@@ -57,21 +59,40 @@ pub fn upsert_queued(
     asset_id: i64,
     kinds: &[StepKind],
     force: bool,
+    origin: Origin,
 ) -> rusqlite::Result<usize> {
     // 삭제 표시된 자산(폴더 제거 등)에는 단계를 만들지 않는다
     if !crate::purge::asset_is_active(conn, asset_id)? {
         return Ok(0);
     }
     let mut stmt = conn.prepare_cached(
-        "INSERT INTO ai_task_state (asset_id, kind, state, error_code, attempts, updated_at)
-         VALUES (?1, ?2, 'queued', NULL, 0, ?3)
+        "INSERT INTO ai_task_state (asset_id, kind, state, error_code, attempts, updated_at, origin)
+         VALUES (?1, ?2, 'queued', NULL, 0, ?3, ?5)
          ON CONFLICT (asset_id, kind) DO UPDATE SET
-           state = 'queued', error_code = NULL, attempts = 0, updated_at = excluded.updated_at
+           state = 'queued', error_code = NULL, attempts = 0, updated_at = excluded.updated_at,
+           origin = excluded.origin, wait_since = NULL
          WHERE ?4 = 1 OR ai_task_state.state IN ('failed', 'skipped')",
     )?;
     let mut changed = 0;
     for k in kinds {
-        changed += stmt.execute(params![asset_id, k.as_str(), now, i64::from(force)])?;
+        changed += stmt.execute(params![
+            asset_id,
+            k.as_str(),
+            now,
+            i64::from(force),
+            origin.as_str()
+        ])?;
+    }
+    if origin == Origin::Manual {
+        // 수동 요청이 자동 출처의 대기 행을 덮으면 manual 로 승격한다 (자동 옵션을 꺼도 보존). 반대 방향 강등은 없다
+        let mut promote = conn.prepare_cached(
+            "UPDATE ai_task_state SET origin = 'manual'
+             WHERE asset_id = ?1 AND kind = ?2 AND state IN ('queued', 'running')
+               AND origin IS NOT NULL AND origin <> 'manual'",
+        )?;
+        for k in kinds {
+            promote.execute(params![asset_id, k.as_str()])?;
+        }
     }
     Ok(changed)
 }

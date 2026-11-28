@@ -42,7 +42,7 @@ fn t_mig_resume_01_upgrade_from_v24_defaults_existing_folder_to_enabled() {
     let report = migrate(&mut db.conn, &db.backup_dir, &FixedClock(T0 + 1)).unwrap();
 
     // Assert
-    assert_eq!(report.applied, vec![25, 26, 27]);
+    assert_eq!(report.applied, vec![25, 26, 27, 28, 29, 30, 31]);
     let v: i64 = db
         .conn
         .query_row("SELECT resume_enabled FROM managed_folders", [], |r| {

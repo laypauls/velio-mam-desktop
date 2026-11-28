@@ -45,7 +45,9 @@ fn t_hide_db_01_upgrade_from_v13_defaults_existing_folder_to_visible() {
     // Assert
     assert_eq!(
         report.applied,
-        vec![14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
+        vec![
+            14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
+        ]
     );
     let hidden: i64 = db
         .conn

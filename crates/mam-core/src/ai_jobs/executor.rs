@@ -32,6 +32,8 @@ pub struct AiDeps {
     pub external: Arc<dyn ExternalAnalyzer>,
     pub stt: Arc<dyn SttRunner>,
     pub embedding: Arc<dyn EmbeddingRunner>,
+    /// 로컬 - UTC (분) - 예약 시간대 게이트가 로컬 시각을 구하는 데 쓴다
+    pub utc_offset: Arc<dyn Fn() -> i32 + Send + Sync>,
 }
 
 pub struct AiExecutor {
@@ -118,6 +120,7 @@ impl AiExecutor {
         let asset_id = job
             .asset_id
             .ok_or_else(|| JobError::fatal("ai job without asset"))?;
+        self.drop_disabled_origin_steps(asset_id)?;
         let steps: Vec<StepKind> = self
             .read(|c| Ok(state::pending_steps(c, asset_id)?))?
             .into_iter()
@@ -126,6 +129,12 @@ impl AiExecutor {
         if steps.is_empty() {
             return Ok(JobOutcome::Done);
         }
+        if let Some(until) = self.outside_window_until(asset_id)? {
+            // 예약 시간대 밖 - 삭제하지 않고 다음 시간대 시작까지 미룬다 (시도 횟수 불변)
+            tracing::debug!(asset_id, "ai job deferred until the next schedule window");
+            self.defer_until(job, until)?;
+            return Ok(JobOutcome::Yielded);
+        }
         let Some(info) = self.asset_info(asset_id)? else {
             // 자산이 없거나 활성이 아니다 - 할 일이 없다 (실패 아님)
             self.skip_all(asset_id, &steps, "asset_inactive")?;
@@ -133,8 +142,12 @@ impl AiExecutor {
         };
         let mut note = RetryNote::default();
         let flow = self.run_steps(job, asset_id, &info, &steps, stop, &mut note)?;
-        if flow == Flow::Wait && note.is_empty() {
-            // 파생물이 아직 만들어지는 중 - 시도·경고 없이 잠시 뒤에 다시 (재시도 실패가 함께 있으면 그쪽이 우선)
+        if flow == Flow::Wait
+            && note.is_empty()
+            && !self.expire_waiting_steps(job, asset_id, &mut note)?
+        {
+            // 파생물이 아직 만들어지는 중 - 시도·경고 없이 잠시 뒤에 다시 (재시도 실패가 함께 있으면 그쪽이 우선).
+            // 첫 대기부터 30분이 지나면 위에서 `thumbnail_missing` 재시도 실패로 바뀌어 아래 `Err` 로 이어진다
             tracing::debug!(asset_id, "ai job waits for thumbnail/strip derivative");
             self.defer(job)?;
             return Ok(JobOutcome::Yielded);
@@ -166,7 +179,7 @@ impl AiExecutor {
         self.defer_until(job, self.now().saturating_add(NOT_READY_WAIT_MS))
     }
 
-    fn defer_until(&self, job: &Job, not_before: i64) -> Result<(), AiJobError> {
+    pub(super) fn defer_until(&self, job: &Job, not_before: i64) -> Result<(), AiJobError> {
         let job_id = job.job_id;
         self.write(move |c, _| {
             c.execute(
