@@ -34,48 +34,101 @@ impl Origin {
     }
 }
 
-/// 설정이 꺼져 있어 더는 실행하면 안 되는 자동 출처들.
-pub(super) fn disabled_origins(st: &AiRuntimeSettings) -> Vec<Origin> {
+/// 정리 대상 단계 종류 범위. 자막(`stt`)은 자동 분석과 따로 켜고 끄므로 종류 단위로 나눈다.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KindScope {
+    /// 모든 AI 단계
+    All,
+    /// 자막(`stt`)만
+    OnlyStt,
+    /// 자막을 뺀 단계
+    ExceptStt,
+}
+
+impl KindScope {
+    const fn sql(self) -> &'static str {
+        match self {
+            KindScope::All => {
+                "kind IN ('describe', 'keywords', 'ocr', 'summary', 'stt', 'embedding')"
+            }
+            KindScope::OnlyStt => "kind = 'stt'",
+            KindScope::ExceptStt => {
+                "kind IN ('describe', 'keywords', 'ocr', 'summary', 'embedding')"
+            }
+        }
+    }
+}
+
+/// (출처, 종류 범위) - 정리·실행 게이트의 단위.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OriginScope {
+    pub origin: Origin,
+    pub kinds: KindScope,
+}
+
+impl OriginScope {
+    pub const fn all(origin: Origin) -> Self {
+        Self {
+            origin,
+            kinds: KindScope::All,
+        }
+    }
+}
+
+/// 설정이 꺼져 있어 더는 실행하면 안 되는 자동 출처들 (자동 신규는 분석·자막을 따로 판단한다).
+pub(super) fn disabled_origins(st: &AiRuntimeSettings) -> Vec<OriginScope> {
     let mut v = Vec::new();
     if !(st.auto_analyze_new && st.consent_given) {
-        v.push(Origin::AutoNew);
+        v.push(OriginScope {
+            origin: Origin::AutoNew,
+            kinds: KindScope::ExceptStt,
+        });
+    }
+    if !st.auto_subtitle_new {
+        v.push(OriginScope {
+            origin: Origin::AutoNew,
+            kinds: KindScope::OnlyStt,
+        });
     }
     if !(st.background_analyze && st.consent_given) {
-        v.push(Origin::Background);
+        v.push(OriginScope::all(Origin::Background));
     }
     if !st.semantic_enabled {
-        v.push(Origin::Backfill);
+        v.push(OriginScope::all(Origin::Backfill));
     }
     v
 }
 
-/// 해당 출처의 단계 행을 지우고, 그 결과 처리할 단계(queued/running)가 없어진 자산의 대기(pending) `ai` 작업을 지운다.
+/// 해당 (출처, 종류 범위)의 단계 행을 지우고, 그 결과 처리할 단계(queued/running)가 없어진 자산의 대기(pending) `ai` 작업을 지운다.
 /// `include_running` 이면 실행 중(running) 표식도 지운다 (실행기가 시작 시 고아 행을 정리할 때). 호출자의 트랜잭션 안에서 부른다.
 /// 지운 단계 수를 돌려준다. 멱등.
 pub(super) fn delete_origin_steps(
     conn: &Connection,
-    origins: &[Origin],
+    scopes: &[OriginScope],
     asset_id: Option<i64>,
     include_running: bool,
 ) -> rusqlite::Result<usize> {
-    if origins.is_empty() {
+    if scopes.is_empty() {
         return Ok(0);
     }
-    let marks = vec!["?"; origins.len()].join(",");
     let states = if include_running {
         "('queued', 'running')"
     } else {
         "('queued')"
     };
-    let scope = if asset_id.is_some() {
+    let asset_cond = if asset_id.is_some() {
         "AND asset_id = ?"
     } else {
         ""
     };
-    let kinds = "kind IN ('describe', 'keywords', 'ocr', 'summary', 'stt', 'embedding')";
-    let mut args: Vec<rusqlite::types::Value> = origins
+    let cond = scopes
         .iter()
-        .map(|o| o.as_str().to_string().into())
+        .map(|s| format!("(origin = ? AND {})", s.kinds.sql()))
+        .collect::<Vec<_>>()
+        .join(" OR ");
+    let mut args: Vec<rusqlite::types::Value> = scopes
+        .iter()
+        .map(|s| s.origin.as_str().to_string().into())
         .collect();
     if let Some(id) = asset_id {
         args.push(id.into());
@@ -83,7 +136,7 @@ pub(super) fn delete_origin_steps(
     let affected: Vec<i64> = {
         let mut stmt = conn.prepare(&format!(
             "SELECT DISTINCT asset_id FROM ai_task_state
-             WHERE {kinds} AND state IN {states} AND origin IN ({marks}) {scope}"
+             WHERE state IN {states} AND ({cond}) {asset_cond}"
         ))?;
         stmt.query_map(params_from_iter(args.iter()), |r| r.get(0))?
             .collect::<rusqlite::Result<_>>()?
@@ -91,7 +144,7 @@ pub(super) fn delete_origin_steps(
     let removed = conn.execute(
         &format!(
             "DELETE FROM ai_task_state
-             WHERE {kinds} AND state IN {states} AND origin IN ({marks}) {scope}"
+             WHERE state IN {states} AND ({cond}) {asset_cond}"
         ),
         params_from_iter(args.iter()),
     )?;
@@ -110,10 +163,16 @@ impl AiScheduler {
     /// 자동 옵션이 꺼졌을 때: 해당 출처의 대기(queued) 단계와, 처리할 단계가 남지 않은 자산의 대기 `ai` 작업을 한 트랜잭션에서
     /// 지운다. 실행 중(running) 단계와 사용자 요청(manual·구 행)은 건드리지 않는다. 지운 단계 수를 돌려준다. 멱등.
     pub fn cancel_auto_pending(&self, origins: &[Origin]) -> Result<usize, AiJobError> {
-        let origins = origins.to_vec();
+        let scopes: Vec<OriginScope> = origins.iter().copied().map(OriginScope::all).collect();
+        self.cancel_auto_scopes(&scopes)
+    }
+
+    /// [`Self::cancel_auto_pending`] 의 종류 범위 버전 - 예: 자동 자막만 끄면 `auto_new` 의 `stt` 단계만 지운다.
+    pub fn cancel_auto_scopes(&self, scopes: &[OriginScope]) -> Result<usize, AiJobError> {
+        let scopes = scopes.to_vec();
         self.write(move |c, _| {
             let tx = c.transaction()?;
-            let n = delete_origin_steps(&tx, &origins, None, false)?;
+            let n = delete_origin_steps(&tx, &scopes, None, false)?;
             tx.commit()?;
             Ok(n)
         })

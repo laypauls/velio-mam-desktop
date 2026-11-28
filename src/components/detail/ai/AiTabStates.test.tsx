@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import "@/i18n"
 import { ApiProvider, type UiApi } from "@/lib/api"
 import { createMockApi } from "@/lib/api/mock"
-import type { AiAnalysis, AnalysisStatus, AssetAiDetail, Transcript } from "@/lib/ipc-contract-ai"
+import type { AiAnalysis, AnalysisStatus, AssetAiDetail, Subtitle } from "@/lib/ipc-contract-ai"
 import { resetAllStores } from "@/stores"
 import { AiTab } from "./AiTab"
 
@@ -33,7 +33,7 @@ const st = (kind: AnalysisStatus["kind"], state: AnalysisStatus["state"], errorC
   updatedAt: null,
 })
 
-const transcript = (n: number): Transcript => ({
+const transcript = (n: number): Subtitle => ({
   language: "ko",
   text: "",
   engine: "whisper",
@@ -175,12 +175,12 @@ describe("AiTab 결과·버튼", () => {
     expect(screen.getByRole("heading", { name: "요약" })).toBeInTheDocument()
   })
 
-  it("T-ui-ai-state-10 [Boundary] STT shows 3 segments first, '전체 보기' expands to the paged list (50), then 더 보기", async () => {
+  it("T-ui-ai-state-10 [Boundary] subtitle shows 3 segments first, '전체 보기' expands to the paged list (50), then 더 보기", async () => {
     // Arrange
     setup({ analysis: analysis(), transcript: transcript(120), status: [st("stt", "done")] }, "video")
     const user = userEvent.setup()
-    const list = await screen.findByRole("list", { name: "음성 인식 구간" })
-    expect(screen.getByText("음성 인식 · 한국어")).toBeInTheDocument()
+    const list = await screen.findByRole("list", { name: "자막 구간" })
+    expect(screen.getByText("자막 · 한국어")).toBeInTheDocument()
     expect(within(list).getAllByRole("button")).toHaveLength(3)
     // Act 1
     await user.click(screen.getByRole("button", { name: "전체 보기 (120구간)" }))
@@ -192,11 +192,11 @@ describe("AiTab 결과·버튼", () => {
     expect(within(list).getAllByRole("button")).toHaveLength(100)
   })
 
-  it("T-ui-ai-state-11 [Boundary] STT with 3 or fewer segments has no 전체 보기 button", async () => {
+  it("T-ui-ai-state-11 [Boundary] subtitle with 3 or fewer segments has no 전체 보기 button", async () => {
     // Arrange / Act
     setup({ analysis: analysis(), transcript: transcript(3), status: [st("stt", "done")] }, "video")
     // Assert
-    const list = await screen.findByRole("list", { name: "음성 인식 구간" })
+    const list = await screen.findByRole("list", { name: "자막 구간" })
     expect(within(list).getAllByRole("button")).toHaveLength(3)
     expect(screen.queryByRole("button", { name: /전체 보기/ })).not.toBeInTheDocument()
   })

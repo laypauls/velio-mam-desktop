@@ -52,6 +52,7 @@ fn t_p3w_set_01_defaults_match_the_contract() {
             "consent": {"given": false, "at": null},
             "language": "ko",
             "autoAnalyzeNew": false,
+            "autoSubtitleNew": null,
             "backgroundAnalyze": false,
             "schedule": {"enabled": false, "startHour": 0, "endHour": 0},
             "externalKinds": ["describe", "keywords", "ocr"],

@@ -7,7 +7,7 @@ import type {
   AnalysisRun,
   AnalysisStatus,
   SimilarItem,
-  Transcript,
+  Subtitle,
 } from "@/lib/ipc-contract-ai"
 import type { MockAiShared } from "./mock-ai"
 import type { MockCtx } from "./mock-ctx"
@@ -18,12 +18,12 @@ import { decodeCursor, encodeCursor, cmdError } from "./mock-search"
 
 type AnalysisApi = Pick<
   AiApi,
-  | "analyzeAssets" | "analyzeAll" | "retryFailedAnalysis" | "getAssetAi" | "updateAnalysis" | "listAnalysisHistory" | "findSimilar"
+  | "analyzeAssets" | "analyzeAll" | "generateSubtitlesAll" | "retryFailedAnalysis" | "getAssetAi" | "updateAnalysis" | "listAnalysisHistory" | "findSimilar"
 >
 
 interface AssetAiRec {
   analysis: AiAnalysis | null
-  transcript: Transcript | null
+  transcript: Subtitle | null
   status: Map<AnalysisKind, AnalysisStatus>
   history: AnalysisRun[]
 }
@@ -185,6 +185,19 @@ export function createMockAnalysis(ctx: MockCtx, shared: MockAiShared): Analysis
         ids.push(a.id)
       }
       return plan(ids, defaultKinds(), !onlyUnanalyzed, false)
+    },
+    generateSubtitlesAll: async () => {
+      await wait()
+      if (!settings.localStt.enabled) throw cmdError("invalid_input", "subtitles are turned off")
+      const ids: number[] = []
+      for (const a of db().recs) {
+        if (ids.length >= BATCH_CAP) break
+        if (a.status !== "active" || a.type === "image") continue
+        const st = store.get(a.id)?.status.get("stt")?.state
+        if (st === "done" || st === "queued" || st === "running") continue
+        ids.push(a.id)
+      }
+      return plan(ids, ["stt"], false, false)
     },
     retryFailedAnalysis: async (assetIds) => {
       await wait()

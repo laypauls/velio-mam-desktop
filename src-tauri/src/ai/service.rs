@@ -16,8 +16,8 @@ use mam_ai::keys::{KeyError, KeyStorage, KeyVault};
 use mam_ai::local::embed::{CLIP_IMAGE_MODEL_ID, E5_MODEL_ID};
 use mam_core::SharedClock;
 use mam_core::ai_jobs::{
-    AiDeps, AiExecutor, AiJobsConfig, AiRuntimeSettings, AiScheduler, Origin, QueueResult,
-    StepKind, StepStatus, list_status,
+    AiDeps, AiExecutor, AiJobsConfig, AiRuntimeSettings, AiScheduler, KindScope, Origin,
+    OriginScope, QueueResult, StepKind, StepStatus, list_status,
 };
 use mam_core::ai_store::{
     AiStoreError, AiUsageRow, AnalysisEdit, AnalysisRun, AnalysisView, TranscriptView, UsageEntry,
@@ -320,7 +320,7 @@ impl AiService {
         let off = origins_turned_off(&before, &doc.settings);
         if !off.is_empty() {
             self.scheduler
-                .cancel_auto_pending(&off)
+                .cancel_auto_scopes(&off)
                 .map_err(job_failure)?;
         }
         Ok(doc.settings)
@@ -340,14 +340,29 @@ impl AiService {
 
     /// 동의 철회 (PA3): 자동·백그라운드 분석을 끄고 대기 중 외부 단계를 건너뜀 처리한다. 기존 결과는 보존한다.
     pub fn revoke_consent(&self) -> Result<AiSettings, AiFailure> {
-        let (_, doc) = self.store.update(|d| {
+        let (before, doc) = self.store.update(|d| {
+            let before = d.settings.clone();
             d.settings.consent = Default::default();
             d.settings.auto_analyze_new = false;
             d.settings.background_analyze = false;
-            Ok(())
+            Ok(before)
         })?;
+        // 같은 전이 규칙을 쓴다 - 자동 자막이 명시적으로 켜져 있으면 대기 중 자막은 유지한다.
+        // 이미 꺼져 있던 분석·백그라운드의 잔여 행도 지우도록(멱등) 전이와 무관하게 이 둘은 항상 대상에 넣는다.
+        let mut off = origins_turned_off(&before, &doc.settings);
+        for s in [
+            OriginScope {
+                origin: Origin::AutoNew,
+                kinds: KindScope::ExceptStt,
+            },
+            OriginScope::all(Origin::Background),
+        ] {
+            if !off.contains(&s) {
+                off.push(s);
+            }
+        }
         self.scheduler
-            .cancel_auto_pending(&[Origin::AutoNew, Origin::Background])
+            .cancel_auto_scopes(&off)
             .map_err(job_failure)?;
         self.scheduler
             .cancel_external_pending()
@@ -565,6 +580,18 @@ impl AiService {
             .map_err(job_failure)
     }
 
+    /// 자막이 없는(없음·건너뜀·실패) 활성 동영상·음성 전체에 자막만 등록한다. 로컬 처리라 외부 AI 동의와 무관하다.
+    /// 자막 스위치(`localStt.enabled`)가 꺼져 있으면 `InvalidInput`(`localStt.enabled`)로 거부한다.
+    pub fn generate_subtitles_all(&self) -> Result<QueueResult, AiFailure> {
+        let rt = self.runtime();
+        if !rt.stt_enabled {
+            return Err(AiFailure::Invalid("localStt.enabled"));
+        }
+        self.scheduler
+            .generate_subtitles_all(&rt)
+            .map_err(job_failure)
+    }
+
     pub fn retry_failed(&self, ids: Option<&[i64]>) -> Result<QueueResult, AiFailure> {
         if ids.is_some_and(|v| v.len() > MAX_ANALYZE_IDS || v.iter().any(|i| *i <= 0)) {
             return Err(AiFailure::Invalid("assetIds"));
@@ -748,10 +775,11 @@ impl AiService {
 
     // ── 예약 루프 틱 (runner.rs 가 부른다) ──────────────────────────────
 
-    /// 신규 자산 자동 분석 (`autoAnalyzeNew` + 동의). 꺼져 있는 동안에는 워터마크만 따라가서, 켠 뒤에 생긴 자산만 대상이 된다.
+    /// 신규 자산 자동 등록 (자동 분석 + 동의, 또는 자동 자막 + 자막 스위치). 둘 다 꺼져 있는 동안에는 워터마크만 따라가서, 켠 뒤에 생긴 자산만 대상이 된다.
     pub fn tick_new_assets(&self) -> Result<usize, AiFailure> {
         let doc = self.store.stored();
-        let enabled = doc.settings.auto_analyze_new && doc.settings.consent.given;
+        let enabled = (doc.settings.auto_analyze_new && doc.settings.consent.given)
+            || (doc.settings.auto_subtitle_effective() && doc.settings.local_stt.enabled);
         let max: i64 = self.pool.read(|c| {
             Ok(c.query_row(
                 "SELECT COALESCE(MAX(asset_id), 0) FROM media_assets",

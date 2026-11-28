@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
+import { analysisKindKey } from "@/components/ai/labels"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -44,7 +45,7 @@ function BulkAnalyzeBody({ assetIds }: { assetIds: number[] }) {
         {KINDS.map((k) => (
           <Label key={k} className="!items-center gap-2 font-normal">
             <Checkbox checked={kinds.has(k)} onCheckedChange={(v) => toggle(k, v === true)} />
-            {t(`ai.kind.${k}`)}
+            {t(analysisKindKey(k))}
           </Label>
         ))}
       </fieldset>

@@ -52,13 +52,13 @@ const openDetail = async (user: ReturnType<typeof userEvent.setup>, chip: string
 describe("StatusBar background queue", () => {
   it("T-ui-status-01 [Happy] shows pending AI work as a chip", async () => {
     setup(summary({ ai: { pending: 340 } }))
-    expect(await screen.findByRole("button", { name: /AI 분석 340/ })).toBeTruthy()
+    expect(await screen.findByRole("button", { name: /AI 분석·자막 340/ })).toBeTruthy()
   })
 
-  it("T-ui-status-02 [Boundary] renders no chip trigger when every count is zero", async () => {
+  it("T-ui-status-02 [Boundary] renders no job chip when every count is zero (the plain trigger remains)", async () => {
     setup(summary())
     await screen.findByRole("button", { name: "작업 일시정지" })
-    expect(screen.queryByText(/AI 분석|썸네일|메타데이터|중복 검사/)).toBeNull()
+    expect(screen.queryByText(/AI 분석·자막 [0-9]|썸네일 [0-9]|메타데이터 [0-9]|중복 검사 [0-9]/)).toBeNull()
   })
 
   it("T-ui-status-03 [Boundary] formats large counts with thousands separators", async () => {
@@ -75,8 +75,8 @@ describe("StatusBar background queue", () => {
 
   it("T-ui-status-05 [Business rule] table lists all four kinds even when zero, and the trigger opens it", async () => {
     const { user } = setup(summary({ ai: { pending: 2, running: 1, failed: 7 } }))
-    const table = await openDetail(user, /AI 분석 3/)
-    for (const name of ["메타데이터", "썸네일", "중복 검사", "AI 분석"]) {
+    const table = await openDetail(user, /AI 분석·자막 3/)
+    for (const name of ["메타데이터", "썸네일", "중복 검사", "AI 분석·자막"]) {
       expect(within(table).getByRole("rowheader", { name })).toBeTruthy()
     }
     expect(screen.getByRole("button", { name: "썸네일 일시정지" })).toBeTruthy()
@@ -122,17 +122,39 @@ describe("StatusBar background queue", () => {
 
   it("T-ui-status-08 [Business rule] a paused kind with zero waiting stays visible and can be resumed", async () => {
     const { user, resumeJobs } = setup(summary({}, ["ai"]))
-    await openDetail(user, /AI 분석 0/)
-    await user.click(screen.getByRole("button", { name: "AI 분석 재개" }))
+    await openDetail(user, /AI 분석·자막 0/)
+    await user.click(screen.getByRole("button", { name: "AI 분석·자막 재개" }))
     expect(resumeJobs).toHaveBeenCalledWith("ai")
   })
 
   it("T-ui-status-07[External] pauseJobs(kind) rejection surfaces a toast", async () => {
     const { user, pauseJobs } = setup(summary({ ai: { pending: 4 } }))
     pauseJobs.mockRejectedValueOnce({ code: "internal", message: "boom" })
-    await openDetail(user, /AI 분석 4/)
-    await user.click(screen.getByRole("button", { name: "AI 분석 일시정지" }))
+    await openDetail(user, /AI 분석·자막 4/)
+    await user.click(screen.getByRole("button", { name: "AI 분석·자막 일시정지" }))
     expect(pauseJobs).toHaveBeenCalledWith("ai")
     await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1))
+  })
+})
+
+describe("StatusBar always-visible queue trigger", () => {
+  it("T-ui-status-09 [Happy] no jobs → the 백그라운드 작업 button opens the popover with the table and the empty-state line", async () => {
+    // Arrange
+    const { user } = setup(summary())
+    // Act
+    await user.click(await screen.findByRole("button", { name: "백그라운드 작업" }))
+    // Assert
+    expect(await screen.findByRole("table")).toBeTruthy()
+    expect(screen.getByText("대기 중인 작업이 없습니다.")).toBeTruthy()
+  })
+
+  it("T-ui-status-10 [Business rule] with jobs the chip stays and the empty-state line and plain button are absent", async () => {
+    // Arrange
+    const { user } = setup(summary({ ai: { pending: 2 } }))
+    // Act
+    await openDetail(user, /AI 분석·자막 2/)
+    // Assert
+    expect(screen.queryByRole("button", { name: "백그라운드 작업" })).toBeNull()
+    expect(screen.queryByText("대기 중인 작업이 없습니다.")).toBeNull()
   })
 })

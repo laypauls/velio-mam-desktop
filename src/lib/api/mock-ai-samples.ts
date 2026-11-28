@@ -1,4 +1,4 @@
-import type { Transcript, TranscriptSegment } from "@/lib/ipc-contract-ai"
+import type { Subtitle, SubtitleSegment } from "@/lib/ipc-contract-ai"
 
 export interface AiSample {
   description: string
@@ -22,10 +22,10 @@ export function sampleFor(assetId: number): AiSample {
 const LINES = ["안녕하세요, 오늘 회의를 시작하겠습니다.", "먼저 지난주 진행 상황을 공유드립니다.", "일정은 예정대로 진행되고 있습니다.", "다음 단계는 검토 후 결정하겠습니다.", "질문 있으시면 말씀해 주세요.", "이상으로 마치겠습니다. 감사합니다."]
 
 /** 길이를 7초 구간으로 나눈 STT 결과 (최대 6구간). 원문 언어는 ko. */
-export function transcriptFor(assetId: number, durationMs: number | null, createdAt: number): Transcript {
+export function transcriptFor(assetId: number, durationMs: number | null, createdAt: number): Subtitle {
   const total = Math.max(7000, durationMs ?? 21_000)
   const count = Math.min(LINES.length, Math.max(2, Math.floor(total / 7000)))
-  const segments: TranscriptSegment[] = []
+  const segments: SubtitleSegment[] = []
   for (let i = 0; i < count; i++) {
     segments.push({ startMs: i * 7000, endMs: (i + 1) * 7000, text: LINES[(i + assetId) % LINES.length] })
   }

@@ -9,9 +9,9 @@ import { AnalysisActions } from "./AnalysisActions"
 import { AnalysisHistory } from "./AnalysisHistory"
 import { AnalysisResult } from "./AnalysisResult"
 import { AnalysisFailedBanner, AnalysisRunningBanner } from "./AnalysisStatusBanner"
-import { TranscriptSection } from "./TranscriptSection"
+import { SubtitleSection } from "./SubtitleSection"
 
-/** D4: 상세 패널 AI 탭 — 결과(편집 가능)·종류별 상태·분석 버튼·이력·STT 원문. */
+/** D4: 상세 패널 AI 탭 — 결과(편집 가능)·종류별 상태·분석 버튼·이력·자막. */
 export function AiTab({ assetId, mediaType }: { assetId: number; mediaType: MediaType }) {
   const { t } = useTranslation()
   const { data, isPending, isError, refetch } = useAssetAi(assetId)
@@ -30,6 +30,7 @@ export function AiTab({ assetId, mediaType }: { assetId: number; mediaType: Medi
     )
   }
   const busy = data.status.some((s) => s.state === "queued" || s.state === "running")
+  const subtitleBusy = data.status.some((s) => s.kind === "stt" && (s.state === "queued" || s.state === "running"))
   const failed = data.status.some((s) => s.state === "failed")
   const analysis = data.analysis
 
@@ -47,7 +48,7 @@ export function AiTab({ assetId, mediaType }: { assetId: number; mediaType: Medi
           <AnalysisActions assetId={assetId} hasResult={false} edited={false} busy={busy} />
         </div>
       )}
-      {mediaType !== "image" && <TranscriptSection assetId={assetId} transcript={data.transcript} />}
+      {mediaType !== "image" && <SubtitleSection assetId={assetId} subtitle={data.transcript} busy={subtitleBusy} status={data.status.find((s) => s.kind === "stt")} />}
       {analysis && (
         <div className="flex flex-wrap items-center justify-between gap-2">
           {!busy && !failed && (

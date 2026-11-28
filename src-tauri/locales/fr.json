@@ -395,6 +395,7 @@
       "delete": "Supprimer",
       "move": "Déplacer",
       "ai": "Analyse IA",
+      "subtitle": "Générer les sous-titres",
       "resumeClear": "Réinitialiser la reprise"
     }
   },
@@ -752,6 +753,8 @@
     "analyze": "Analyse IA",
     "reanalyze": "Réanalyser par IA",
     "analyzeMany": "Analyse IA…",
+    "subtitle": "Générer les sous-titres",
+    "subtitleMany": "Générer les sous-titres ({{count}})",
     "sceneExtract": "Extraire les changements de scène",
     "resumeClear": "Réinitialiser la reprise"
   },
@@ -793,7 +796,7 @@
       "meta": "Métadonnées",
       "thumb": "Miniatures",
       "hash": "Détection des doublons",
-      "ai": "Analyse IA",
+      "ai": "Analyse IA et sous-titres",
       "scene": "Détection des scènes",
       "plugin": "Plugin"
     },
@@ -804,6 +807,7 @@
       "running": "En cours",
       "failed": "Échecs",
       "action": "Pause/reprise",
+      "empty": "Aucune tâche en attente.",
       "pauseKind": "Suspendre {{name}}",
       "resumeKind": "Reprendre {{name}}"
     },
@@ -962,7 +966,7 @@
       "protection": "Mot de passe, durée de dispense d'authentification et activation du déplacement/suppression des originaux.",
       "data": "Sauvegarde automatique et restauration, emplacement et réinitialisation des données de gestion.",
       "ai": "Consentement à l'envoi vers une IA externe, fournisseurs et authentification, analyse automatique/groupée et utilisation.",
-      "ai-local": "Recherche sémantique, reconnaissance vocale, modèles et critères des médias similaires, traités sur ce PC.",
+      "ai-local": "Recherche sémantique, sous-titres, modèles et critères des médias similaires, traités sur ce PC.",
       "licenses": "Mentions et licences des composants open source utilisés par velio. Les textes des licences sont en anglais.",
       "resume": "Mémorise la dernière position de lecture des vidéos et des fichiers audio et reprend à cet endroit.",
       "plugins": "Installez des plugins, vérifiez leurs autorisations, puis activez-les, désactivez-les ou supprimez-les."
@@ -1619,7 +1623,7 @@
       "sendMeta": "Métadonnées (nom de fichier, date de prise de vue, type, durée, etc.) et valeurs des champs de métadonnées personnalisées (chemin absolu du fichier exclu)",
       "neverTitle": "Ce qui n'est jamais envoyé",
       "neverOriginal": "Les fichiers image et vidéo originaux complets",
-      "neverAudio": "L'audio original (la reconnaissance vocale est traitée uniquement sur ce PC)",
+      "neverAudio": "L'audio original (les sous-titres sont générés uniquement sur ce PC)",
       "revoke": "Vous pouvez retirer votre consentement à tout moment dans Paramètres > IA. Les analyses externes en attente sont alors annulées ; les résultats déjà reçus sont conservés.",
       "decline": "Refuser",
       "agree": "Accepter et continuer",
@@ -1641,7 +1645,7 @@
       "describe": "Description",
       "keywords": "Mots-clés",
       "ocr": "OCR",
-      "stt": "Reconnaissance vocale",
+      "subtitle": "Sous-titres",
       "summary": "Résumé",
       "embedding": "Embedding"
     },
@@ -1676,14 +1680,39 @@
       "error": "Impossible de charger l'historique des analyses.",
       "empty": "Aucun historique d'analyse."
     },
-    "stt": {
-      "title": "Reconnaissance vocale (STT)",
-      "titleLang": "Reconnaissance vocale · {{lang}}",
-      "none": "Aucun résultat de reconnaissance vocale.",
-      "segments": "Segments de reconnaissance vocale",
+    "subtitle": {
+      "title": "Sous-titres",
+      "titleLang": "Sous-titres · {{lang}}",
+      "none": "Aucun sous-titre.",
+      "segments": "Segments de sous-titres",
       "seek": "{{time}} {{text}}",
       "showAll": "Tout afficher (segments : {{count}})",
-      "more": "Afficher plus"
+      "more": "Afficher plus",
+      "generate": "Générer les sous-titres",
+      "regenerate": "Régénérer",
+      "regenerateTitle": "Régénérer les sous-titres ?",
+      "regenerateConfirm": "Régénérer",
+      "regenerateWarning": "Les sous-titres existants seront écrasés.",
+      "busy": "Les sous-titres sont en cours de génération ; vous ne pouvez pas les redemander.",
+      "queued": "{{queued}} en attente de sous-titres",
+      "nothingQueued": "Aucun élément ne nécessite de sous-titres.",
+      "queuedHint": "Les éléments qui ont déjà des sous-titres ou sont en attente, ainsi que les images, sont ignorés.",
+      "disabledToast": "Les sous-titres sont désactivés. Activez-les dans Paramètres > IA locale et recherche.",
+      "modelMissingToast": "Le modèle de sous-titres n'est pas installé. Installez-le dans Paramètres > IA locale et recherche.",
+      "openSettings": "Ouvrir les paramètres",
+      "retry": "Réessayer",
+      "skip": {
+        "unsupported": "L'outil de sous-titres est introuvable, les sous-titres n'ont donc pas été créés.",
+        "model_missing": "Le modèle de sous-titres n'est pas installé, les sous-titres n'ont donc pas été créés. Installez-le dans Paramètres > IA locale et recherche.",
+        "disabled": "Les sous-titres sont désactivés, ils n'ont donc pas été créés. Activez-les dans Paramètres > IA locale et recherche.",
+        "asset_inactive": "Le fichier est indisponible, les sous-titres n'ont donc pas été créés.",
+        "unknown": "Impossible de créer les sous-titres."
+      },
+      "reason": {
+        "disabled": "Les sous-titres sont désactivés. Activez-les dans Paramètres > IA locale et recherche.",
+        "modelMissing": "Le modèle de sous-titres n'est pas installé. Installez-le dans Paramètres > IA locale et recherche.",
+        "imagesOnly": "Impossible de générer des sous-titres pour des images."
+      }
     },
     "empty": {
       "title": "Aucun résultat d'analyse pour l'instant",
@@ -1791,6 +1820,7 @@
       "section": "Analyse automatique",
       "new": "Analyser automatiquement les nouvelles ressources",
       "newHint": "Analyse automatiquement les ressources nouvellement ajoutées.",
+      "newSubtitleHint": "Les sous-titres suivent l'option « Générer automatiquement les sous-titres des nouveaux fichiers » dans IA locale et recherche.",
       "needConsent": "Disponible après consentement à l'envoi vers une IA externe.",
       "background": "Analyse en arrière-plan des ressources non analysées",
       "backgroundHint": "Analyse progressivement les ressources non analysées lorsque le système est disponible.",
@@ -1826,9 +1856,19 @@
     },
     "local": {
       "section": "Traitement local",
-      "stt": "Reconnaissance vocale locale (STT)",
-      "sttHint": "L'audio est traité uniquement sur ce PC et n'est jamais envoyé à l'extérieur.",
-      "sttModel": "Modèle de reconnaissance vocale",
+      "subtitle": "Sous-titres",
+      "subtitleHint": "Reconnaît la voix sur ce PC pour créer des sous-titres et ne l'envoie jamais à l'extérieur.",
+      "subtitleModel": "Modèle de sous-titres",
+      "subtitleAutoNew": "Générer automatiquement les sous-titres des nouveaux fichiers",
+      "subtitleAutoNewHint": "Crée automatiquement des sous-titres pour les nouvelles vidéos et les nouveaux audios. Indépendant du consentement à l'IA externe.",
+      "subtitleBatch": "Générer les sous-titres en lot",
+      "subtitleBatchHint": "Crée des sous-titres pour toutes les vidéos et tous les audios existants qui n'en ont pas. La progression se suit dans les tâches en arrière-plan, où vous pouvez aussi mettre en pause.",
+      "subtitleBatchButton": "Générer pour les éléments sans sous-titres",
+      "subtitleBatchConfirmTitle": "Générer les sous-titres en lot ?",
+      "subtitleBatchConfirmDescription": "Toutes les vidéos et tous les audios sans sous-titres seront mis en attente. Cela peut être long selon le nombre de fichiers.",
+      "subtitleBatchStart": "Démarrer",
+      "subtitleOffReason": "Activez d'abord les sous-titres.",
+      "subtitleModelMissingReason": "Installez le modèle de sous-titres dans la liste des modèles locaux.",
       "semantic": "Recherche sémantique",
       "semanticHint": "Recherche des images selon le sens d'une phrase. Traitement sur ce PC.",
       "semanticNeedModels": "Disponible après le téléchargement du modèle de recherche de texte (e5). Le modèle CLIP pour la recherche d'images similaires n'est pas nécessaire."
@@ -1839,8 +1879,8 @@
         "clip-image": "Embedding d'image",
         "clip-text": "Embedding de texte",
         "e5": "Recherche de texte",
-        "whisper-base": "Reconnaissance vocale",
-        "whisper-small": "Reconnaissance vocale"
+        "whisper-base": "Sous-titres",
+        "whisper-small": "Sous-titres"
       },
       "state": { "missing": "Absent", "downloading": "Téléchargement", "ready": "Prêt", "failed": "Échec" },
       "download": "Télécharger",

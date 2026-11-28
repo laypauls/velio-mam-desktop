@@ -11,11 +11,11 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { ApiProvider } from "@/lib/api"
 import { createMockApi } from "@/lib/api/mock"
 import type { AssetDetail } from "@/lib/ipc-contract"
-import type { AiAnalysis, Transcript } from "@/lib/ipc-contract-ai"
+import type { AiAnalysis, Subtitle } from "@/lib/ipc-contract-ai"
 import { resetAllStores, useViewStore } from "@/stores"
 import { AssetInfo } from "./AssetInfo"
 import { AnalysisResult } from "./ai/AnalysisResult"
-import { TranscriptSection } from "./ai/TranscriptSection"
+import { SubtitleSection } from "./ai/SubtitleSection"
 
 beforeEach(() => resetAllStores())
 afterEach(() => vi.restoreAllMocks())
@@ -124,9 +124,9 @@ describe("AI tab select-text", () => {
     expect(screen.getByRole("heading", { level: 3, name: "OCR" })).not.toHaveClass("select-text")
   })
 
-  it("T-ui-select-06 [Happy] STT segment text is selectable", () => {
+  it("T-ui-select-06 [Happy] subtitle segment text is selectable", () => {
     // Arrange
-    const transcript: Transcript = {
+    const subtitle: Subtitle = {
       language: "ko",
       text: "안녕하세요",
       segments: [{ startMs: 0, endMs: 1000, text: "안녕하세요" }],
@@ -134,7 +134,15 @@ describe("AI tab select-text", () => {
       createdAt: 0,
     }
     // Act
-    render(<TranscriptSection assetId={1} transcript={transcript} />)
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ApiProvider api={createMockApi({ count: 10 })}>
+          <TooltipProvider>
+            <SubtitleSection assetId={1} subtitle={subtitle} />
+          </TooltipProvider>
+        </ApiProvider>
+      </QueryClientProvider>
+    )
     // Assert
     expect(screen.getByText("안녕하세요")).toHaveClass("select-text")
   })

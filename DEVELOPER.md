@@ -55,7 +55,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 
 ### 개발용 temp 라이브러리 (`pnpm dev:temp`)
 
-- `scripts/dev-temp-library.mjs` 가 ffmpeg 사이드카로 `D:\mam-desktop\library`(약 30개·5MB 합성 미디어)를 만들고(누락분만), `scripts/dev-temp.mjs` 가 `MAM_DATA_DIR=D:\mam-desktop\MAMData`, `MAM_DEV_SEED_FOLDER=D:\mam-desktop\library` 로 `tauri dev` 실행 — D: 가 없는 PC 는 `devRoot` 를 바꾼다. 디버그 전용 `src-tauri/src/dev_seed.rs` 가 관리 폴더가 없을 때만 등록
+- `scripts/dev-temp-library.mjs` 가 ffmpeg 사이드카로 `D:\mam-desktop\library`(약 30개·5MB 합성 미디어)를 만들고(누락분만), `scripts/dev-temp.mjs` 가 `MAM_DATA_DIR=D:\mam-desktop\MAMData`, `MAM_DEV_SEED_FOLDER=D:\mam-desktop\library` 로 `tauri dev` 실행 — D: 가 없는 PC 는 `devRoot` 를 바꾼다. 개발 실행에는 사이드카 오버레이가 없어 `scripts/dev-sidecars.mjs` 가 `src-tauri/binaries` 의 whisper-cli·`whisper`/`ggml*` DLL 을 `target/debug` 에 복사한다(없거나 달라진 것만, 원본 없으면 경고 — `scripts/fetch-sidecars.ps1`; 이게 없으면 자막(STT)이 `unsupported` 로 건너뛰어진다. ffmpeg 는 PATH 사용). 순수 `pnpm tauri dev` 는 복사하지 않는다. 디버그 전용 `src-tauri/src/dev_seed.rs` 가 관리 폴더가 없을 때만 등록
 - CDP 자동 활성화(`--remote-debugging-port=19333` 을 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` 에 추가, `CDP: http://127.0.0.1:19333/json/version` 출력). `MAM_DEV_CDP_PORT=<포트>` 재지정, `0` 이면 끔, 포트 사용 중이면 exit 1
 - 초기화는 `D:\mam-desktop` 의 `MAMData`·`library` 삭제
 

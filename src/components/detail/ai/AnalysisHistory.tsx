@@ -1,7 +1,7 @@
 import { ChevronRight } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
-import { aiErrorText } from "@/components/ai/labels"
+import { aiErrorText, analysisKindKey } from "@/components/ai/labels"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { useAnalysisHistory } from "@/hooks/useAi"
 import { formatDateTime } from "@/lib/format"
@@ -29,7 +29,7 @@ export function AnalysisHistory({ assetId }: { assetId: number }) {
             {history.data?.map((r) => (
               <li key={r.runId} className="flex flex-wrap gap-x-2 text-muted-foreground">
                 <span className="tabular-nums">{formatDateTime(r.at)}</span>
-                <span>{t(`ai.kind.${r.kind}`)}</span>
+                <span>{t(analysisKindKey(r.kind))}</span>
                 <span>{r.provider}</span>
                 <span className={r.state === "failed" ? "text-destructive" : undefined}>
                   {r.state === "failed" ? `${t("ai.state.failed")} (${aiErrorText(t, r.errorCode ?? "unknown")})` : t("ai.state.done")}

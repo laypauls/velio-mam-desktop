@@ -41,6 +41,7 @@ fn t_aij_11_new_asset_is_queued_only_with_auto_analyze_and_consent() {
 
     e.set(|s| {
         s.auto_analyze_new = true;
+        s.auto_subtitle_new = true; // 자막은 별도 옵션 (실효값) - 음성의 stt 가 등록되는지 본다
         s.consent_given = true;
     });
     let r = e.sched.enqueue_new_asset(img, &snap(&e)).unwrap();

@@ -394,6 +394,7 @@
       "delete": "삭제",
       "move": "이동",
       "ai": "AI 분석",
+      "subtitle": "자막 생성",
       "resumeClear": "이어보기 초기화"
     }
   },
@@ -751,6 +752,8 @@
     "analyze": "AI 분석",
     "reanalyze": "AI 재분석",
     "analyzeMany": "AI 분석…",
+    "subtitle": "자막 생성",
+    "subtitleMany": "자막 생성 ({{count}}개)",
     "sceneExtract": "장면전환점 추출",
     "resumeClear": "이어보기 초기화"
   },
@@ -792,7 +795,7 @@
       "meta": "메타데이터",
       "thumb": "썸네일",
       "hash": "중복 검사",
-      "ai": "AI 분석",
+      "ai": "AI 분석·자막",
       "scene": "장면 검출",
       "plugin": "플러그인"
     },
@@ -803,6 +806,7 @@
       "running": "실행 중",
       "failed": "실패",
       "action": "일시정지/재개",
+      "empty": "대기 중인 작업이 없습니다.",
       "pauseKind": "{{name}} 일시정지",
       "resumeKind": "{{name}} 재개"
     },
@@ -961,7 +965,7 @@
       "protection": "비밀번호와 인증 면제 시간, 원본 이동·삭제 사용 여부를 설정합니다.",
       "data": "자동 백업과 복원, 관리 데이터 위치와 초기화를 관리합니다.",
       "ai": "외부 AI 전송 동의, 공급자·인증, 자동·일괄 분석과 사용량을 설정합니다.",
-      "ai-local": "이 PC 에서 처리하는 의미 검색, 음성 인식, 모델과 유사 미디어 기준을 설정합니다.",
+      "ai-local": "이 PC 에서 처리하는 의미 검색, 자막, 모델과 유사 미디어 기준을 설정합니다.",
       "licenses": "velio. 가 사용하는 오픈소스 구성 요소의 고지와 라이선스를 확인합니다. 라이선스 원문은 영문입니다.",
       "resume": "동영상·음성의 마지막 재생 위치를 기억해 이어서 재생합니다.",
       "plugins": "플러그인을 설치하고 권한을 확인하며, 켜고 끄거나 제거합니다."
@@ -1618,7 +1622,7 @@
       "sendMeta": "파일명·촬영일·유형·길이 등 메타데이터와 사용자 메타데이터 필드 값 (파일의 절대 경로는 제외)",
       "neverTitle": "전송하지 않는 것",
       "neverOriginal": "원본 이미지·동영상 파일 전체",
-      "neverAudio": "원본 음성 (음성 인식은 이 PC 에서만 처리합니다)",
+      "neverAudio": "원본 음성 (자막은 이 PC 에서만 만듭니다)",
       "revoke": "동의는 설정 > AI 에서 언제든 철회할 수 있습니다. 철회하면 대기 중인 외부 분석이 취소되고, 이미 받은 결과는 그대로 남습니다.",
       "decline": "동의하지 않음",
       "agree": "동의하고 계속",
@@ -1640,7 +1644,7 @@
       "describe": "설명",
       "keywords": "키워드",
       "ocr": "OCR",
-      "stt": "음성 인식",
+      "subtitle": "자막",
       "summary": "요약",
       "embedding": "임베딩"
     },
@@ -1675,14 +1679,39 @@
       "error": "분석 이력을 불러오지 못했습니다.",
       "empty": "분석 이력이 없습니다."
     },
-    "stt": {
-      "title": "음성 인식 (STT)",
-      "titleLang": "음성 인식 · {{lang}}",
-      "none": "음성 인식 결과가 없습니다.",
-      "segments": "음성 인식 구간",
+    "subtitle": {
+      "title": "자막",
+      "titleLang": "자막 · {{lang}}",
+      "none": "자막이 없습니다.",
+      "segments": "자막 구간",
       "seek": "{{time}} {{text}}",
       "showAll": "전체 보기 ({{count}}구간)",
-      "more": "더 보기"
+      "more": "더 보기",
+      "generate": "자막 생성",
+      "regenerate": "다시 생성",
+      "regenerateTitle": "자막을 다시 생성할까요?",
+      "regenerateConfirm": "다시 생성",
+      "regenerateWarning": "기존 자막을 덮어씁니다.",
+      "busy": "자막을 만드는 중이라 다시 요청할 수 없습니다.",
+      "queued": "자막 생성 대기 {{queued}}개",
+      "nothingQueued": "새로 자막을 만들 항목이 없습니다.",
+      "queuedHint": "이미 자막이 있거나 대기 중인 항목, 이미지는 건너뜁니다.",
+      "disabledToast": "자막이 꺼져 있습니다. 설정 > 로컬 AI·검색에서 자막을 켜세요.",
+      "modelMissingToast": "자막 모델이 설치되어 있지 않습니다. 설정 > 로컬 AI·검색에서 모델을 설치하세요.",
+      "openSettings": "설정 열기",
+      "retry": "다시 시도",
+      "skip": {
+        "unsupported": "자막 도구를 찾을 수 없어 자막을 만들지 못했습니다.",
+        "model_missing": "자막 모델이 설치되어 있지 않아 자막을 만들지 못했습니다. 설정 > 로컬 AI·검색에서 모델을 설치하세요.",
+        "disabled": "자막이 꺼져 있어 자막을 만들지 못했습니다. 설정 > 로컬 AI·검색에서 켜세요.",
+        "asset_inactive": "파일을 사용할 수 없는 상태라 자막을 만들지 못했습니다.",
+        "unknown": "자막을 만들지 못했습니다."
+      },
+      "reason": {
+        "disabled": "자막이 꺼져 있습니다. 설정 > 로컬 AI·검색에서 켜세요.",
+        "modelMissing": "자막 모델이 설치되어 있지 않습니다. 설정 > 로컬 AI·검색에서 설치하세요.",
+        "imagesOnly": "이미지에는 자막을 만들 수 없습니다."
+      }
     },
     "empty": {
       "title": "아직 분석 결과가 없습니다",
@@ -1790,6 +1819,7 @@
       "section": "자동 분석",
       "new": "새 자산 자동 분석",
       "newHint": "새로 등록된 자산을 자동으로 분석합니다.",
+      "newSubtitleHint": "자막은 로컬 AI·검색의 \"새 파일 자동 자막 생성\"을 따릅니다.",
       "needConsent": "외부 AI 전송에 동의하면 사용할 수 있습니다.",
       "background": "미분석 자산 백그라운드 분석",
       "backgroundHint": "여유가 있을 때 미분석 자산을 천천히 분석합니다.",
@@ -1825,9 +1855,19 @@
     },
     "local": {
       "section": "로컬 처리",
-      "stt": "로컬 음성 인식 (STT)",
-      "sttHint": "음성은 이 PC 에서만 처리하며 외부로 보내지 않습니다.",
-      "sttModel": "음성 인식 모델",
+      "subtitle": "자막",
+      "subtitleHint": "이 PC 에서 음성을 인식해 자막을 만들며, 외부로 보내지 않습니다.",
+      "subtitleModel": "자막 모델",
+      "subtitleAutoNew": "새 파일 자동 자막 생성",
+      "subtitleAutoNewHint": "새로 들어온 동영상·음성에 자막을 자동으로 만듭니다. 외부 AI 동의와 무관합니다.",
+      "subtitleBatch": "자막 일괄 생성",
+      "subtitleBatchHint": "자막이 없는 기존 동영상·음성 전체에 자막을 만듭니다. 진행 상황은 백그라운드 작업에서 확인하고 일시정지할 수 있습니다.",
+      "subtitleBatchButton": "자막 없는 항목 생성",
+      "subtitleBatchConfirmTitle": "자막을 일괄 생성할까요?",
+      "subtitleBatchConfirmDescription": "자막이 없는 동영상·음성 전체를 대기열에 올립니다. 파일 수에 따라 오래 걸릴 수 있습니다.",
+      "subtitleBatchStart": "생성 시작",
+      "subtitleOffReason": "자막을 켜세요.",
+      "subtitleModelMissingReason": "로컬 모델에서 자막 모델을 설치하세요.",
       "semantic": "의미 검색",
       "semanticHint": "문장 뜻으로 이미지를 찾습니다. 이 PC 에서 처리합니다.",
       "semanticNeedModels": "텍스트 검색 모델(e5)을 내려받으면 켤 수 있습니다. 이미지 유사 검색용 CLIP 모델은 따로 필요하지 않습니다."
@@ -1838,8 +1878,8 @@
         "clip-image": "이미지 임베딩",
         "clip-text": "텍스트 임베딩",
         "e5": "텍스트 검색",
-        "whisper-base": "음성 인식",
-        "whisper-small": "음성 인식"
+        "whisper-base": "자막",
+        "whisper-small": "자막"
       },
       "state": { "missing": "없음", "downloading": "내려받는 중", "ready": "준비됨", "failed": "실패" },
       "download": "다운로드",

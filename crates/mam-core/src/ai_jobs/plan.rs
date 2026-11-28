@@ -20,6 +20,14 @@ pub const EMBEDDING_BACKFILL_SQL: &str = "SELECT a.asset_id FROM media_assets a
      WHERE a.asset_id > ?1 AND a.status = 'active'
        AND NOT EXISTS (SELECT 1 FROM ai_task_state s WHERE s.asset_id = a.asset_id AND s.kind = 'embedding')
      ORDER BY a.asset_id LIMIT ?2";
+/// 자막 일괄 생성 대상: 자막(`stt`) 단계가 done·queued·running 이 아닌(= 행 없음·skipped·failed) 활성 동영상·음성,
+/// `?1` 초과 id 부터 `?2` 개. 유형은 `<> 'image'` (IN 은 임시 B-tree 를 만든다 - 위 주석).
+pub const MISSING_SUBTITLE_SQL: &str = "SELECT a.asset_id FROM media_assets a
+     WHERE a.asset_id > ?1 AND a.status = 'active' AND a.media_type <> 'image'
+       AND NOT EXISTS (SELECT 1 FROM ai_task_state s
+                       WHERE s.asset_id = a.asset_id AND s.kind = 'stt'
+                         AND s.state IN ('done', 'queued', 'running'))
+     ORDER BY a.asset_id LIMIT ?2";
 /// 전체 재분석용 활성 자산 keyset.
 pub const ACTIVE_SQL: &str = "SELECT asset_id FROM media_assets
      WHERE asset_id > ?1 AND status = 'active' ORDER BY asset_id LIMIT ?2";

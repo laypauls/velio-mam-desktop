@@ -99,7 +99,7 @@ describe("detail panel ai tab (P3)", () => {
     expect(await within(panel).findByText(sampleFor(image.assetId).description)).toBeInTheDocument()
   })
 
-  it("T-ui-ai-detail-03 [Happy] clicking an STT segment opens the preview player at that time, and seeks it while open", async () => {
+  it("T-ui-ai-detail-03 [Happy] clicking a subtitle segment opens the preview player at that time, and seeks it while open", async () => {
     // Arrange
     stubLayout()
     const api = createMockApi({ count: 500, ai: { consent: true, schedule: immediate } })
@@ -110,8 +110,8 @@ describe("detail panel ai tab (P3)", () => {
     const user = userEvent.setup()
     renderApp(api)
     const panel = await openAiDetail(user, video.assetId)
-    expect(await within(panel).findByText("음성 인식 · 한국어")).toBeInTheDocument()
-    const segments = within(panel).getByRole("list", { name: "음성 인식 구간" })
+    expect(await within(panel).findByText("자막 · 한국어")).toBeInTheDocument()
+    const segments = within(panel).getByRole("list", { name: "자막 구간" })
     const second = within(segments).getAllByRole("button")[1]
 
     // Act 1: 닫혀 있는 큰 보기 → 해당 시각으로 연다

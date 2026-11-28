@@ -395,6 +395,7 @@
       "delete": "削除",
       "move": "移動",
       "ai": "AI 分析",
+      "subtitle": "字幕を作成",
       "resumeClear": "続きから再生をリセット"
     }
   },
@@ -752,6 +753,8 @@
     "analyze": "AI 分析",
     "reanalyze": "AI 再分析",
     "analyzeMany": "AI 分析…",
+    "subtitle": "字幕を作成",
+    "subtitleMany": "字幕を作成 ({{count}} 件)",
     "sceneExtract": "シーン切替点を抽出",
     "resumeClear": "続きから再生をリセット"
   },
@@ -793,7 +796,7 @@
       "meta": "メタデータ",
       "thumb": "サムネイル",
       "hash": "重複チェック",
-      "ai": "AI 分析",
+      "ai": "AI 分析・字幕",
       "scene": "シーン検出",
       "plugin": "プラグイン"
     },
@@ -804,6 +807,7 @@
       "running": "実行中",
       "failed": "失敗",
       "action": "一時停止/再開",
+      "empty": "待機中の作業はありません。",
       "pauseKind": "{{name}} を一時停止",
       "resumeKind": "{{name}} を再開"
     },
@@ -962,7 +966,7 @@
       "protection": "パスワードと認証免除時間、元ファイルの移動・削除の使用可否を設定します。",
       "data": "自動バックアップと復元、管理データの場所と初期化を管理します。",
       "ai": "外部 AI 送信への同意、プロバイダー・認証、自動・一括分析と使用量を設定します。",
-      "ai-local": "この PC で処理する意味検索、音声認識、モデルと類似メディアの基準を設定します。",
+      "ai-local": "この PC で処理する意味検索、字幕、モデルと類似メディアの基準を設定します。",
       "licenses": "velio. が使用しているオープンソースコンポーネントの告知とライセンスを確認します。ライセンス原文は英語です。",
       "resume": "動画・音声の最後の再生位置を記憶し、続きから再生します。",
       "plugins": "プラグインのインストール、権限の確認、オン/オフの切り替え、削除を行います。"
@@ -1619,7 +1623,7 @@
       "sendMeta": "ファイル名・撮影日・種類・長さなどのメタデータと、ユーザーメタデータフィールドの値 (ファイルの絶対パスは除く)",
       "neverTitle": "送信しないもの",
       "neverOriginal": "元の画像・動画ファイル全体",
-      "neverAudio": "元の音声 (音声認識はこの PC でのみ処理します)",
+      "neverAudio": "元の音声 (字幕はこの PC でのみ作成します)",
       "revoke": "同意は 設定 > AI でいつでも撤回できます。撤回すると待機中の外部分析はキャンセルされ、受信済みの結果はそのまま残ります。",
       "decline": "同意しない",
       "agree": "同意して続行",
@@ -1641,7 +1645,7 @@
       "describe": "説明",
       "keywords": "キーワード",
       "ocr": "OCR",
-      "stt": "音声認識",
+      "subtitle": "字幕",
       "summary": "要約",
       "embedding": "埋め込み"
     },
@@ -1676,14 +1680,39 @@
       "error": "分析履歴を読み込めませんでした。",
       "empty": "分析履歴はありません。"
     },
-    "stt": {
-      "title": "音声認識 (STT)",
-      "titleLang": "音声認識 · {{lang}}",
-      "none": "音声認識の結果がありません。",
-      "segments": "音声認識の区間",
+    "subtitle": {
+      "title": "字幕",
+      "titleLang": "字幕 · {{lang}}",
+      "none": "字幕がありません。",
+      "segments": "字幕の区間",
       "seek": "{{time}} {{text}}",
       "showAll": "すべて表示 ({{count}} 区間)",
-      "more": "さらに表示"
+      "more": "さらに表示",
+      "generate": "字幕を作成",
+      "regenerate": "再作成",
+      "regenerateTitle": "字幕を再作成しますか?",
+      "regenerateConfirm": "再作成",
+      "regenerateWarning": "既存の字幕を上書きします。",
+      "busy": "字幕を作成中のため、再度リクエストできません。",
+      "queued": "字幕作成の待機 {{queued}} 件",
+      "nothingQueued": "字幕を作成する項目がありません。",
+      "queuedHint": "すでに字幕がある項目、待機中の項目、画像はスキップされます。",
+      "disabledToast": "字幕がオフです。設定 > ローカル AI・検索 でオンにしてください。",
+      "modelMissingToast": "字幕モデルがインストールされていません。設定 > ローカル AI・検索 でインストールしてください。",
+      "openSettings": "設定を開く",
+      "retry": "再試行",
+      "skip": {
+        "unsupported": "字幕ツールが見つからないため、字幕を作成できませんでした。",
+        "model_missing": "字幕モデルがインストールされていないため、字幕を作成できませんでした。設定 > ローカル AI・検索 でインストールしてください。",
+        "disabled": "字幕がオフのため、字幕を作成できませんでした。設定 > ローカル AI・検索 でオンにしてください。",
+        "asset_inactive": "ファイルを利用できない状態のため、字幕を作成できませんでした。",
+        "unknown": "字幕を作成できませんでした。"
+      },
+      "reason": {
+        "disabled": "字幕がオフです。設定 > ローカル AI・検索 でオンにしてください。",
+        "modelMissing": "字幕モデルがインストールされていません。設定 > ローカル AI・検索 でインストールしてください。",
+        "imagesOnly": "画像には字幕を作成できません。"
+      }
     },
     "empty": {
       "title": "まだ分析結果がありません",
@@ -1791,6 +1820,7 @@
       "section": "自動分析",
       "new": "新しいアセットを自動分析",
       "newHint": "新たに登録されたアセットを自動的に分析します。",
+      "newSubtitleHint": "字幕は ローカル AI・検索 の「新しいファイルの字幕を自動作成」に従います。",
       "needConsent": "外部 AI への送信に同意すると使用できます。",
       "background": "未分析アセットのバックグラウンド分析",
       "backgroundHint": "余裕があるときに未分析のアセットを少しずつ分析します。",
@@ -1826,9 +1856,19 @@
     },
     "local": {
       "section": "ローカル処理",
-      "stt": "ローカル音声認識 (STT)",
-      "sttHint": "音声はこの PC でのみ処理し、外部には送信しません。",
-      "sttModel": "音声認識モデル",
+      "subtitle": "字幕",
+      "subtitleHint": "この PC で音声を認識して字幕を作成し、外部には送信しません。",
+      "subtitleModel": "字幕モデル",
+      "subtitleAutoNew": "新しいファイルの字幕を自動作成",
+      "subtitleAutoNewHint": "新しく入った動画・音声の字幕を自動で作成します。外部 AI への同意とは無関係です。",
+      "subtitleBatch": "字幕を一括作成",
+      "subtitleBatchHint": "字幕のない既存の動画・音声すべてに字幕を作成します。進行状況はバックグラウンド作業で確認でき、一時停止もできます。",
+      "subtitleBatchButton": "字幕のない項目を作成",
+      "subtitleBatchConfirmTitle": "字幕を一括作成しますか?",
+      "subtitleBatchConfirmDescription": "字幕のない動画・音声すべてを待機キューに追加します。ファイル数によっては時間がかかります。",
+      "subtitleBatchStart": "作成開始",
+      "subtitleOffReason": "先に字幕をオンにしてください。",
+      "subtitleModelMissingReason": "ローカルモデルで字幕モデルをインストールしてください。",
       "semantic": "意味検索",
       "semanticHint": "文の意味で画像を探します。この PC で処理します。",
       "semanticNeedModels": "テキスト検索モデル (e5) をダウンロードするとオンにできます。画像の類似検索用の CLIP モデルは別途必要ありません。"
@@ -1839,8 +1879,8 @@
         "clip-image": "画像埋め込み",
         "clip-text": "テキスト埋め込み",
         "e5": "テキスト検索",
-        "whisper-base": "音声認識",
-        "whisper-small": "音声認識"
+        "whisper-base": "字幕",
+        "whisper-small": "字幕"
       },
       "state": { "missing": "なし", "downloading": "ダウンロード中", "ready": "準備完了", "failed": "失敗" },
       "download": "ダウンロード",

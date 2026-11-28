@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next"
+import { analysisKindKey } from "@/components/ai/labels"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
@@ -45,7 +46,7 @@ export function TransferSection({ ctl }: { ctl: AiCtl }) {
         {KINDS.map((k) => (
           <Label key={k} className="!items-center gap-2 font-normal">
             <Checkbox checked={externalKinds.includes(k)} onCheckedChange={(v) => toggleKind(k, v === true)} />
-            {t(`ai.kind.${k}`)}
+            {t(analysisKindKey(k))}
           </Label>
         ))}
       </fieldset>

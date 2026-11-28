@@ -24,6 +24,8 @@ mod store;
 // 프레임 스트립 셀 자르기 — 어댑터가 스트립 입력을 받을 때 쓴다 (업스트림 전환 예정)
 mod strip;
 mod stt;
+#[cfg(test)]
+mod subtitle_tests;
 mod sysinfo;
 #[cfg(test)]
 mod test_support;

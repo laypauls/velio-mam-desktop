@@ -14,7 +14,7 @@ export function AutomationSection({ ctl }: { ctl: AiCtl }) {
   const { startHour, endHour, enabled } = settings.schedule
   return (
     <section aria-label={t("ai.auto.section")} className="flex flex-col gap-3">
-      <SettingRow label={t("ai.auto.new")} description={consented ? t("ai.auto.newHint") : t("ai.auto.needConsent")}>
+      <SettingRow label={t("ai.auto.new")} description={`${consented ? t("ai.auto.newHint") : t("ai.auto.needConsent")} ${t("ai.auto.newSubtitleHint")}`}>
         <Switch aria-label={t("ai.auto.new")} checked={settings.autoAnalyzeNew} disabled={!consented} onCheckedChange={(autoAnalyzeNew) => patch({ autoAnalyzeNew })} />
       </SettingRow>
       <SettingRow label={t("ai.auto.background")} description={consented ? t("ai.auto.backgroundHint") : t("ai.auto.needConsent")}>

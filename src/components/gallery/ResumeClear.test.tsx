@@ -6,6 +6,7 @@ import type { ReactNode } from "react"
 import { toast } from "sonner"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import "@/i18n"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { ApiProvider } from "@/lib/api"
 import { createMockApi } from "@/lib/api/mock"
 import type { AssetSummary } from "@/lib/ipc-contract"
@@ -49,7 +50,9 @@ function setup(assets: AssetSummary[], withRecord: number[], ui: (lookup: (id: n
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={queryClient}>
-      <ApiProvider api={api}>{ui((id) => byId.get(id))}</ApiProvider>
+      <ApiProvider api={api}>
+        <TooltipProvider>{ui((id) => byId.get(id))}</TooltipProvider>
+      </ApiProvider>
     </QueryClientProvider>
   )
   return { count, clear, user: userEvent.setup() }

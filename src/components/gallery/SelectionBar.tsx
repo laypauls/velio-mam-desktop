@@ -1,7 +1,8 @@
-import { ArrowUpDown, ChevronDown, Copy, Sparkles, Download, FolderInput, FolderPlus, Heart, Star, Tag, Trash2, X } from "lucide-react"
+import { ArrowUpDown, ChevronDown, Copy, MessageSquareText, Sparkles, Download, FolderInput, FolderPlus, Heart, Star, Tag, Trash2, X } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import { CollectionCheckItems, DROPDOWN_MENU_PRIMITIVES } from "@/components/collections/CollectionCheckItems"
+import { ReasonTooltip } from "@/components/detail/ReasonTooltip"
 import { RATING_MENU_VALUES, RatingMenuLabel } from "@/components/rating/RatingMenuLabel"
 import { Button } from "@/components/ui/button"
 import {
@@ -14,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useCopyToClipboard } from "@/hooks/useReuse"
 import { useSettings } from "@/hooks/useSettings"
+import { useSubtitleActions } from "@/hooks/useSubtitleActions"
 import { useRemoveFromCollection, useSetFavorite, useSetRating, useToastError } from "@/hooks/useUserData"
 import { formatNumber } from "@/lib/format"
 import type { AssetSummary } from "@/lib/ipc-contract"
@@ -163,8 +165,10 @@ export function SelectionBar({ lookup }: { lookup?: (assetId: number) => AssetSu
   const askOriginals = useProtectStore((s) => s.askOriginals)
   const openBulkAnalyze = useAiStore((s) => s.openBulkAnalyze)
   const originalActions = useSettings().data?.originalActionsEnabled ?? false
+  const subtitle = useSubtitleActions()
   if (selected.size < 2) return null
   const ids = [...selected]
+  const subtitleReason = !includesPlayable(ids, lookup) ? t("ai.subtitle.reason.imagesOnly") : subtitle.reasonText
   return (
     <div role="toolbar" aria-label={t("selection.bar")} className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/40 px-4 py-2">
       <span className="text-sm font-medium break-keep">{t("selection.count", { count: formatNumber(selected.size) })}</span>
@@ -177,6 +181,12 @@ export function SelectionBar({ lookup }: { lookup?: (assetId: number) => AssetSu
         <Sparkles aria-hidden="true" />
         {t("selection.action.ai")}
       </Button>
+      <ReasonTooltip reason={subtitleReason}>
+        <Button size="sm" variant="outline" disabled={subtitleReason !== null} onClick={() => void subtitle.generate(ids)}>
+          <MessageSquareText aria-hidden="true" />
+          {t("selection.action.subtitle")}
+        </Button>
+      </ReasonTooltip>
       <FavoriteMenu ids={ids} />
       <RatingMenu ids={ids} />
       <CollectionMenu ids={ids} />

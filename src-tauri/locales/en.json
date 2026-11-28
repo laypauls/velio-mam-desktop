@@ -395,6 +395,7 @@
       "delete": "Delete",
       "move": "Move",
       "ai": "AI analysis",
+      "subtitle": "Generate subtitles",
       "resumeClear": "Reset resume position"
     }
   },
@@ -752,6 +753,8 @@
     "analyze": "AI analysis",
     "reanalyze": "Reanalyze with AI",
     "analyzeMany": "AI analysis…",
+    "subtitle": "Generate subtitles",
+    "subtitleMany": "Generate subtitles ({{count}})",
     "sceneExtract": "Extract scene cuts",
     "resumeClear": "Reset resume position"
   },
@@ -793,7 +796,7 @@
       "meta": "Metadata",
       "thumb": "Thumbnails",
       "hash": "Duplicate check",
-      "ai": "AI analysis",
+      "ai": "AI analysis & subtitles",
       "scene": "Scene detection",
       "plugin": "Plugin"
     },
@@ -804,6 +807,7 @@
       "running": "Running",
       "failed": "Failed",
       "action": "Pause/resume",
+      "empty": "No pending tasks.",
       "pauseKind": "Pause {{name}}",
       "resumeKind": "Resume {{name}}"
     },
@@ -962,7 +966,7 @@
       "protection": "Password, authentication grace period, and whether moving/deleting originals is allowed.",
       "data": "Automatic backup and restore, app data location, and reset.",
       "ai": "Consent to external AI, providers and authentication, automatic and batch analysis, and usage.",
-      "ai-local": "Semantic search, speech recognition, models, and similar-media criteria processed on this PC.",
+      "ai-local": "Semantic search, subtitles, models, and similar-media criteria processed on this PC.",
       "licenses": "Notices and licenses for the open-source components used by velio. License texts are in English.",
       "resume": "Remember the last playback position of videos and audio and resume from there.",
       "plugins": "Install plugins, review their permissions, and turn them on, off, or remove them."
@@ -1619,7 +1623,7 @@
       "sendMeta": "Metadata such as file name, date taken, type, and duration, plus custom metadata field values (absolute file paths excluded)",
       "neverTitle": "What is never sent",
       "neverOriginal": "Complete original image and video files",
-      "neverAudio": "Original audio (speech recognition is processed only on this PC)",
+      "neverAudio": "Original audio (subtitles are generated only on this PC)",
       "revoke": "You can withdraw consent at any time in Settings > AI. Withdrawing cancels pending external analyses; results already received are kept.",
       "decline": "Don't agree",
       "agree": "Agree and continue",
@@ -1641,7 +1645,7 @@
       "describe": "Description",
       "keywords": "Keywords",
       "ocr": "OCR",
-      "stt": "Speech recognition",
+      "subtitle": "Subtitles",
       "summary": "Summary",
       "embedding": "Embedding"
     },
@@ -1676,14 +1680,39 @@
       "error": "Couldn't load analysis history.",
       "empty": "No analysis history."
     },
-    "stt": {
-      "title": "Speech recognition (STT)",
-      "titleLang": "Speech recognition · {{lang}}",
-      "none": "No speech recognition results.",
-      "segments": "Speech recognition segments",
+    "subtitle": {
+      "title": "Subtitles",
+      "titleLang": "Subtitles · {{lang}}",
+      "none": "No subtitles.",
+      "segments": "Subtitle segments",
       "seek": "{{time}} {{text}}",
       "showAll": "Show all (segments: {{count}})",
-      "more": "Show more"
+      "more": "Show more",
+      "generate": "Generate subtitles",
+      "regenerate": "Regenerate",
+      "regenerateTitle": "Regenerate subtitles?",
+      "regenerateConfirm": "Regenerate",
+      "regenerateWarning": "Existing subtitles will be overwritten.",
+      "busy": "Subtitles are being generated, so you cannot request them again.",
+      "queued": "{{queued}} queued for subtitles",
+      "nothingQueued": "No items need subtitles.",
+      "queuedHint": "Items that already have subtitles or are queued, and images, are skipped.",
+      "disabledToast": "Subtitles are turned off. Turn them on in Settings > Local AI & search.",
+      "modelMissingToast": "The subtitle model is not installed. Install it in Settings > Local AI & search.",
+      "openSettings": "Open settings",
+      "retry": "Try again",
+      "skip": {
+        "unsupported": "The subtitle tool could not be found, so subtitles were not created.",
+        "model_missing": "The subtitle model is not installed, so subtitles were not created. Install it in Settings > Local AI & search.",
+        "disabled": "Subtitles are turned off, so they were not created. Turn them on in Settings > Local AI & search.",
+        "asset_inactive": "The file is unavailable, so subtitles were not created.",
+        "unknown": "Subtitles could not be created."
+      },
+      "reason": {
+        "disabled": "Subtitles are turned off. Turn them on in Settings > Local AI & search.",
+        "modelMissing": "The subtitle model is not installed. Install it in Settings > Local AI & search.",
+        "imagesOnly": "Subtitles cannot be generated for images."
+      }
     },
     "empty": {
       "title": "No analysis results yet",
@@ -1791,6 +1820,7 @@
       "section": "Automatic analysis",
       "new": "Auto-analyze new assets",
       "newHint": "Automatically analyzes newly added assets.",
+      "newSubtitleHint": "Subtitles follow \"Auto-generate subtitles for new files\" in Local AI & search.",
       "needConsent": "Available after you consent to sending data to external AI.",
       "background": "Background analysis of unanalyzed assets",
       "backgroundHint": "Slowly analyzes unanalyzed assets when the system is idle.",
@@ -1826,9 +1856,19 @@
     },
     "local": {
       "section": "Local processing",
-      "stt": "Local speech recognition (STT)",
-      "sttHint": "Audio is processed only on this PC and never sent externally.",
-      "sttModel": "Speech recognition model",
+      "subtitle": "Subtitles",
+      "subtitleHint": "Recognizes speech on this PC to create subtitles and never sends it externally.",
+      "subtitleModel": "Subtitle model",
+      "subtitleAutoNew": "Auto-generate subtitles for new files",
+      "subtitleAutoNewHint": "Automatically creates subtitles for new videos and audio. Independent of external AI consent.",
+      "subtitleBatch": "Generate subtitles in bulk",
+      "subtitleBatchHint": "Creates subtitles for all existing videos and audio without them. Track progress in background tasks, where you can also pause.",
+      "subtitleBatchButton": "Generate for items without subtitles",
+      "subtitleBatchConfirmTitle": "Generate subtitles in bulk?",
+      "subtitleBatchConfirmDescription": "All videos and audio without subtitles will be queued. This can take a long time depending on the number of files.",
+      "subtitleBatchStart": "Start",
+      "subtitleOffReason": "Turn subtitles on first.",
+      "subtitleModelMissingReason": "Install the subtitle model in the local models list.",
       "semantic": "Semantic search",
       "semanticHint": "Finds images by the meaning of a sentence. Processed on this PC.",
       "semanticNeedModels": "Can be turned on after downloading the text search model (e5). The CLIP models for image similarity search are not required."
@@ -1839,8 +1879,8 @@
         "clip-image": "Image embedding",
         "clip-text": "Text embedding",
         "e5": "Text search",
-        "whisper-base": "Speech recognition",
-        "whisper-small": "Speech recognition"
+        "whisper-base": "Subtitles",
+        "whisper-small": "Subtitles"
       },
       "state": { "missing": "Not installed", "downloading": "Downloading", "ready": "Ready", "failed": "Failed" },
       "download": "Download",

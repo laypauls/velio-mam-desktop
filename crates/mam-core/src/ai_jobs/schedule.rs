@@ -9,8 +9,8 @@ use rusqlite::Connection;
 use super::config::{AiRuntimeSettings, local_hour};
 use super::origin::Origin;
 use super::plan::{
-    ACTIVE_SQL, CHUNK, EMBEDDING_BACKFILL_SQL, QueueResult, UNANALYZED_SQL, ids_page, mark_skipped,
-    plan,
+    ACTIVE_SQL, CHUNK, EMBEDDING_BACKFILL_SQL, MISSING_SUBTITLE_SQL, QueueResult, UNANALYZED_SQL,
+    ids_page, mark_skipped, plan,
 };
 use super::types::StepKind;
 
@@ -106,19 +106,73 @@ impl AiScheduler {
         Ok(res)
     }
 
-    /// 신규 자산 자동 분석 (`autoAnalyzeNew` + 동의). 설정이 꺼져 있으면 아무것도 하지 않는다 (skipped 1).
+    /// 신규 자산 자동 등록. 종류는 두 옵션을 합친 것이다 - 자동 분석(`autoAnalyzeNew` + 동의) = 외부 종류(+ 의미 검색이
+    /// 켜져 있으면 임베딩, 자막 제외), 자동 자막(`auto_subtitle_new` 실효값 + 자막 스위치) = `[Stt]` (동의 불필요).
+    /// 등록할 종류가 없으면 아무것도 하지 않는다 (skipped 1).
     pub fn enqueue_new_asset(
         &self,
         asset_id: i64,
         st: &AiRuntimeSettings,
     ) -> Result<QueueResult, AiJobError> {
-        if !st.auto_analyze_new || !st.consent_given {
+        let mut kinds: Vec<StepKind> = Vec::new();
+        if st.auto_analyze_new && st.consent_given {
+            kinds.extend(
+                st.external_kinds
+                    .iter()
+                    .copied()
+                    .filter(|k| *k != StepKind::Stt),
+            );
+            if st.semantic_enabled {
+                kinds.push(StepKind::Embedding);
+            }
+        }
+        if st.auto_subtitle_new && st.stt_enabled {
+            kinds.push(StepKind::Stt);
+        }
+        if kinds.is_empty() {
             return Ok(QueueResult {
                 queued: 0,
                 skipped: 1,
             });
         }
-        self.queue_assets(vec![asset_id], None, false, st, false, Origin::AutoNew)
+        self.queue_assets(
+            vec![asset_id],
+            Some(kinds),
+            false,
+            st,
+            false,
+            Origin::AutoNew,
+        )
+    }
+
+    /// 자막이 없는 활성 동영상·음성 전체에 자막(`stt`)만 등록한다 (없음·skipped·failed 대상, done·queued·running 제외).
+    /// 자막 스위치가 꺼져 있으면 거부한다. 500건 keyset 단위, 출처 `manual`.
+    pub fn generate_subtitles_all(
+        &self,
+        st: &AiRuntimeSettings,
+    ) -> Result<QueueResult, AiJobError> {
+        if !st.stt_enabled {
+            return Err(AiJobError::SubtitleDisabled);
+        }
+        let mut total = QueueResult::default();
+        let mut after = 0;
+        loop {
+            let ids = self
+                .pool
+                .read(|c| Ok::<_, DbError>(ids_page(c, MISSING_SUBTITLE_SQL, after, CHUNK)))??;
+            let Some(last) = ids.last().copied() else {
+                return Ok(total);
+            };
+            after = last;
+            total.add(self.queue_assets(
+                ids,
+                Some(vec![StepKind::Stt]),
+                false,
+                st,
+                false,
+                Origin::Manual,
+            )?);
+        }
     }
 
     /// 미분석 자산 백그라운드 분석: `backgroundAnalyze` + 동의 + 예약 시간대 안일 때만, 대기 중 AI 작업을 포함해

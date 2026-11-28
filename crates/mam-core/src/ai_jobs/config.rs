@@ -57,6 +57,8 @@ pub struct AiRuntimeSettings {
     /// 임베딩·의미 검색
     pub semantic_enabled: bool,
     pub auto_analyze_new: bool,
+    /// 새 파일 자동 자막 생성의 **실효값** (`autoSubtitleNew` 명시값, 없으면 `autoAnalyzeNew && 동의`). 동의와 무관하다.
+    pub auto_subtitle_new: bool,
     pub background_analyze: bool,
     pub schedule: Schedule,
 }
@@ -72,6 +74,7 @@ impl Default for AiRuntimeSettings {
             stt_enabled: true,
             semantic_enabled: false,
             auto_analyze_new: false,
+            auto_subtitle_new: false,
             background_analyze: false,
             schedule: Schedule::default(),
         }

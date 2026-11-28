@@ -15,14 +15,17 @@ export function useAnalyzeActions() {
   const { t } = useTranslation()
   const { withConsent } = useConsentFlow()
 
-  const run = async (command: () => Promise<QueueResult>): Promise<QueueResult | null> => {
+  const run = async (command: () => Promise<QueueResult>, quiet = false): Promise<QueueResult | null> => {
     try {
       const res = await withConsent(command)
       if (!res.ran) return null
       const { queued, skipped } = res.value
       const counts = { queued: formatNumber(queued), skipped: formatNumber(skipped) }
-      if (queued > 0) toast.success(t("ai.queued", counts), skipped > 0 ? { description: t("ai.skippedHint") } : undefined)
-      else toast.info(t("ai.nothingQueued"), { description: t("ai.skippedHint") })
+      // quiet: 호출부가 자기 문구(예: 자막 생성)로 결과를 알린다
+      if (!quiet) {
+        if (queued > 0) toast.success(t("ai.queued", counts), skipped > 0 ? { description: t("ai.skippedHint") } : undefined)
+        else toast.info(t("ai.nothingQueued"), { description: t("ai.skippedHint") })
+      }
       void qc.invalidateQueries({ queryKey: qk.assetAiAll })
       return res.value
     } catch (e) {
@@ -32,8 +35,8 @@ export function useAnalyzeActions() {
   }
 
   return {
-    analyze: (assetIds: number[], kinds: AnalysisKind[] | null, force: boolean) =>
-      run(() => api.analyzeAssets(assetIds, kinds, force)),
+    analyze: (assetIds: number[], kinds: AnalysisKind[] | null, force: boolean, opts?: { quiet?: boolean }) =>
+      run(() => api.analyzeAssets(assetIds, kinds, force), opts?.quiet),
     analyzeAll: (onlyUnanalyzed: boolean) => run(() => api.analyzeAll(onlyUnanalyzed)),
     retryFailed: (assetIds: number[] | null) => run(() => api.retryFailedAnalysis(assetIds)),
   }

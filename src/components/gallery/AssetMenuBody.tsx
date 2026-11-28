@@ -18,6 +18,7 @@ import type { AssetSummary } from "@/lib/ipc-contract"
 import { CONTEXT_MENU_PRIMITIVES, CollectionCheckItems } from "@/components/collections/CollectionCheckItems"
 import { CollectionOrderItems, CollectionPlayItem } from "./CollectionContextItems"
 import { ContextMenuAiItem } from "./ContextMenuAiItem"
+import { ContextMenuSubtitleItem } from "./ContextMenuSubtitleItem"
 import { ContextMenuSceneItem } from "./ContextMenuSceneItem"
 import { ContextMenuResumeItem } from "./ResumeClearActions"
 import { PluginMenuSlot } from "./PluginMenuSlot"
@@ -122,6 +123,7 @@ export function AssetMenuBody({
       </ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuAiItem asset={asset} ids={ids} onReanalyze={onReanalyze} />
+      <ContextMenuSubtitleItem asset={asset} ids={ids} playable={target.hasPlayable ?? asset.mediaType !== "image"} />
       <ContextMenuSceneItem asset={asset} ids={ids} />
       <ContextMenuResumeItem ids={ids} playable={target.hasPlayable ?? asset.mediaType !== "image"} />
       <PluginMenuSlot asset={asset} ids={ids} />

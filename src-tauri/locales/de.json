@@ -395,6 +395,7 @@
       "delete": "Löschen",
       "move": "Verschieben",
       "ai": "KI-Analyse",
+      "subtitle": "Untertitel erstellen",
       "resumeClear": "Fortsetzen zurücksetzen"
     }
   },
@@ -752,6 +753,8 @@
     "analyze": "KI-Analyse",
     "reanalyze": "KI erneut analysieren",
     "analyzeMany": "KI-Analyse…",
+    "subtitle": "Untertitel erstellen",
+    "subtitleMany": "Untertitel erstellen ({{count}})",
     "sceneExtract": "Szenenwechsel erkennen",
     "resumeClear": "Fortsetzen zurücksetzen"
   },
@@ -793,7 +796,7 @@
       "meta": "Metadaten",
       "thumb": "Miniaturen",
       "hash": "Duplikatprüfung",
-      "ai": "KI-Analyse",
+      "ai": "KI-Analyse & Untertitel",
       "scene": "Szenenerkennung",
       "plugin": "Plugin"
     },
@@ -804,6 +807,7 @@
       "running": "Aktiv",
       "failed": "Fehler",
       "action": "Anhalten/Fortsetzen",
+      "empty": "Keine ausstehenden Aufgaben.",
       "pauseKind": "{{name}} anhalten",
       "resumeKind": "{{name}} fortsetzen"
     },
@@ -962,7 +966,7 @@
       "protection": "Kennwort, kennwortfreie Zeit und das Verschieben/Löschen von Originalen einstellen.",
       "data": "Automatisches Backup und Wiederherstellung, Speicherort und Zurücksetzen der App-Daten verwalten.",
       "ai": "Zustimmung zur Übertragung an externe KI, Anbieter und Anmeldung, automatische und Stapelanalyse sowie Nutzung einstellen.",
-      "ai-local": "Auf diesem PC verarbeitete semantische Suche, Spracherkennung, Modelle und Kriterien für ähnliche Medien einstellen.",
+      "ai-local": "Auf diesem PC verarbeitete semantische Suche, Untertitel, Modelle und Kriterien für ähnliche Medien einstellen.",
       "licenses": "Hinweise und Lizenzen der von velio. verwendeten Open-Source-Komponenten. Die Lizenztexte liegen im englischen Original vor.",
       "resume": "Merkt sich die letzte Wiedergabeposition von Videos und Audio und setzt dort fort.",
       "plugins": "Plugins installieren, ihre Berechtigungen prüfen sowie ein- und ausschalten oder entfernen."
@@ -1619,7 +1623,7 @@
       "sendMeta": "Metadaten wie Dateiname, Aufnahmedatum, Typ und Dauer sowie Werte benutzerdefinierter Metadatenfelder (ohne absoluten Dateipfad)",
       "neverTitle": "Was nicht gesendet wird",
       "neverOriginal": "Vollständige Original-Bild- und -Videodateien",
-      "neverAudio": "Original-Audio (die Spracherkennung erfolgt nur auf diesem PC)",
+      "neverAudio": "Original-Audio (Untertitel werden nur auf diesem PC erstellt)",
       "revoke": "Sie können Ihre Zustimmung jederzeit unter Einstellungen > KI widerrufen. Dann werden ausstehende externe Analysen abgebrochen; bereits erhaltene Ergebnisse bleiben erhalten.",
       "decline": "Ablehnen",
       "agree": "Zustimmen und fortfahren",
@@ -1641,7 +1645,7 @@
       "describe": "Beschreibung",
       "keywords": "Stichwörter",
       "ocr": "OCR",
-      "stt": "Spracherkennung",
+      "subtitle": "Untertitel",
       "summary": "Zusammenfassung",
       "embedding": "Embedding"
     },
@@ -1676,14 +1680,39 @@
       "error": "Der Analyseverlauf konnte nicht geladen werden.",
       "empty": "Kein Analyseverlauf."
     },
-    "stt": {
-      "title": "Spracherkennung (STT)",
-      "titleLang": "Spracherkennung · {{lang}}",
-      "none": "Kein Spracherkennungsergebnis.",
-      "segments": "Spracherkennungsabschnitte",
+    "subtitle": {
+      "title": "Untertitel",
+      "titleLang": "Untertitel · {{lang}}",
+      "none": "Keine Untertitel vorhanden.",
+      "segments": "Untertitelsegmente",
       "seek": "{{time}} {{text}}",
       "showAll": "Alle anzeigen (Abschnitte: {{count}})",
-      "more": "Mehr anzeigen"
+      "more": "Mehr anzeigen",
+      "generate": "Untertitel erstellen",
+      "regenerate": "Neu erstellen",
+      "regenerateTitle": "Untertitel neu erstellen?",
+      "regenerateConfirm": "Neu erstellen",
+      "regenerateWarning": "Vorhandene Untertitel werden überschrieben.",
+      "busy": "Die Untertitel werden gerade erstellt und können nicht erneut angefordert werden.",
+      "queued": "{{queued}} für Untertitel eingereiht",
+      "nothingQueued": "Keine Elemente benötigen Untertitel.",
+      "queuedHint": "Elemente mit vorhandenen oder eingereihten Untertiteln sowie Bilder werden übersprungen.",
+      "disabledToast": "Untertitel sind ausgeschaltet. Schalten Sie sie unter Einstellungen > Lokale KI & Suche ein.",
+      "modelMissingToast": "Das Untertitelmodell ist nicht installiert. Installieren Sie es unter Einstellungen > Lokale KI & Suche.",
+      "openSettings": "Einstellungen öffnen",
+      "retry": "Erneut versuchen",
+      "skip": {
+        "unsupported": "Das Untertitel-Tool wurde nicht gefunden, daher wurden keine Untertitel erstellt.",
+        "model_missing": "Das Untertitelmodell ist nicht installiert, daher wurden keine Untertitel erstellt. Installieren Sie es unter Einstellungen > Lokale KI & Suche.",
+        "disabled": "Untertitel sind ausgeschaltet, daher wurden keine erstellt. Schalten Sie sie unter Einstellungen > Lokale KI & Suche ein.",
+        "asset_inactive": "Die Datei ist nicht verfügbar, daher wurden keine Untertitel erstellt.",
+        "unknown": "Die Untertitel konnten nicht erstellt werden."
+      },
+      "reason": {
+        "disabled": "Untertitel sind ausgeschaltet. Schalten Sie sie unter Einstellungen > Lokale KI & Suche ein.",
+        "modelMissing": "Das Untertitelmodell ist nicht installiert. Installieren Sie es unter Einstellungen > Lokale KI & Suche.",
+        "imagesOnly": "Für Bilder können keine Untertitel erstellt werden."
+      }
     },
     "empty": {
       "title": "Noch keine Analyseergebnisse",
@@ -1791,6 +1820,7 @@
       "section": "Automatische Analyse",
       "new": "Neue Assets automatisch analysieren",
       "newHint": "Neu registrierte Assets werden automatisch analysiert.",
+      "newSubtitleHint": "Untertitel folgen der Option „Untertitel für neue Dateien automatisch erstellen“ unter Lokale KI & Suche.",
       "needConsent": "Verfügbar, sobald Sie der Übertragung an externe KI zustimmen.",
       "background": "Nicht analysierte Assets im Hintergrund analysieren",
       "backgroundHint": "Nicht analysierte Assets werden bei freien Kapazitäten nach und nach analysiert.",
@@ -1826,9 +1856,19 @@
     },
     "local": {
       "section": "Lokale Verarbeitung",
-      "stt": "Lokale Spracherkennung (STT)",
-      "sttHint": "Audio wird nur auf diesem PC verarbeitet und nicht nach außen gesendet.",
-      "sttModel": "Spracherkennungsmodell",
+      "subtitle": "Untertitel",
+      "subtitleHint": "Erkennt Sprache auf diesem PC, um Untertitel zu erstellen, und sendet sie nicht nach außen.",
+      "subtitleModel": "Untertitelmodell",
+      "subtitleAutoNew": "Untertitel für neue Dateien automatisch erstellen",
+      "subtitleAutoNewHint": "Erstellt automatisch Untertitel für neue Videos und Audiodateien. Unabhängig von der Zustimmung zu externer KI.",
+      "subtitleBatch": "Untertitel gesammelt erstellen",
+      "subtitleBatchHint": "Erstellt Untertitel für alle vorhandenen Videos und Audiodateien ohne Untertitel. Den Fortschritt sehen Sie bei den Hintergrundaufgaben, dort können Sie auch pausieren.",
+      "subtitleBatchButton": "Für Elemente ohne Untertitel erstellen",
+      "subtitleBatchConfirmTitle": "Untertitel gesammelt erstellen?",
+      "subtitleBatchConfirmDescription": "Alle Videos und Audiodateien ohne Untertitel werden eingereiht. Je nach Dateianzahl kann das lange dauern.",
+      "subtitleBatchStart": "Starten",
+      "subtitleOffReason": "Schalten Sie zuerst die Untertitel ein.",
+      "subtitleModelMissingReason": "Installieren Sie das Untertitelmodell in der Liste der lokalen Modelle.",
       "semantic": "Semantische Suche",
       "semanticHint": "Findet Bilder anhand der Bedeutung von Sätzen. Die Verarbeitung erfolgt auf diesem PC.",
       "semanticNeedModels": "Laden Sie das Textsuchmodell (e5) herunter, um diese Funktion zu aktivieren. Das CLIP-Modell für die Bildähnlichkeitssuche ist dafür nicht erforderlich."
@@ -1839,8 +1879,8 @@
         "clip-image": "Bild-Embedding",
         "clip-text": "Text-Embedding",
         "e5": "Textsuche",
-        "whisper-base": "Spracherkennung",
-        "whisper-small": "Spracherkennung"
+        "whisper-base": "Untertitel",
+        "whisper-small": "Untertitel"
       },
       "state": { "missing": "Fehlt", "downloading": "Wird geladen", "ready": "Bereit", "failed": "Fehler" },
       "download": "Herunterladen",

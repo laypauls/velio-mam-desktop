@@ -4,6 +4,7 @@ import {
   aiCliLoginStatus,
   aiCliLogout,
   analyzeAll,
+  generateSubtitlesAll,
   analyzeAssets,
   checkProvider,
   clearApiKey,
@@ -61,6 +62,7 @@ export function createTauriAi(call: Call, guard: Guard): AiApi {
 
     analyzeAssets: (assetIds, kinds, force) => guard(analyzeAssets(assetIds, kinds, force)),
     analyzeAll: (onlyUnanalyzed) => guard(analyzeAll(onlyUnanalyzed)),
+    generateSubtitlesAll: () => guard(generateSubtitlesAll()),
     retryFailedAnalysis: (assetIds) => guard(retryFailedAnalysis(assetIds)),
     getAssetAi: (assetId) => guard(getAssetAi(assetId)),
     updateAnalysis: (assetId, edit) => guard(updateAnalysis(assetId, edit)),

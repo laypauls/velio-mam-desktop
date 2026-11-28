@@ -970,6 +970,10 @@ export function analyzeAll(onlyUnanalyzed: boolean): Promise<QueueResult> {
   return invoke<QueueResult>("analyze_all", { onlyUnanalyzed })
 }
 
+export function generateSubtitlesAll(): Promise<QueueResult> {
+  return invoke<QueueResult>("generate_subtitles_all")
+}
+
 export function retryFailedAnalysis(assetIds: number[] | null): Promise<QueueResult> {
   return invoke<QueueResult>("retry_failed_analysis", { assetIds })
 }

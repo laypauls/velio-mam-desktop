@@ -682,6 +682,7 @@ pub fn run() {
             ai_commands::download_model,
             ai_commands::analyze_assets,
             ai_commands::analyze_all,
+            ai_commands::generate_subtitles_all,
             ai_commands::retry_failed_analysis,
             ai_commands::get_asset_ai,
             ai_commands::update_analysis,

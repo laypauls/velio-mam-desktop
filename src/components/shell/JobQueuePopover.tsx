@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { Loader2, Pause, Play } from "lucide-react"
+import { ListTodo, Loader2, Pause, Play } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -14,7 +14,7 @@ import type { JobKind, JobSummary } from "@/lib/ipc-contract"
 const QUEUE_KINDS = ["meta", "thumb", "hash", "ai", "scene", "plugin"] as const satisfies readonly JobKind[]
 type QueueKind = (typeof QUEUE_KINDS)[number]
 
-/** 하단 상태 표시줄의 백그라운드 대기열 요약 칩 + 상세 Popover. 대기·실행 중인 작업이 없으면 렌더하지 않는다. */
+/** 하단 상태 표시줄의 백그라운드 대기열 요약 칩 + 상세 Popover. 작업이 없어도 "백그라운드 작업" 버튼은 항상 보이고, 열면 빈 상태 문구를 보인다. */
 export function JobQueuePopover({ summary }: { summary: JobSummary }) {
   const { t } = useTranslation()
   const api = useApi()
@@ -28,12 +28,17 @@ export function JobQueuePopover({ summary }: { summary: JobSummary }) {
 
   const waiting = (kind: QueueKind) => summary.counts[kind].pending + summary.counts[kind].running
   const active = QUEUE_KINDS.filter((kind) => waiting(kind) > 0 || summary.pausedKinds.includes(kind))
-  if (active.length === 0) return null
 
   return (
     <Popover>
       <PopoverTrigger asChild>
         <Button size="xs" variant="ghost" className="gap-2">
+          {active.length === 0 && (
+            <span className="flex items-center gap-1">
+              <ListTodo aria-hidden="true" />
+              {t("status.detail.title")}
+            </span>
+          )}
           {active.map((kind) => (
             <span key={kind} className="flex items-center gap-1">
               {summary.counts[kind].running > 0 && <Loader2 aria-hidden="true" className="animate-spin" />}
@@ -84,6 +89,7 @@ export function JobQueuePopover({ summary }: { summary: JobSummary }) {
             })}
           </tbody>
         </table>
+        {active.length === 0 && <p className="text-sm break-keep text-muted-foreground">{t("status.detail.empty")}</p>}
       </PopoverContent>
     </Popover>
   )

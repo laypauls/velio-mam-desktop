@@ -30,8 +30,11 @@ pub use config::{
 pub use executor::{AiDeps, AiExecutor};
 pub use failure::{FailureClass, classify};
 pub use inflight::{InFlight, InFlightGuard};
-pub use origin::Origin;
-pub use plan::{ACTIVE_SQL, EMBEDDING_BACKFILL_SQL, FAILED_SQL, QueueResult, UNANALYZED_SQL};
+pub use origin::{KindScope, Origin, OriginScope};
+pub use plan::{
+    ACTIVE_SQL, EMBEDDING_BACKFILL_SQL, FAILED_SQL, MISSING_SUBTITLE_SQL, QueueResult,
+    UNANALYZED_SQL,
+};
 pub use schedule::AiScheduler;
 pub use state::list_status;
 pub use types::{
@@ -56,6 +59,9 @@ pub enum AiJobError {
     Core(#[from] CoreError),
     #[error(transparent)]
     Queue(#[from] crate::jobs::JobsError),
+    /// 자막 스위치(`localStt.enabled`)가 꺼져 있어 자막 일괄 생성을 거부한다
+    #[error("subtitle generation is disabled")]
+    SubtitleDisabled,
 }
 
 impl From<AiJobError> for JobError {

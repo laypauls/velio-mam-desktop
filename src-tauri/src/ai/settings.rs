@@ -8,7 +8,8 @@ use std::collections::BTreeMap;
 
 use mam_ai::external::{AuthMode, Provider, TransferScope};
 use mam_core::ai_jobs::{
-    AiRuntimeSettings, AiSettingsSource, Origin, Schedule, StepKind, Transfer,
+    AiRuntimeSettings, AiSettingsSource, KindScope, Origin, OriginScope, Schedule, StepKind,
+    Transfer,
 };
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -67,6 +68,8 @@ pub struct AiSettings {
     pub consent: Consent,
     pub language: String,
     pub auto_analyze_new: bool,
+    /// 새 파일 자동 자막 생성. `null` = 미설정 -> `autoAnalyzeNew` 와 동의를 따른다 ([`AiSettings::auto_subtitle_effective`])
+    pub auto_subtitle_new: Option<bool>,
     pub background_analyze: bool,
     pub schedule: ScheduleSetting,
     pub external_kinds: Vec<StepKind>,
@@ -83,6 +86,7 @@ impl Default for AiSettings {
             consent: Consent::default(),
             language: "ko".into(),
             auto_analyze_new: false,
+            auto_subtitle_new: None,
             background_analyze: false,
             schedule: ScheduleSetting {
                 enabled: false,
@@ -184,6 +188,7 @@ pub struct AiSettingsPatch {
     default_provider: Option<Option<Provider>>,
     language: Option<String>,
     auto_analyze_new: Option<bool>,
+    auto_subtitle_new: Option<bool>,
     background_analyze: Option<bool>,
     schedule: Option<SchedulePatch>,
     external_kinds: Option<Vec<StepKind>>,
@@ -236,6 +241,10 @@ pub fn apply_patch(
     }
     if let Some(v) = patch.background_analyze {
         next.background_analyze = v;
+    }
+    // 자막은 이 PC 에서만 만들므로 외부 전송 동의 없이도 켤 수 있다
+    if let Some(v) = patch.auto_subtitle_new {
+        next.auto_subtitle_new = Some(v);
     }
     if let Some(s) = patch.schedule {
         if let Some(v) = s.enabled {
@@ -303,6 +312,12 @@ pub fn apply_patch(
 // ─── 작업 코어용 스냅샷 ─────────────────────────────────────────────────────
 
 impl AiSettings {
+    /// 새 파일 자동 자막 생성 실효값: 명시값이 있으면 그 값, 없으면 `autoAnalyzeNew && 동의` (기존 동작 유지).
+    pub fn auto_subtitle_effective(&self) -> bool {
+        self.auto_subtitle_new
+            .unwrap_or(self.auto_analyze_new && self.consent.given)
+    }
+
     pub fn runtime(&self) -> AiRuntimeSettings {
         AiRuntimeSettings {
             consent_given: self.consent.given,
@@ -316,6 +331,7 @@ impl AiSettings {
             stt_enabled: self.local_stt.enabled,
             semantic_enabled: self.semantic_search.enabled,
             auto_analyze_new: self.auto_analyze_new,
+            auto_subtitle_new: self.auto_subtitle_effective(),
             background_analyze: self.background_analyze,
             schedule: Schedule {
                 enabled: self.schedule.enabled,
@@ -332,17 +348,28 @@ impl AiSettingsSource for super::store::AiStore {
     }
 }
 
-/// 설정 변경으로 새로 꺼진 자동 분석 출처 - 그 출처의 대기 단계를 정리해야 한다 (true -> false 전이만).
-pub fn origins_turned_off(before: &AiSettings, after: &AiSettings) -> Vec<Origin> {
+/// 설정 변경으로 새로 꺼진 자동 출처 - 그 (출처, 종류 범위)의 대기 단계를 정리해야 한다 (실효값 true -> false 전이만).
+/// 자동 분석(+동의)이 꺼지면 `auto_new` 의 자막 외 단계, 자동 자막(실효값)이 꺼지면 `auto_new` 의 자막 단계만 지운다.
+pub fn origins_turned_off(before: &AiSettings, after: &AiSettings) -> Vec<OriginScope> {
     let mut v = Vec::new();
-    if before.auto_analyze_new && !after.auto_analyze_new {
-        v.push(Origin::AutoNew);
+    let analyze = |s: &AiSettings| s.auto_analyze_new && s.consent.given;
+    if analyze(before) && !analyze(after) {
+        v.push(OriginScope {
+            origin: Origin::AutoNew,
+            kinds: KindScope::ExceptStt,
+        });
+    }
+    if before.auto_subtitle_effective() && !after.auto_subtitle_effective() {
+        v.push(OriginScope {
+            origin: Origin::AutoNew,
+            kinds: KindScope::OnlyStt,
+        });
     }
     if before.background_analyze && !after.background_analyze {
-        v.push(Origin::Background);
+        v.push(OriginScope::all(Origin::Background));
     }
     if before.semantic_search.enabled && !after.semantic_search.enabled {
-        v.push(Origin::Backfill);
+        v.push(OriginScope::all(Origin::Backfill));
     }
     v
 }
@@ -360,13 +387,28 @@ mod origin_tests {
             background_analyze: true,
             ..AiSettings::default()
         };
+        on.consent.given = true;
         on.semantic_search.enabled = true;
-        let off = AiSettings::default();
+        let off = AiSettings {
+            consent: on.consent,
+            ..AiSettings::default()
+        };
 
-        // Act / Assert
+        // Act / Assert: 자동 분석(자막 외)·자동 자막(자막만, 미설정이라 분석을 따름)이 각각 꺼진다
         assert_eq!(
             origins_turned_off(&on, &off),
-            vec![Origin::AutoNew, Origin::Background, Origin::Backfill]
+            vec![
+                OriginScope {
+                    origin: Origin::AutoNew,
+                    kinds: KindScope::ExceptStt
+                },
+                OriginScope {
+                    origin: Origin::AutoNew,
+                    kinds: KindScope::OnlyStt
+                },
+                OriginScope::all(Origin::Background),
+                OriginScope::all(Origin::Backfill),
+            ]
         );
         assert!(origins_turned_off(&off, &on).is_empty());
         assert!(origins_turned_off(&on, &on).is_empty());

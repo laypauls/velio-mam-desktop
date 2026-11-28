@@ -395,6 +395,7 @@
       "delete": "Eliminar",
       "move": "Mover",
       "ai": "Análisis IA",
+      "subtitle": "Generar subtítulos",
       "resumeClear": "Restablecer reanudación"
     }
   },
@@ -752,6 +753,8 @@
     "analyze": "Análisis de IA",
     "reanalyze": "Volver a analizar con IA",
     "analyzeMany": "Análisis de IA…",
+    "subtitle": "Generar subtítulos",
+    "subtitleMany": "Generar subtítulos ({{count}})",
     "sceneExtract": "Detectar cambios de escena",
     "resumeClear": "Restablecer reanudación"
   },
@@ -793,7 +796,7 @@
       "meta": "Metadatos",
       "thumb": "Miniaturas",
       "hash": "Duplicados",
-      "ai": "Análisis de IA",
+      "ai": "Análisis de IA y subtítulos",
       "scene": "Escenas",
       "plugin": "Plugin"
     },
@@ -804,6 +807,7 @@
       "running": "En curso",
       "failed": "Con error",
       "action": "Pausar/reanudar",
+      "empty": "No hay tareas pendientes.",
       "pauseKind": "Pausar {{name}}",
       "resumeKind": "Reanudar {{name}}"
     },
@@ -962,7 +966,7 @@
       "protection": "Contraseña, tiempo de exención de autenticación y uso de mover/eliminar originales.",
       "data": "Copias de seguridad automáticas, restauración, ubicación y restablecimiento de los datos de administración.",
       "ai": "Consentimiento de envío a IA externa, proveedores y autenticación, análisis automático y en bloque, y uso.",
-      "ai-local": "Búsqueda semántica, reconocimiento de voz, modelos y criterios de medios similares procesados en este equipo.",
+      "ai-local": "Búsqueda semántica, subtítulos, modelos y criterios de medios similares procesados en este equipo.",
       "licenses": "Avisos y licencias de los componentes de código abierto que usa velio. Los textos de las licencias están en inglés.",
       "resume": "Recuerda la última posición de reproducción de vídeos y audios y continúa desde ahí.",
       "plugins": "Instale plugins, revise sus permisos, y actívelos, desactívelos o elimínelos."
@@ -1619,7 +1623,7 @@
       "sendMeta": "Metadatos como nombre de archivo, fecha de captura, tipo y duración, y valores de los campos de metadatos del usuario (sin la ruta absoluta del archivo)",
       "neverTitle": "Qué no se envía",
       "neverOriginal": "Archivos originales completos de imagen y video",
-      "neverAudio": "Audio original (el reconocimiento de voz se procesa solo en este equipo)",
+      "neverAudio": "Audio original (los subtítulos se generan solo en este equipo)",
       "revoke": "Puede retirar el consentimiento en cualquier momento en Configuración > IA. Al retirarlo se cancelan los análisis externos pendientes y se conservan los resultados ya recibidos.",
       "decline": "No acepto",
       "agree": "Aceptar y continuar",
@@ -1641,7 +1645,7 @@
       "describe": "Descripción",
       "keywords": "Palabras clave",
       "ocr": "OCR",
-      "stt": "Reconocimiento de voz",
+      "subtitle": "Subtítulos",
       "summary": "Resumen",
       "embedding": "Embedding"
     },
@@ -1676,14 +1680,39 @@
       "error": "No se pudo cargar el historial de análisis.",
       "empty": "No hay historial de análisis."
     },
-    "stt": {
-      "title": "Reconocimiento de voz (STT)",
-      "titleLang": "Reconocimiento de voz · {{lang}}",
-      "none": "No hay resultados de reconocimiento de voz.",
-      "segments": "Segmentos de reconocimiento de voz",
+    "subtitle": {
+      "title": "Subtítulos",
+      "titleLang": "Subtítulos · {{lang}}",
+      "none": "No hay subtítulos.",
+      "segments": "Segmentos de subtítulos",
       "seek": "{{time}} {{text}}",
       "showAll": "Ver todo (segmentos: {{count}})",
-      "more": "Ver más"
+      "more": "Ver más",
+      "generate": "Generar subtítulos",
+      "regenerate": "Volver a generar",
+      "regenerateTitle": "¿Volver a generar los subtítulos?",
+      "regenerateConfirm": "Volver a generar",
+      "regenerateWarning": "Se sobrescribirán los subtítulos existentes.",
+      "busy": "Se están generando los subtítulos, por lo que no se pueden solicitar de nuevo.",
+      "queued": "{{queued}} en cola para subtítulos",
+      "nothingQueued": "Ningún elemento necesita subtítulos.",
+      "queuedHint": "Se omiten los elementos que ya tienen subtítulos o están en cola, y las imágenes.",
+      "disabledToast": "Los subtítulos están desactivados. Actívelos en Ajustes > IA local y búsqueda.",
+      "modelMissingToast": "El modelo de subtítulos no está instalado. Instálelo en Ajustes > IA local y búsqueda.",
+      "openSettings": "Abrir ajustes",
+      "retry": "Reintentar",
+      "skip": {
+        "unsupported": "No se encontró la herramienta de subtítulos, por lo que no se crearon.",
+        "model_missing": "El modelo de subtítulos no está instalado, por lo que no se crearon. Instálelo en Ajustes > IA local y búsqueda.",
+        "disabled": "Los subtítulos están desactivados, por lo que no se crearon. Actívelos en Ajustes > IA local y búsqueda.",
+        "asset_inactive": "El archivo no está disponible, por lo que no se crearon subtítulos.",
+        "unknown": "No se pudieron crear los subtítulos."
+      },
+      "reason": {
+        "disabled": "Los subtítulos están desactivados. Actívelos en Ajustes > IA local y búsqueda.",
+        "modelMissing": "El modelo de subtítulos no está instalado. Instálelo en Ajustes > IA local y búsqueda.",
+        "imagesOnly": "No se pueden generar subtítulos para imágenes."
+      }
     },
     "empty": {
       "title": "Aún no hay resultados de análisis",
@@ -1791,6 +1820,7 @@
       "section": "Análisis automático",
       "new": "Analizar automáticamente recursos nuevos",
       "newHint": "Analiza automáticamente los recursos recién registrados.",
+      "newSubtitleHint": "Los subtítulos siguen la opción \"Generar subtítulos automáticamente para archivos nuevos\" de IA local y búsqueda.",
       "needConsent": "Disponible tras aceptar el envío a IA externa.",
       "background": "Analizar en segundo plano recursos sin analizar",
       "backgroundHint": "Analiza poco a poco los recursos sin analizar cuando el equipo está poco ocupado.",
@@ -1826,9 +1856,19 @@
     },
     "local": {
       "section": "Procesamiento local",
-      "stt": "Reconocimiento de voz local (STT)",
-      "sttHint": "El audio se procesa solo en este equipo y no se envía al exterior.",
-      "sttModel": "Modelo de reconocimiento de voz",
+      "subtitle": "Subtítulos",
+      "subtitleHint": "Reconoce la voz en este equipo para crear subtítulos y no la envía al exterior.",
+      "subtitleModel": "Modelo de subtítulos",
+      "subtitleAutoNew": "Generar subtítulos automáticamente para archivos nuevos",
+      "subtitleAutoNewHint": "Crea automáticamente subtítulos para los vídeos y audios nuevos. No depende del consentimiento de IA externa.",
+      "subtitleBatch": "Generar subtítulos en bloque",
+      "subtitleBatchHint": "Crea subtítulos para todos los vídeos y audios existentes que no los tengan. El progreso se ve en las tareas en segundo plano, donde también puede pausar.",
+      "subtitleBatchButton": "Generar para elementos sin subtítulos",
+      "subtitleBatchConfirmTitle": "¿Generar subtítulos en bloque?",
+      "subtitleBatchConfirmDescription": "Se pondrán en cola todos los vídeos y audios sin subtítulos. Puede tardar mucho según el número de archivos.",
+      "subtitleBatchStart": "Iniciar",
+      "subtitleOffReason": "Active primero los subtítulos.",
+      "subtitleModelMissingReason": "Instale el modelo de subtítulos en la lista de modelos locales.",
       "semantic": "Búsqueda semántica",
       "semanticHint": "Busca imágenes por el significado de una frase. Se procesa en este equipo.",
       "semanticNeedModels": "Se puede activar tras descargar el modelo de búsqueda de texto (e5). No se necesita el modelo CLIP de búsqueda de imágenes similares."
@@ -1839,8 +1879,8 @@
         "clip-image": "Embedding de imagen",
         "clip-text": "Embedding de texto",
         "e5": "Búsqueda de texto",
-        "whisper-base": "Reconocimiento de voz",
-        "whisper-small": "Reconocimiento de voz"
+        "whisper-base": "Subtítulos",
+        "whisper-small": "Subtítulos"
       },
       "state": { "missing": "No instalado", "downloading": "Descargando", "ready": "Listo", "failed": "Con error" },
       "download": "Descargar",

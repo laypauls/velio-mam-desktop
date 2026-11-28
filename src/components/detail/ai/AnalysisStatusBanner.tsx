@@ -1,6 +1,6 @@
 import { AlertCircle, Loader2 } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { aiErrorText } from "@/components/ai/labels"
+import { aiErrorText, analysisKindKey } from "@/components/ai/labels"
 import { Button } from "@/components/ui/button"
 import { useAnalyzeActions } from "@/hooks/useAnalyze"
 import type { AnalysisStatus } from "@/lib/ipc-contract-ai"
@@ -15,7 +15,7 @@ export function AnalysisRunningBanner({ status }: { status: AnalysisStatus[] }) 
   const active = tracked.filter((s) => s.state === "queued" || s.state === "running")
   if (active.length === 0) return null
   const done = tracked.filter((s) => s.state === "done").length
-  const detail = active.map((s) => `${t(`ai.kind.${s.kind}`)} ${t(`ai.state.${s.state}`)}`).join(" · ")
+  const detail = active.map((s) => `${t(analysisKindKey(s.kind))} ${t(`ai.state.${s.state}`)}`).join(" · ")
   return (
     <div
       role="status"
@@ -45,7 +45,7 @@ export function AnalysisFailedBanner({
   const { retryFailed } = useAnalyzeActions()
   const failed = status.filter((s) => s.state === "failed")
   if (failed.length === 0) return null
-  const kinds = failed.map((s) => t(`ai.kind.${s.kind}`)).join(" · ")
+  const kinds = failed.map((s) => t(analysisKindKey(s.kind))).join(" · ")
   const reasons = [...new Set(failed.map((s) => aiErrorText(t, s.errorCode ?? "unknown")))]
   return (
     <div

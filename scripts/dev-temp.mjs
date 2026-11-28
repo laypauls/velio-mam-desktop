@@ -5,6 +5,7 @@ import { spawn, spawnSync } from "node:child_process"
 import { createConnection } from "node:net"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { ensureDevSidecars } from "./dev-sidecars.mjs"
 import { hasCdpFlag, mergeBrowserArgs, resolveCdpPort } from "./dev-temp-cdp.mjs"
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..")
@@ -49,6 +50,10 @@ if (hasCdpFlag(userArgs)) {
   env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = mergeBrowserArgs(userArgs, cdpPort)
   cdpLine = `CDP: http://127.0.0.1:${cdpPort}/json/version`
 }
+
+// 개발 실행에는 사이드카 오버레이가 없어 whisper-cli 를 target/debug 에 복사한다(없으면 경고만)
+const sidecarCopied = ensureDevSidecars({ root })
+if (sidecarCopied.length > 0) console.log(`dev sidecars: copied ${sidecarCopied.length} file(s) to target/debug`)
 
 console.log(`MAM_DATA_DIR=${dataDir}\nMAM_DEV_SEED_FOLDER=${library}\n${cdpLine}`)
 // Windows 에서 pnpm 은 .cmd 셸이라 shell 이 필요하다. 환경 변수는 인자가 아니라 env 로 넘긴다.

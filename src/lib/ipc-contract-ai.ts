@@ -5,7 +5,7 @@
  * 제약 (백엔드 합의):
  *  - API 키는 UI 에서 **쓰기 전용**이다 — 설정·삭제·보유 여부만. 키 값은 어떤 응답·이벤트에도 실리지 않는다
  *  - 의미 검색은 `SearchRequest.mode` 옵션이며, UI 가 입력 완료 후 디바운스해 호출한다
- *  - 외부 전송은 사용자 최초 동의(consent) 전에는 일어나지 않는다. 원본 음성은 외부로 보내지 않는다 (STT 는 로컬)
+ *  - 외부 전송은 사용자 최초 동의(consent) 전에는 일어나지 않는다. 원본 음성은 외부로 보내지 않는다 (자막 생성은 로컬)
  */
 
 import type { AssetSummary, Page, SearchPage } from "./ipc-contract"
@@ -84,6 +84,10 @@ export interface ProviderCheck {
   errorCode: string | null
 }
 
+/**
+ * 용어: 화면·프론트 코드에서는 STT 를 "자막(subtitle)"이라 부른다. 단 DB·설정 문서와 1:1 인 저장·교환 값은 호환을 위해 그대로 둔다 —
+ * 종류 값 `"stt"`, 설정 키 `localStt`, 응답 필드 `transcript`. 표시 문구는 `analysisKindKey` 가 `ai.kind.subtitle` 로 변환한다.
+ */
 export type AnalysisKind = "describe" | "keywords" | "ocr" | "stt" | "summary" | "embedding"
 
 export interface TransferScope {
@@ -105,6 +109,8 @@ export interface AiSettings {
   language: string
   /** 신규 등록 자산 자동 분석 */
   autoAnalyzeNew: boolean
+  /** 새 파일 자동 자막 생성 — null 은 사용자가 아직 정하지 않음(실효값은 `effectiveAutoSubtitle`). 로컬 처리라 외부 동의와 무관 */
+  autoSubtitleNew: boolean | null
   /** 미분석 자산 백그라운드 분석 */
   backgroundAnalyze: boolean
   /** 예약 실행 시간대 (로컬 시각, 시작 == 끝이면 하루 종일) */
@@ -112,17 +118,19 @@ export interface AiSettings {
   /** 외부 분석 종류 (stt 는 로컬 전용이라 제외) */
   externalKinds: Exclude<AnalysisKind, "stt" | "embedding">[]
   transfer: TransferScope
-  /** 로컬 STT (whisper) */
+  /** 로컬 자막 (whisper) — 설정 문서 키는 `localStt` 유지 */
   localStt: { enabled: boolean; model: "base" | "small" }
   /** 로컬 임베딩·의미 검색 */
   semanticSearch: { enabled: boolean }
 }
 
 export type AiSettingsPatch = Partial<
-  Omit<AiSettings, "consent" | "schedule" | "transfer" | "localStt" | "semanticSearch">
+  Omit<AiSettings, "consent" | "schedule" | "transfer" | "localStt" | "semanticSearch" | "autoSubtitleNew">
 > & {
   schedule?: Partial<AiSettings["schedule"]>
   transfer?: Partial<TransferScope>
+  /** null 로 되돌릴 수 없다. 외부 AI 동의가 필요 없다 */
+  autoSubtitleNew?: boolean
   localStt?: Partial<AiSettings["localStt"]>
   semanticSearch?: Partial<AiSettings["semanticSearch"]>
 }
@@ -181,17 +189,17 @@ export interface AiAnalysis {
   edited: boolean
 }
 
-export interface TranscriptSegment {
+export interface SubtitleSegment {
   startMs: number
   endMs: number
   text: string
 }
 
-export interface Transcript {
+export interface Subtitle {
   /** 원문 언어 (감지 결과 보존) */
   language: string
   text: string
-  segments: TranscriptSegment[]
+  segments: SubtitleSegment[]
   engine: string
   createdAt: number
 }
@@ -199,7 +207,7 @@ export interface Transcript {
 /** `get_asset_detail` 의 `AssetDetail` 에 추가되는 `ai` 필드 */
 export interface AssetAiDetail {
   analysis: AiAnalysis | null
-  transcript: Transcript | null
+  transcript: Subtitle | null
   status: AnalysisStatus[]
 }
 
@@ -274,6 +282,7 @@ export const AI_LIMITS = {
 export const AI_DEFAULTS: Omit<AiSettings, "consent" | "language"> = {
   defaultProvider: null,
   autoAnalyzeNew: false,
+  autoSubtitleNew: null,
   backgroundAnalyze: false,
   schedule: { enabled: false, startHour: 0, endHour: 0 },
   externalKinds: ["describe", "keywords", "ocr"],
@@ -318,6 +327,8 @@ export interface AiApi {
   analyzeAssets(assetIds: number[], kinds: AnalysisKind[] | null, force: boolean): Promise<QueueResult> // analyze_assets { assetIds, kinds, force }
   /** 전체 일괄 (onlyUnanalyzed=false 면 전체 재분석) */
   analyzeAll(onlyUnanalyzed: boolean): Promise<QueueResult> // analyze_all { onlyUnanalyzed }
+  /** 자막 없는 동영상·음성 전체에 자막 생성 등록 — 자막 스위치가 꺼져 있으면 invalid_input */
+  generateSubtitlesAll(): Promise<QueueResult> // generate_subtitles_all
   retryFailedAnalysis(assetIds: number[] | null): Promise<QueueResult> // retry_failed_analysis { assetIds }
   getAssetAi(assetId: number): Promise<AssetAiDetail> // get_asset_ai { assetId }
   updateAnalysis(assetId: number, edit: AnalysisEdit): Promise<AiAnalysis> // update_analysis { assetId, edit }
@@ -348,4 +359,9 @@ export interface AnalysisChange {
 
 export interface AnalysisEvent {
   changes: AnalysisChange[]
+}
+
+/** 새 파일 자동 자막 생성의 실효값 — 값이 있으면 그 값, 없으면(null) 기존 동작대로 "자동 분석 켜짐 + 외부 AI 동의" 를 따른다 */
+export function effectiveAutoSubtitle(s: Pick<AiSettings, "autoSubtitleNew" | "autoAnalyzeNew" | "consent">): boolean {
+  return s.autoSubtitleNew ?? (s.autoAnalyzeNew && s.consent.given)
 }

@@ -173,6 +173,12 @@ pub async fn analyze_all(svc: Svc<'_>, only_unanalyzed: bool) -> Result<QueueRes
     blocking(&svc, move |s| s.analyze_all(only_unanalyzed)).await
 }
 
+/// 자막이 없는 동영상·음성 전체에 자막 생성 등록 (`stt` = 자막). 자막 스위치가 꺼져 있으면 `invalid_input`.
+#[tauri::command]
+pub async fn generate_subtitles_all(svc: Svc<'_>) -> Result<QueueResult, CommandError> {
+    blocking(&svc, |s| s.generate_subtitles_all()).await
+}
+
 #[tauri::command]
 pub async fn retry_failed_analysis(
     svc: Svc<'_>,
