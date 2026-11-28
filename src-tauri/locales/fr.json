@@ -517,6 +517,11 @@
     "subtitle": {
       "button": "Sous-titres",
       "none": "Aucun sous-titre",
+      "fileGroup": "Fichier de sous-titres",
+      "generatedGroup": "Sous-titres générés",
+      "generatedLabel": "{{language}} (généré automatiquement)",
+      "noFile": "Aucun fichier de sous-titres",
+      "noGenerated": "Aucun sous-titre généré",
       "off": "Désactiver les sous-titres",
       "unknown": "Inconnu",
       "loadFailed": "Impossible de charger les sous-titres.",

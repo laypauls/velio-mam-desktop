@@ -376,6 +376,7 @@ mod tests {
                 "galleryCardDisplay",
                 "galleryPageSize",
                 "galleryPaging",
+                "generatedSubtitleVisible",
                 "hideShortcut",
                 "indexRail",
                 "language",

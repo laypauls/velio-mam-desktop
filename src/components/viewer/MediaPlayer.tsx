@@ -23,7 +23,9 @@ import { useResumeSave } from "./useResumeSave"
 import { useRangeController } from "./useRangeController"
 import { useRangePlayback } from "./useRangePlayback"
 import { useSceneController } from "./useSceneController"
-import { useSubtitles } from "./useSubtitles"
+import { HtmlGeneratedSubtitle } from "./GeneratedSubtitleOverlay"
+import { useGeneratedSubtitle } from "./useGeneratedSubtitle"
+import { useSubtitles, type SubtitleUi } from "./useSubtitles"
 import { useSystemVolume } from "./useSystemVolume"
 import { useToggleFullscreen } from "./useToggleFullscreen"
 import { VolumeIndicator, useVolumeIndicator, useVolumeWheel } from "./useVolumeWheel"
@@ -52,8 +54,11 @@ export function MediaPlayer({ asset, name }: { asset: AssetDetail; name: string 
   // 외부 자막 — 영상만 (음성은 조회하지 않는다)
   // 영상을 실제로 열 수 있다는 것(메타데이터 로드, 오류 없음)이 확인된 뒤에만 자막을 찾는다
   const opened = useMetadataLoaded(el, src)
-  const subtitles = useSubtitles(asset.assetId, isVideo && opened, isVideo && !opened)
-  useHtmlSubtitle(isVideo ? el : null, asset.assetId, subtitles.effectiveId)
+  const fileSubtitles = useSubtitles(asset.assetId, isVideo && opened, isVideo && !opened)
+  useHtmlSubtitle(isVideo ? el : null, asset.assetId, fileSubtitles.effectiveId)
+  // 생성된 자막(음성 인식 결과) — 영상만, 열기 성공 뒤에만. 자막 파일과 별개로 HTML 오버레이로 그린다
+  const generated = useGeneratedSubtitle(asset.assetId, isVideo && opened)
+  const subtitles: SubtitleUi = { ...fileSubtitles, generated }
   // 연속 재생의 현재 항목이거나 설정 "열 때 자동 재생" 이 켜져 있으면 열리면 자동 재생하고, 끝나면/오류가 나면 대기열에 알린다
   const autoplay = useOpenAutoplay(asset.assetId)
   const onEnd = () => usePlaybackStore.getState().reportEnded(asset.assetId)
@@ -180,6 +185,7 @@ export function MediaPlayer({ asset, name }: { asset: AssetDetail; name: string 
           <PlayFeedbackOverlay toggle={feedback.toggle} seek={feedback.seek} />
           <ResumeNotice restoredMs={htmlResume.restoredMs} onRestart={() => seekTo(resumeRestartTarget(rangeCtl.activeRanges) / 1000)} />
           <VolumeIndicator level={indicator.level} system={indicator.system} error={indicator.error} />
+          {isVideo && <HtmlGeneratedSubtitle el={el} ui={generated} fileShown={fileSubtitles.effectiveId !== null} />}
           {isVideo ? (
             <video ref={mediaRef} src={src} aria-label={name} preload="metadata" onEnded={onEnd} onError={onError} className="size-full object-contain" />
           ) : (

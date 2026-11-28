@@ -517,6 +517,11 @@
     "subtitle": {
       "button": "字幕",
       "none": "字幕なし",
+      "fileGroup": "字幕ファイル",
+      "generatedGroup": "生成された字幕",
+      "generatedLabel": "{{language}}(自動生成)",
+      "noFile": "字幕ファイルなし",
+      "noGenerated": "生成された字幕なし",
       "off": "字幕オフ",
       "unknown": "不明",
       "loadFailed": "字幕を読み込めませんでした。",

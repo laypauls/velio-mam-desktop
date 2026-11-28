@@ -302,6 +302,8 @@ export interface Settings {
   collectionPlayRangesOnly: boolean
   /** 동영상 자막 표시 (기본 true) — 플레이어 CC 켜기/끄기와 같은 값 */
   subtitleVisible: boolean
+  /** 생성된 자막(음성 인식 결과)을 플레이어에 표시 (기본 true) */
+  generatedSubtitleVisible: boolean
   /** 자막 기본 언어 (기본 "ko", null = 자막 끄고 시작) */
   subtitleDefaultLanguage: SubtitleLanguage | null
   /** 탐색 바에 장면전환점 표시 (기본 true) */

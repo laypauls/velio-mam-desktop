@@ -93,6 +93,7 @@ fn t_store_08b_serializes_to_the_frontend_contract_shape() {
             "playRangesOnly": false,
             "collectionPlayRangesOnly": false,
             "subtitleVisible": true,
+            "generatedSubtitleVisible": true,
             "subtitleDefaultLanguage": "ko",
             "sceneCutsVisible": true,
             "sceneDetectAuto": false,

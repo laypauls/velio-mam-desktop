@@ -215,6 +215,8 @@ export interface Settings {
   collectionPlayRangesOnly: boolean
   /** 기본 true */
   subtitleVisible: boolean
+  /** 기본 true */
+  generatedSubtitleVisible: boolean
   /** 기본 "ko", null = 자막 끄고 시작 */
   subtitleDefaultLanguage: SubtitleLanguage | null
   /** 기본 true */

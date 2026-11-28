@@ -1,10 +1,14 @@
 import type { TFunction } from "i18next"
 import { Captions } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { languageText } from "@/components/ai/labels"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
@@ -35,12 +39,16 @@ function trackLabels(tracks: readonly SubtitleTrack[], t: TFunction): string[] {
   })
 }
 
-/** 컨트롤 바의 자막 버튼(CC) + 켜기/끄기·언어 선택 라디오 메뉴. 트랙이 없거나 찾는 중이면 비활성 + "자막 없음" 툴팁. */
+/**
+ * 컨트롤 바의 자막 버튼(CC) + 두 그룹 메뉴 — "자막 파일"(끄기·트랙 라디오)과 "생성된 자막"(표시 체크).
+ * 자막 파일도 생성된 자막도 없거나 찾는 중이면 비활성 + "자막 없음" 툴팁. 버튼이 눌린 상태 = 둘 중 하나라도 표시 중.
+ */
 export function SubtitleMenu({ ui }: { ui: SubtitleUi }) {
   const { t } = useTranslation()
   const label = t("viewer.subtitle.button")
-  const pressed = ui.effectiveId !== null
-  if (ui.tracks.length === 0) {
+  const generated = ui.generated
+  const pressed = ui.effectiveId !== null || generated?.shown === true
+  if (ui.tracks.length === 0 && !generated?.available) {
     // 비활성 버튼은 포인터 이벤트를 받지 못해 툴팁이 뜨지 않는다 — span 으로 감싼다
     return (
       <TooltipProvider>
@@ -66,15 +74,34 @@ export function SubtitleMenu({ ui }: { ui: SubtitleUi }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-w-80 min-w-44">
-        <DropdownMenuRadioGroup value={ui.effectiveId ?? OFF} onValueChange={(v) => ui.select(v === OFF ? null : v)}>
-          <DropdownMenuRadioItem value={OFF}>{t("viewer.subtitle.off")}</DropdownMenuRadioItem>
-          <DropdownMenuSeparator />
-          {ui.tracks.map((track, i) => (
-            <DropdownMenuRadioItem key={track.id} value={track.id} title={track.fileName} className="break-keep wrap-anywhere">
-              {labels[i]}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
+        <DropdownMenuLabel className="text-xs text-muted-foreground">{t("viewer.subtitle.fileGroup")}</DropdownMenuLabel>
+        {ui.tracks.length === 0 ? (
+          <DropdownMenuItem disabled className="break-keep">
+            {t("viewer.subtitle.noFile")}
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuRadioGroup value={ui.effectiveId ?? OFF} onValueChange={(v) => ui.select(v === OFF ? null : v)}>
+            <DropdownMenuRadioItem value={OFF}>{t("viewer.subtitle.off")}</DropdownMenuRadioItem>
+            <DropdownMenuSeparator />
+            {ui.tracks.map((track, i) => (
+              <DropdownMenuRadioItem key={track.id} value={track.id} title={track.fileName} className="break-keep wrap-anywhere">
+                {labels[i]}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="text-xs text-muted-foreground">{t("viewer.subtitle.generatedGroup")}</DropdownMenuLabel>
+        {generated?.available ? (
+          // 체크 항목을 눌러도 메뉴를 닫지 않는다 — 두 자막을 이어서 조정할 수 있다
+          <DropdownMenuCheckboxItem checked={generated.visible} onCheckedChange={generated.toggle} onSelect={(e) => e.preventDefault()} className="break-keep">
+            {t("viewer.subtitle.generatedLabel", { language: languageText(t, generated.language ?? "") })}
+          </DropdownMenuCheckboxItem>
+        ) : (
+          <DropdownMenuItem disabled className="break-keep">
+            {t("viewer.subtitle.noGenerated")}
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )

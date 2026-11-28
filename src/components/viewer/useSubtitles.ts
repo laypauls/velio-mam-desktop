@@ -5,6 +5,7 @@ import { useSettings, useUpdateSettings } from "@/hooks/useSettings"
 import { useApi } from "@/lib/api"
 import type { SubtitleTrack } from "@/lib/ipc-contract"
 import { useSubtitleStore } from "@/stores"
+import type { GeneratedSubtitleUi } from "./useGeneratedSubtitle"
 import { pickTrack } from "./subtitlePick"
 
 /** 자막 메뉴와 재생 경로(`<video>`/libmpv)가 공유하는 자막 상태 */
@@ -18,6 +19,8 @@ export interface SubtitleUi {
   select: (id: string | null) => void
   /** 트랙 목록을 받는 중 */
   loading: boolean
+  /** 생성된 자막(음성 인식 결과) — 플레이어가 `useGeneratedSubtitle` 결과를 합쳐 넘긴다. 없으면 자막 파일 메뉴만 */
+  generated?: GeneratedSubtitleUi
 }
 
 const NO_TRACKS: SubtitleTrack[] = []

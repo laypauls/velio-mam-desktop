@@ -25,7 +25,9 @@ import { usePlaybackFailure } from "./usePlaybackFailure"
 import { useRangeController } from "./useRangeController"
 import { useRenderActive } from "./useRenderActive"
 import { useSceneController } from "./useSceneController"
-import { useSubtitles } from "./useSubtitles"
+import { MpvGeneratedSubtitle } from "./GeneratedSubtitleOverlay"
+import { useGeneratedSubtitle } from "./useGeneratedSubtitle"
+import { useSubtitles, type SubtitleUi } from "./useSubtitles"
 import { useSystemVolume } from "./useSystemVolume"
 import { useToggleFullscreen } from "./useToggleFullscreen"
 import { useVolumeIndicator, useVolumeWheel } from "./useVolumeWheel"
@@ -116,8 +118,11 @@ export function MpvPlayer({ asset, name }: { asset: AssetDetail; name: string })
   openRanges.current = rangeCtl.activeRanges
   useMpvRanges(asset.assetId, ready, rangeCtl.activeRanges, session.openedKey)
   // 외부 자막 — 플레이어는 열 때마다 자막을 끄고 시작하므로 열기 성공 뒤 고른 트랙을 보낸다 (워커가 프레임에 직접 그린다)
-  const subtitles = useSubtitles(asset.assetId, ready && !failed, !ready && !failed)
-  useMpvSubtitle(asset.assetId, ready, subtitles.effectiveId)
+  const fileSubtitles = useSubtitles(asset.assetId, ready && !failed, !ready && !failed)
+  useMpvSubtitle(asset.assetId, ready, fileSubtitles.effectiveId)
+  // 생성된 자막(음성 인식 결과) — 열기 성공 뒤에만. 워커가 프레임에 그리는 자막 파일과 달리 HTML 오버레이로 그린다
+  const generated = useGeneratedSubtitle(asset.assetId, ready && !failed)
+  const subtitles: SubtitleUi = { ...fileSubtitles, generated }
 
   // 음량 변경 — 연속으로 빠르게 들어오는 휠 입력이 렌더 전의 낡은 값 위에 쌓이지 않도록 마지막으로 정한 값을 ref 로 이어간다
   const indicator = useVolumeIndicator()
@@ -171,6 +176,7 @@ export function MpvPlayer({ asset, name }: { asset: AssetDetail; name: string })
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div ref={setStageEl} role="img" aria-label={name} aria-busy={!ready} onClick={controls.onTogglePlay} className="relative min-h-0 flex-1 overflow-hidden bg-viewer-stage">
           <canvas ref={setCanvasEl} aria-hidden="true" className="absolute inset-0 size-full object-contain" />
+          <MpvGeneratedSubtitle ui={generated} timeMs={state.currentTime * 1000} playing={!state.paused} rate={state.rate} fileShown={fileSubtitles.effectiveId !== null} />
           <PlayFeedbackOverlay toggle={feedback.toggle} seek={feedback.seek} />
         </div>
         <ResumeNotice restoredMs={session.startMs} onRestart={() => base.onSeek(resumeRestartTarget(rangeCtl.activeRanges) / 1000)} />

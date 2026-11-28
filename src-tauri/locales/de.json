@@ -517,6 +517,11 @@
     "subtitle": {
       "button": "Untertitel",
       "none": "Keine Untertitel",
+      "fileGroup": "Untertiteldatei",
+      "generatedGroup": "Erzeugte Untertitel",
+      "generatedLabel": "{{language}} (automatisch erzeugt)",
+      "noFile": "Keine Untertiteldatei",
+      "noGenerated": "Keine erzeugten Untertitel",
       "off": "Untertitel aus",
       "unknown": "Unbekannt",
       "loadFailed": "Untertitel konnten nicht geladen werden.",

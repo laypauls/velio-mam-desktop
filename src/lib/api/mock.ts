@@ -82,6 +82,7 @@ export function createMockApi(opts: MockOptions = {}): UiApi {
     playRangesOnly: false,
     collectionPlayRangesOnly: false,
     subtitleVisible: true,
+    generatedSubtitleVisible: true,
     subtitleDefaultLanguage: "ko",
     sceneCutsVisible: true,
     sceneDetectAuto: false,
@@ -229,7 +230,7 @@ export function createMockApi(opts: MockOptions = {}): UiApi {
       if (rest.sceneDetectSensitivity !== undefined && !SCENE_SENSITIVITIES.includes(rest.sceneDetectSensitivity)) {
         throw cmdError("invalid_input", "sceneDetectSensitivity must be low|medium|high")
       }
-      for (const k of ["mediaOpenAutoplay", "playRangesOnly", "collectionPlayRangesOnly", "subtitleVisible", "sceneCutsVisible", "sceneDetectAuto", "resumeEnabled"] as const) {
+      for (const k of ["mediaOpenAutoplay", "playRangesOnly", "collectionPlayRangesOnly", "subtitleVisible", "generatedSubtitleVisible", "sceneCutsVisible", "sceneDetectAuto", "resumeEnabled"] as const) {
         if (rest[k] !== undefined && typeof rest[k] !== "boolean") throw cmdError("invalid_input", k + " must be a boolean")
       }
       if (rest.resumeMinDurationSec !== undefined && !(RESUME_MIN_DURATION_CHOICES as readonly number[]).includes(rest.resumeMinDurationSec)) {

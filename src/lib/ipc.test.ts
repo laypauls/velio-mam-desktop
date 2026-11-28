@@ -248,6 +248,7 @@ describe("ipc storage commands (P2-1)", () => {
     playRangesOnly: false,
     collectionPlayRangesOnly: false,
     subtitleVisible: true,
+    generatedSubtitleVisible: true,
     subtitleDefaultLanguage: "ko",
     sceneCutsVisible: true,
     sceneDetectAuto: false,

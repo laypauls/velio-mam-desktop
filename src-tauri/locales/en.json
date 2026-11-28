@@ -517,6 +517,11 @@
     "subtitle": {
       "button": "Subtitles",
       "none": "No subtitles",
+      "fileGroup": "Subtitle file",
+      "generatedGroup": "Generated subtitles",
+      "generatedLabel": "{{language}} (auto-generated)",
+      "noFile": "No subtitle file",
+      "noGenerated": "No generated subtitles",
       "off": "Subtitles off",
       "unknown": "Unknown",
       "loadFailed": "Couldn't load subtitles.",

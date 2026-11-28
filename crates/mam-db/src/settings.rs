@@ -96,6 +96,8 @@ pub struct Settings {
     pub collection_play_ranges_only: bool,
     /// 동영상 외부 자막 표시 (꺼짐 = 자막 끔)
     pub subtitle_visible: bool,
+    /// 플레이어에 AI 생성 자막(로컬 음성 인식 결과) 오버레이 표시
+    pub generated_subtitle_visible: bool,
     /// 자막 기본 언어 `ko|en|ja|zh` (`None` = 기본 언어 없음)
     pub subtitle_default_language: Option<String>,
     /// 탐색 바에 장면전환점 표시
@@ -360,6 +362,12 @@ const DEFS: &[Def] = &[
         valid: Value::is_boolean,
     },
     Def {
+        key: "generated_subtitle_visible",
+        field: "generatedSubtitleVisible",
+        default: || json!(true),
+        valid: Value::is_boolean,
+    },
+    Def {
         key: "subtitle_default_language",
         field: "subtitleDefaultLanguage",
         default: || json!("ko"),
@@ -514,6 +522,10 @@ impl Settings {
             collection_play_ranges_only: flag("collectionPlayRangesOnly"),
             subtitle_visible: values
                 .get("subtitleVisible")
+                .and_then(Value::as_bool)
+                .unwrap_or(true),
+            generated_subtitle_visible: values
+                .get("generatedSubtitleVisible")
                 .and_then(Value::as_bool)
                 .unwrap_or(true),
             subtitle_default_language: values
