@@ -43,12 +43,15 @@ export function NavItem({ icon: Icon, label, count, active, playing = false, onC
 
 export function Group({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <section aria-label={title} className="flex flex-col gap-1">
-      <div className="flex items-center justify-between px-2">
-        <h2 className="text-xs font-medium text-muted-foreground">{title}</h2>
+    <section aria-label={title} className="flex min-h-0 flex-1 flex-col">
+      <div className="flex h-10 shrink-0 items-center gap-1 border-b border-border pr-2 pl-4">
+        <h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{title}</h2>
         {action}
       </div>
-      {children}
+      {/* relative: 스크롤 컨테이너 안의 숨김·absolute 자손이 바깥 조상 기준으로 배치돼 문서 스크롤이 생기는 것을 막는다 */}
+      <div data-slot="sidebar-panel-body" className="relative flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2">
+        {children}
+      </div>
     </section>
   )
 }

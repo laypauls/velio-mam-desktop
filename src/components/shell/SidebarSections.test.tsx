@@ -1,4 +1,4 @@
-// Categories: Happy (T-ui-sbar-01, 04, 06) / Boundary (T-ui-sbar-02 collections tab name, 07 tag cap, 08 empty/no-match) / Business rule (T-ui-sbar-03 one section at a time, 04 playing marker, 09 tag selection rules) / Regression (T-ui-sbar-05)
+// Categories: Happy (T-ui-sbar-01, 04, 06) / Boundary (T-ui-sbar-02 collections tab name, 07 tag cap, 08 empty/no-match) / Business rule (T-ui-sbar-03 one section at a time, 04 playing marker, 09 tag selection rules) / Regression (T-ui-sbar-05, 11 fixed header outside scroll body)
 import { act, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -95,6 +95,35 @@ describe("sidebar section panels", () => {
     // Assert
     expect(within(nav()).queryByRole("region", { name: "저장한 검색" })).not.toBeInTheDocument()
     expect(within(nav()).queryByText("저장한 검색이 없습니다.")).not.toBeInTheDocument()
+  })
+
+  it("T-ui-sbar-11 [Regression] every section keeps its title heading and action outside the scrolling body, with the list items inside it", async () => {
+    // Arrange
+    stubLayout()
+    renderApp(createMockApi({ count: 50 }))
+    await screen.findByRole("navigation", { name: "라이브러리 탐색" })
+    const sections: { id: Parameters<typeof openSidebarSection>[0]; title: string; action?: string }[] = [
+      { id: "library", title: "라이브러리" },
+      { id: "rating", title: "별점" },
+      { id: "folders", title: "관리 폴더", action: "관리 폴더 추가" },
+      { id: "tags", title: "태그", action: "태그 관리" },
+      { id: "collections", title: "컬렉션", action: "컬렉션 추가" },
+    ]
+    for (const { id, title, action } of sections) {
+      // Act
+      openSidebarSection(id)
+      const region = await within(nav()).findByRole("region", { name: title })
+      const body = region.querySelector<HTMLElement>('[data-slot="sidebar-panel-body"]')
+      // Assert
+      expect(body, title).not.toBeNull()
+      const heading = within(region).getByRole("heading", { name: title })
+      expect(body!.contains(heading), `${title} heading`).toBe(false)
+      if (action) {
+        const button = within(region).getByRole("button", { name: action })
+        expect(body!.contains(button), `${title} action`).toBe(false)
+      }
+      await waitFor(() => expect(within(body!).getAllByRole("button").length, `${title} items`).toBeGreaterThan(0))
+    }
   })
 })
 

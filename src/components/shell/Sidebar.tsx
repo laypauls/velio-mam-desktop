@@ -17,8 +17,8 @@ export function Sidebar() {
   const tab = useViewStore((s) => s.sidebarTab)
   const section = effectiveSection(tab, useSettings().data?.sidebarRatingMenu)
   return (
-    // relative: 스크롤 컨테이너 안의 숨김·absolute 자손이 바깥 조상 기준으로 배치돼 문서 스크롤이 생기는 것을 막는다
-    <nav id={SIDEBAR_PANEL_ID} aria-label={t("sidebar.label")} className="relative flex w-60 shrink-0 flex-col gap-3 overflow-y-auto border-r border-border p-2">
+    // 스크롤은 각 섹션(Group)의 본문이 담당 — 제목 헤더는 고정
+    <nav id={SIDEBAR_PANEL_ID} aria-label={t("sidebar.label")} className="flex w-60 shrink-0 flex-col border-r border-border">
       {section === "library" && <SidebarLibrary />}
       {section === "rating" && <SidebarRating />}
       {section === "folders" && <SidebarFolders />}
