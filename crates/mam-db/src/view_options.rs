@@ -106,8 +106,8 @@ impl GalleryPaging {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum IndexRailMode {
-    #[default]
     Auto,
+    #[default]
     Always,
     Off,
 }

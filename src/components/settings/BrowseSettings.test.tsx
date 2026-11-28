@@ -41,7 +41,7 @@ describe("settings > view & behavior > 목록 탐색", () => {
     // Assert
     expect(within(within(group).getByRole("radiogroup", { name: "탐색 방식" })).getByRole("radio", { name: "무한 스크롤" })).toBeChecked()
     expect(within(group).getByRole("combobox", { name: "페이지당 개수" })).toBeDisabled()
-    expect(within(within(group).getByRole("radiogroup", { name: "목차 레일" })).getByRole("radio", { name: "자동" })).toBeChecked()
+    expect(within(within(group).getByRole("radiogroup", { name: "목차 레일" })).getByRole("radio", { name: "항상 표시" })).toBeChecked()
     const order = within(dialog).getAllByRole("group").map((g) => g.getAttribute("aria-label"))
     expect(order.indexOf("목록 탐색")).toBeGreaterThan(-1)
     expect(order.indexOf("목록 탐색")).toBeLessThan(order.indexOf("정렬 항목"))
@@ -72,7 +72,7 @@ describe("settings > view & behavior > 목록 탐색", () => {
     await waitFor(() => expect(within(group).getByRole("combobox", { name: "페이지당 개수" })).toBeDisabled())
   })
 
-  it("T-ui-set-03 [Happy] index rail cards send 항상 표시 then 끄기", async () => {
+  it("T-ui-set-03 [Happy] index rail cards send 자동 then 끄기 (default is 항상 표시)", async () => {
     // Arrange
     stubLayout()
     const api = createMockApi({ count: 50 })
@@ -81,8 +81,8 @@ describe("settings > view & behavior > 목록 탐색", () => {
     renderApp(api)
     const { group } = await openBrowse(user)
     // Act + Assert
-    await pick(user, group, "목차 레일", "항상 표시")
-    await waitFor(() => expect(update).toHaveBeenLastCalledWith({ indexRail: "always" }))
+    await pick(user, group, "목차 레일", "자동")
+    await waitFor(() => expect(update).toHaveBeenLastCalledWith({ indexRail: "auto" }))
     await pick(user, group, "목차 레일", "끄기")
     await waitFor(() => expect(update).toHaveBeenLastCalledWith({ indexRail: "off" }))
     expect((await api.getSettings()).indexRail).toBe("off")

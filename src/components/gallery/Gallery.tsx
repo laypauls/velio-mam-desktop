@@ -263,7 +263,7 @@ export function Gallery({ renderRail }: { renderRail?: (controller: GalleryScrol
     <GalleryBody
       paging={settings.data?.galleryPaging ?? "infinite"}
       pageSize={settings.data?.galleryPageSize ?? 100}
-      indexRail={settings.data?.indexRail ?? "auto"}
+      indexRail={settings.data?.indexRail ?? "always"}
       titleEditEnabled={settings.data?.titleEditEnabled ?? false}
       capturedAtFallback={settings.data?.capturedAtFallback ?? DEFAULT_CAPTURED_AT_FALLBACK}
       renderRail={renderRail}

@@ -29,7 +29,7 @@ describe("settings visuals > preview cards (탐색·표시)", () => {
     expect(within(paging).getAllByRole("radio").map((r) => r.getAttribute("aria-label"))).toEqual(["무한 스크롤", "페이지"])
     expect(within(rail).getAllByRole("radio").map((r) => r.getAttribute("aria-label"))).toEqual(["자동", "항상 표시", "끄기"])
     expect(within(paging).getByRole("radio", { name: "무한 스크롤" })).toHaveAttribute("aria-checked", "true")
-    expect(within(rail).getByRole("radio", { name: "자동" })).toHaveAttribute("aria-checked", "true")
+    expect(within(rail).getByRole("radio", { name: "항상 표시" })).toHaveAttribute("aria-checked", "true")
     for (const card of [...paging.querySelectorAll("label"), ...rail.querySelectorAll("label")]) {
       expect(card.firstElementChild).toHaveAttribute("aria-hidden", "true")
     }
@@ -38,7 +38,7 @@ describe("settings visuals > preview cards (탐색·표시)", () => {
     // Assert
     await waitFor(() => expect(update).toHaveBeenLastCalledWith({ indexRail: "off" }))
     await waitFor(() => expect(within(rail).getByRole("radio", { name: "끄기" })).toHaveAttribute("aria-checked", "true"))
-    expect(within(rail).getByRole("radio", { name: "자동" })).toHaveAttribute("aria-checked", "false")
+    expect(within(rail).getByRole("radio", { name: "항상 표시" })).toHaveAttribute("aria-checked", "false")
   })
 
   it("T-ui-visual-02 [Happy] clicking the card text (not just the radio dot) selects it", async () => {

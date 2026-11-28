@@ -247,7 +247,7 @@ describe("mock api gallery paging settings", () => {
     const before = await api.getSettings()
     const after = await api.updateSettings({ galleryPaging: "paged", galleryPageSize: 200, indexRail: "off" })
     // Assert
-    expect([before.galleryPaging, before.galleryPageSize, before.indexRail]).toEqual(["infinite", 100, "auto"])
+    expect([before.galleryPaging, before.galleryPageSize, before.indexRail]).toEqual(["infinite", 100, "always"])
     expect([after.galleryPaging, after.galleryPageSize, after.indexRail]).toEqual(["paged", 200, "off"])
   })
 
@@ -261,7 +261,7 @@ describe("mock api gallery paging settings", () => {
       expect(e.code).toBe("invalid_input")
     }
     const s = await api.getSettings()
-    expect([s.galleryPaging, s.galleryPageSize, s.indexRail]).toEqual(["infinite", 100, "auto"])
+    expect([s.galleryPaging, s.galleryPageSize, s.indexRail]).toEqual(["infinite", 100, "always"])
   })
 })
 

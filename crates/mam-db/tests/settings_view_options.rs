@@ -254,11 +254,11 @@ fn t_gpage_01_defaults_and_contract_names() {
 
     assert_eq!(s.gallery_paging, GalleryPaging::Infinite);
     assert_eq!(s.gallery_page_size, 100);
-    assert_eq!(s.index_rail, IndexRailMode::Auto);
+    assert_eq!(s.index_rail, IndexRailMode::Always);
     let v = serde_json::to_value(&s).unwrap();
     assert_eq!(v["galleryPaging"], json!("infinite"));
     assert_eq!(v["galleryPageSize"], json!(100));
-    assert_eq!(v["indexRail"], json!("auto"));
+    assert_eq!(v["indexRail"], json!("always"));
     assert!(warnings.is_empty());
     assert_eq!(Settings::default(), s);
 }
@@ -331,7 +331,7 @@ fn t_gpage_04_corrupt_stored_values_fall_back_with_a_warning() {
 
     assert_eq!(s.gallery_paging, GalleryPaging::Infinite);
     assert_eq!(s.gallery_page_size, 100);
-    assert_eq!(s.index_rail, IndexRailMode::Auto);
+    assert_eq!(s.index_rail, IndexRailMode::Always);
     assert_eq!(warnings.len(), 3, "{warnings:?}");
     assert!(warnings.iter().all(|w| !w.contains("endless")));
 }
@@ -833,4 +833,19 @@ fn t_set_ss_02_corrupt_stored_value_falls_back_to_5_with_a_warning() {
             .any(|w| w.contains("slideshow_image_seconds")),
         "{warnings:?}"
     );
+}
+
+#[test]
+fn t_irail_01_stored_auto_still_reads_as_auto_while_the_default_is_always() {
+    // Arrange: 기본값 변경 전에 사용자가 직접 "자동"을 저장한 DB
+    let db = migrated_db();
+    put_raw(&db.conn, "index_rail", "\"auto\"");
+
+    // Act
+    let (s, warnings) = settings::load(&db.conn).unwrap();
+
+    // Assert
+    assert_eq!(s.index_rail, IndexRailMode::Auto);
+    assert!(warnings.is_empty(), "{warnings:?}");
+    assert_eq!(IndexRailMode::default(), IndexRailMode::Always);
 }

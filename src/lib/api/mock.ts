@@ -74,7 +74,7 @@ export function createMockApi(opts: MockOptions = {}): UiApi {
     similarMinSimilarity: 0.75,
     galleryPaging: "infinite",
     galleryPageSize: 100,
-    indexRail: "auto",
+    indexRail: "always",
     theme: { mode: "system", systemDark: "dim" },
     language: "ko", // 테스트 환경 표시 언어(src/test/setup.ts)와 맞춘다 — 앱 기본값은 en (Rust DEFAULT_LANGUAGE)
     mediaOpenAutoplay: false,
